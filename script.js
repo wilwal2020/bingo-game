@@ -1207,7 +1207,10 @@ class BingoApp {
                     return;
                 }
                 // Re-apply everything without a full reload
-                this.loadState();
+                this.loadFromStorage();
+                this.applySettings();
+                this.applyThemeColors();
+                this.updateThemeButtonColors();
                 this.closeSettingsModal();
                 setTimeout(() => this.openSettingsModal(), 80);
             } catch {
