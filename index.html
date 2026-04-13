@@ -566,9 +566,16 @@
                     <button class="settings-nav-item" data-panel="sg-gameplay" data-label="Spillinnstillinger">Spillinnstillinger</button>
                     <button class="settings-nav-item" data-panel="sg-sound" data-label="Lydeffekter">Lydeffekter</button>
                     <div class="settings-nav-spacer"></div>
-                    <button class="settings-nav-export-btn" id="settings-export-btn">⬆ Eksporter</button>
-                    <button class="settings-nav-export-btn settings-nav-import-btn" id="settings-import-btn">⬇ Importer</button>
-                    <input type="file" id="settings-import-file" accept=".json" style="display:none">
+                    <div class="settings-io-menu">
+                        <button class="settings-io-toggle" id="settings-io-toggle" title="Eksporter / Importer">⋮</button>
+                        <div class="settings-io-dropdown" id="settings-io-dropdown">
+                            <button class="viewer-io-item" id="settings-export-btn">⬆ Eksporter</button>
+                            <label class="viewer-io-item" style="cursor:pointer">
+                                ⬇ Importer
+                                <input type="file" id="settings-import-file" accept=".json" style="display:none">
+                            </label>
+                        </div>
+                    </div>
                     <button class="modal-btn modal-btn-no settings-nav-close-btn" id="settings-close">Lukk</button>
                 </div>
 

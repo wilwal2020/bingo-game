@@ -242,8 +242,9 @@ class BingoApp {
             settingsBtn:        document.getElementById('settings-btn'),
             settingsModal:      document.getElementById('settings-modal'),
             settingsClose:      document.getElementById('settings-close'),
+            settingsIoToggle:   document.getElementById('settings-io-toggle'),
+            settingsIoDropdown: document.getElementById('settings-io-dropdown'),
             settingsExportBtn:  document.getElementById('settings-export-btn'),
-            settingsImportBtn:  document.getElementById('settings-import-btn'),
             settingsImportFile: document.getElementById('settings-import-file'),
             settingProgress:      document.getElementById('setting-progress-enabled'),
             settingProgressDur:   document.getElementById('progress-dur-value'),
@@ -468,7 +469,10 @@ class BingoApp {
             e.stopPropagation();
             this.el.viewerIoDropdown.classList.toggle('open');
         });
-        document.addEventListener('click', () => this.el.viewerIoDropdown.classList.remove('open'));
+        document.addEventListener('click', () => {
+            this.el.viewerIoDropdown.classList.remove('open');
+            this.el.settingsIoDropdown.classList.remove('open');
+        });
 
         // Average filter
         this.el.avgFilterInput.addEventListener('input', () => this.handleAvgFilterInput());
@@ -606,11 +610,18 @@ class BingoApp {
         // Settings
         this.el.settingsBtn.addEventListener('click',   () => this.openSettingsModal());
         this.el.settingsClose.addEventListener('click', () => this.closeSettingsModal());
-        this.el.settingsExportBtn.addEventListener('click', () => this.exportSettings());
-        this.el.settingsImportBtn.addEventListener('click', () => this.el.settingsImportFile.click());
+        this.el.settingsIoToggle.addEventListener('click', e => {
+            e.stopPropagation();
+            this.el.settingsIoDropdown.classList.toggle('open');
+        });
+        this.el.settingsExportBtn.addEventListener('click', () => {
+            this.exportSettings();
+            this.el.settingsIoDropdown.classList.remove('open');
+        });
         this.el.settingsImportFile.addEventListener('change', (e) => {
             this.importSettings(e.target.files[0]);
             e.target.value = '';
+            this.el.settingsIoDropdown.classList.remove('open');
         });
 
         this.el.settingProgress.addEventListener('change', () => {
@@ -1165,7 +1176,9 @@ class BingoApp {
         const a    = document.createElement('a');
         a.href     = url;
         a.download = 'bingo-innstillinger.json';
+        document.body.appendChild(a);
         a.click();
+        document.body.removeChild(a);
         URL.revokeObjectURL(url);
     }
 
