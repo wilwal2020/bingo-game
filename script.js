@@ -1206,18 +1206,8 @@ class BingoApp {
                     alert('Ingen gyldige innstillinger funnet i filen.');
                     return;
                 }
-                // Re-apply everything without a full reload
-                this.loadFromStorage();
-                this.applySettings();
-                this.applySlotToDOM();
-                this.preloadSounds();
-                this.loadUserSoundsIntoPool();
-                // Resume AudioContext if it got suspended during the file dialog
-                if (this._audioCtx && this._audioCtx.state === 'suspended') {
-                    this._audioCtx.resume();
-                }
-                this.closeSettingsModal();
-                setTimeout(() => this.openSettingsModal(), 80);
+                // Reload the page so all settings apply cleanly from scratch
+                window.location.reload();
             } catch {
                 alert('Kunne ikke lese filen. Kontroller at det er en gyldig JSON-fil.');
             }
