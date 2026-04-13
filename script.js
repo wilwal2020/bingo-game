@@ -1165,7 +1165,7 @@ class BingoApp {
     }
 
     exportSettings() {
-        const jsonKeys  = ['bingoSettings', 'bingoThemeColors', 'bingoColorPresets', 'bingoUserSounds'];
+        const jsonKeys  = ['bingoSettings', 'bingoThemeColors', 'bingoColorPresets', 'bingoUserSounds', 'bingoFlareSettings'];
         const plainKeys = ['bingoTheme'];
         const data = {};
         jsonKeys.forEach(k => {
@@ -1193,7 +1193,7 @@ class BingoApp {
         reader.onload = (e) => {
             try {
                 const data = JSON.parse(e.target.result);
-                const jsonKeys  = ['bingoSettings', 'bingoThemeColors', 'bingoColorPresets', 'bingoUserSounds'];
+                const jsonKeys  = ['bingoSettings', 'bingoThemeColors', 'bingoColorPresets', 'bingoUserSounds', 'bingoFlareSettings'];
                 const plainKeys = ['bingoTheme'];
                 let imported = 0;
                 jsonKeys.forEach(k => {
