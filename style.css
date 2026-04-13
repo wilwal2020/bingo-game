@@ -2385,11 +2385,6 @@ body.fullscreen .page-layout {
 /* =====================================================
    RECENT NUMBERS EXPAND
    ===================================================== */
-.recent-numbers-wrapper {
-    width:      90%;
-    position:   relative;
-}
-
 .recent-expand-btn {
     display:          block;
     width:            100%;
@@ -2407,7 +2402,19 @@ body.fullscreen .page-layout {
 .recent-expand-btn:hover { color: var(--accent-color); }
 .recent-expand-btn.expanded { transform: rotate(180deg); }
 
+.recent-numbers-wrapper {
+    position: relative;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
 .recent-numbers-all {
+    position:         absolute;
+    top:              100%;
+    left:             50%;
+    transform:        translateX(-50%);
     width:            90%;
     max-height:       200px;
     overflow-y:       auto;
@@ -2417,11 +2424,13 @@ body.fullscreen .page-layout {
     text-align:       center;
     font-size:        1.4rem;
     color:            var(--accent-color);
-    margin-top:       6px;
+    margin-top:       4px;
     padding:          8px;
-    background:       rgba(255,255,255,.04);
-    border:           1px solid rgba(255,255,255,.1);
+    background:       rgba(20,24,36,.97);
+    border:           1px solid rgba(255,255,255,.15);
     border-radius:    10px;
+    box-shadow:       0 8px 24px rgba(0,0,0,.5);
+    z-index:          50;
 }
 
 .recent-numbers-all::-webkit-scrollbar       { width: 4px; }

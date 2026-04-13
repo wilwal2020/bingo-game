@@ -2616,9 +2616,10 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         const settingsOpen     = this.el.settingsModal?.style.display === 'flex';
         const leaderboardOpen  = document.getElementById('leaderboard-modal')?.style.display === 'flex';
         const graphOpen        = document.getElementById('graph-modal')?.style.display === 'flex';
+        const suggestSaveOpen  = this.el.suggestSaveModal?.style.display === 'flex';
         const anyModal = rekkeConfirmOpen || winnerOpen || sessionOpen || editSessionOpen ||
                          deleteOpen || resetAllOpen || viewerOpen || settingsOpen ||
-                         leaderboardOpen || graphOpen;
+                         leaderboardOpen || graphOpen || suggestSaveOpen;
 
         // ── ENTER: confirm / commit ────────────────────
         if (e.key === 'Enter') {
@@ -2629,6 +2630,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             if (editSessionOpen)   { this.saveEditedSession(); return; }
             if (deleteOpen)        { this.confirmDelete(); return; }
             if (resetAllOpen)      { this.performResetAll(); return; }
+            if (suggestSaveOpen)   { this.el.suggestSaveModal.style.display = 'none'; this.openSessionModal(); return; }
             // Default: commit typed number
             clearTimeout(this.typingTimer);
             this.commitTypedNumber();
@@ -2644,6 +2646,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             if (editSessionOpen)   { this.closeEditSessionModal(); return; }
             if (deleteOpen)        { this.closeDeleteModal(); return; }
             if (resetAllOpen)      { this.closeResetAllModal(); return; }
+            if (suggestSaveOpen)   { this.playSound('cancel'); this.el.suggestSaveModal.style.display = 'none'; return; }
             if (viewerOpen)        { this.closeViewerModal(); return; }
             if (settingsOpen)      { this.closeSettingsModal(); return; }
             if (leaderboardOpen)   { this.closeLeaderboard(); return; }
@@ -2675,6 +2678,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             if (editSessionOpen)   { this.closeEditSessionModal(); return; }
             if (deleteOpen)        { this.closeDeleteModal(); return; }
             if (resetAllOpen)      { this.closeResetAllModal(); return; }
+            if (suggestSaveOpen)   { this.playSound('cancel'); this.el.suggestSaveModal.style.display = 'none'; return; }
             if (viewerOpen)        { this.closeViewerModal(); return; }
             if (settingsOpen)      { this.closeSettingsModal(); return; }
             if (leaderboardOpen)   { this.closeLeaderboard(); return; }
@@ -2938,6 +2942,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         this.playSound('reset-hard');
         this.clearJackpotHighlight();
         this.resetProgressBar();
+        this.stopNextGameCountdown();
         GAME_THEMES.forEach(t => { this.slots[t] = freshSlotState(); });
         this.slots['default'] = freshSlotState();
         localStorage.removeItem('bingoPendingWinners');
