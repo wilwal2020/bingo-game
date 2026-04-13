@@ -242,6 +242,9 @@ class BingoApp {
             settingsBtn:        document.getElementById('settings-btn'),
             settingsModal:      document.getElementById('settings-modal'),
             settingsClose:      document.getElementById('settings-close'),
+            settingsExportBtn:  document.getElementById('settings-export-btn'),
+            settingsImportBtn:  document.getElementById('settings-import-btn'),
+            settingsImportFile: document.getElementById('settings-import-file'),
             settingProgress:      document.getElementById('setting-progress-enabled'),
             settingProgressDur:   document.getElementById('progress-dur-value'),
             settingDurPlus:       document.getElementById('progress-dur-plus'),
@@ -603,6 +606,12 @@ class BingoApp {
         // Settings
         this.el.settingsBtn.addEventListener('click',   () => this.openSettingsModal());
         this.el.settingsClose.addEventListener('click', () => this.closeSettingsModal());
+        this.el.settingsExportBtn.addEventListener('click', () => this.exportSettings());
+        this.el.settingsImportBtn.addEventListener('click', () => this.el.settingsImportFile.click());
+        this.el.settingsImportFile.addEventListener('change', (e) => {
+            this.importSettings(e.target.files[0]);
+            e.target.value = '';
+        });
 
         this.el.settingProgress.addEventListener('change', () => {
             this.settings.progressEnabled = this.el.settingProgress.checked;
@@ -1142,6 +1151,51 @@ class BingoApp {
         this.playSound('cancel');
         this.el.settingsModal.style.display = 'none';
         this.restoreBodyScroll();
+    }
+
+    exportSettings() {
+        const keys = ['bingoSettings', 'bingoThemeColors', 'bingoColorPresets', 'bingoTheme'];
+        const data = {};
+        keys.forEach(k => {
+            const val = localStorage.getItem(k);
+            if (val !== null) data[k] = JSON.parse(val);
+        });
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href     = url;
+        a.download = 'bingo-innstillinger.json';
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    importSettings(file) {
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const data = JSON.parse(e.target.result);
+                const allowed = ['bingoSettings', 'bingoThemeColors', 'bingoColorPresets', 'bingoTheme'];
+                let imported = 0;
+                allowed.forEach(k => {
+                    if (k in data) {
+                        localStorage.setItem(k, JSON.stringify(data[k]));
+                        imported++;
+                    }
+                });
+                if (imported === 0) {
+                    alert('Ingen gyldige innstillinger funnet i filen.');
+                    return;
+                }
+                // Re-apply everything without a full reload
+                this.loadState();
+                this.closeSettingsModal();
+                setTimeout(() => this.openSettingsModal(), 80);
+            } catch {
+                alert('Kunne ikke lese filen. Kontroller at det er en gyldig JSON-fil.');
+            }
+        };
+        reader.readAsText(file);
     }
 
     undoLastNumber() {
