@@ -1165,11 +1165,16 @@ class BingoApp {
     }
 
     exportSettings() {
-        const keys = ['bingoSettings', 'bingoThemeColors', 'bingoColorPresets', 'bingoTheme'];
+        const jsonKeys  = ['bingoSettings', 'bingoThemeColors', 'bingoColorPresets'];
+        const plainKeys = ['bingoTheme'];
         const data = {};
-        keys.forEach(k => {
+        jsonKeys.forEach(k => {
             const val = localStorage.getItem(k);
-            if (val !== null) data[k] = JSON.parse(val);
+            if (val !== null) try { data[k] = JSON.parse(val); } catch(e) {}
+        });
+        plainKeys.forEach(k => {
+            const val = localStorage.getItem(k);
+            if (val !== null) data[k] = val;
         });
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
         const url  = URL.createObjectURL(blob);
@@ -1179,7 +1184,7 @@ class BingoApp {
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
 
     importSettings(file) {
@@ -1188,13 +1193,14 @@ class BingoApp {
         reader.onload = (e) => {
             try {
                 const data = JSON.parse(e.target.result);
-                const allowed = ['bingoSettings', 'bingoThemeColors', 'bingoColorPresets', 'bingoTheme'];
+                const jsonKeys  = ['bingoSettings', 'bingoThemeColors', 'bingoColorPresets'];
+                const plainKeys = ['bingoTheme'];
                 let imported = 0;
-                allowed.forEach(k => {
-                    if (k in data) {
-                        localStorage.setItem(k, JSON.stringify(data[k]));
-                        imported++;
-                    }
+                jsonKeys.forEach(k => {
+                    if (k in data) { localStorage.setItem(k, JSON.stringify(data[k])); imported++; }
+                });
+                plainKeys.forEach(k => {
+                    if (k in data) { localStorage.setItem(k, data[k]); imported++; }
                 });
                 if (imported === 0) {
                     alert('Ingen gyldige innstillinger funnet i filen.');
