@@ -1,0 +1,1177 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Geithus Bingo</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="flare.css">
+</head>
+<body>
+
+    <!-- HEADER / NAV -->
+    <header>
+        <nav class="flex-container">
+            <img src="" class="logo" alt="Geithus Bingo logo">
+            <a class="flex-item" href="#" aria-label="90ball bingo">90ball</a>
+            <a class="flex-item" href="#" aria-label="Bingoark">Bingoark</a>
+            <a class="flex-item" href="#" aria-label="Hjelp">Hjelp</a>
+            <button class="flex-item settings-nav-btn" id="settings-btn" aria-label="Innstillinger">⚙</button>
+            <div class="dropdown">
+                <button class="dropbtn flex-item" aria-label="Apne meny" style="font-size:1.3rem;">
+                    ☰
+                </button>
+                <div class="dropdown-content">
+                    <a href="#">Om lokalet</a>
+                    <a href="#">Om oss</a>
+                    <a href="#">Tilbakemelding</a>
+                    <a href="#">Kontakt oss</a>
+                    <a href="#">Spillevett</a>
+                    <a href="#" id="nav-statistikk">Statistikk</a>
+                    <a href="#">Hvordan spille 90 ball bingo</a>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <!-- THREE-COLUMN LAYOUT -->
+    <div class="page-layout">
+
+        <!-- Column 1: Number Display -->
+        <div class="newnumber">
+            <div class="rekke-wrapper">
+                <div class="rekke-buttons" id="rekke-buttons" aria-label="Velg rekke">
+                    <button class="rekke-btn active" data-rekke="Rekke1">1</button>
+                    <button class="rekke-btn" data-rekke="Rekke2">2</button>
+                    <button class="rekke-btn" data-rekke="Rekke3">3</button>
+                </div>
+                <div class="rekke-backdrop" id="rekke-backdrop" style="display:none"></div>
+                <div class="rekke-confirm" id="rekke-confirm" style="display:none">
+                    <p class="rekke-confirm-text" id="rekke-confirm-text"></p>
+                    <div class="rekke-confirm-adjust">
+                        <button class="rekke-adjust-btn" id="rekke-adjust-minus">−</button>
+                        <span class="rekke-adjust-count" id="rekke-adjust-count">0</span>
+                        <button class="rekke-adjust-btn" id="rekke-adjust-plus">+</button>
+                    </div>
+                    <div class="rekke-confirm-buttons">
+                        <button class="rekke-confirm-btn rekke-confirm-yes" id="modal-yes">Ja</button>
+                        <button class="rekke-confirm-btn rekke-confirm-no" id="modal-no">Nei</button>
+                    </div>
+                </div>
+                <div class="spill-ferdig" id="spill-ferdig" style="display:none"></div>
+                <div class="rekke-tooltip" id="rekke-tooltip">Bytt rekke!</div>
+            </div>
+            <div id="big-number">
+                <div id="big-number-fill"></div>
+                <span id="big-number-text">&#8203;</span>
+            </div>
+            <div class="recent-numbers-wrapper">
+                <div id="recent-numbers" class="grid-container"></div>
+                <button id="recent-expand-btn" class="recent-expand-btn" style="display:none" title="Vis alle tall">▼</button>
+            </div>
+            <div id="recent-numbers-all" class="recent-numbers-all" style="display:none"></div>
+            <div class="winner-btn-wrapper">
+                <button id="log-winner-btn-2" style="display:none">Logg vinner</button>
+            </div>
+        </div>
+
+        <!-- Column 2: Counter / Stats -->
+        <div class="container">
+            <div class="title">Tall som har gatt:</div>
+            <div class="circle">0</div>
+            <div class="average">
+                <div class="text">Gjennomsnittlig<br>antall rekke 1</div>
+                <div class="number-box-wrap">
+                    <div class="DiffBox">
+                        <div class="difference" id="difference">0</div>
+                    </div>
+                    <div class="number-box" id="avg-box-1">16</div>
+                </div>
+            </div>
+            <div class="average">
+                <div class="text">Gjennomsnittlig<br>antall rekke 2</div>
+                <div class="number-box" id="avg-box-2">39</div>
+            </div>
+            <div class="average">
+                <div class="text">Gjennomsnittlig<br>antall rekke 3</div>
+                <div class="number-box" id="avg-box-3">57</div>
+            </div>
+            <div class="igjen">Tid igjen:</div>
+            <div id="countdown">00:00</div>
+            <div id="next-game-cd-wrap" style="display:none">
+                <div class="igjen" style="margin-top:18px;">Neste spill om:</div>
+                <div id="next-game-cd-display">03:00</div>
+                <div class="next-game-cd-bar-outer">
+                    <div id="next-game-cd-bar" class="next-game-cd-bar-fill"></div>
+                </div>
+            </div>
+
+            <!-- Game indicator -->
+            <div class="game-indicator" id="game-indicator"></div>
+
+            <!-- Save full session button (shown when all 4 games done) -->
+            <button class="save-session-btn" id="save-session-btn" style="display:none">
+                Lagre sesjon
+            </button>
+            <button class="save-session-btn log-rekke3-btn" id="log-rekke3-btn" style="display:none">
+                Logg Rekke 3
+            </button>
+            <!-- Winner indicator -->
+            <div class="winner-indicator" id="winner-indicator" style="display:none"></div>
+
+            <button class="save-session-btn view-sessions-btn" id="view-sessions-btn">
+                Vis sesjoner
+            </button>
+            <button class="save-session-btn reset-all-btn" id="reset-all-btn">
+                Nullstill alle spill
+            </button>
+        </div>
+
+        <!-- Column 3: Ball Grid -->
+        <div class="ball-grid">
+            <div class="row1">
+                <div class="balls grid-btn-cell" id="undo-btn-cell" data-skip-ball="true">
+                    <button id="undo-button">↩</button>
+                </div>
+                <div class="balls">1</div>
+                <div class="balls">2</div>
+                <div class="balls">3</div>
+                <div class="balls">4</div>
+                <div class="balls">5</div>
+                <div class="balls">6</div>
+                <div class="balls">7</div>
+                <div class="balls">8</div>
+                <div class="balls">9</div>
+            </div>
+            <div class="row1">
+                <div class="balls">10</div><div class="balls">11</div><div class="balls">12</div>
+                <div class="balls">13</div><div class="balls">14</div><div class="balls">15</div>
+                <div class="balls">16</div><div class="balls">17</div><div class="balls">18</div>
+                <div class="balls">19</div>
+            </div>
+            <div class="row1">
+                <div class="balls">20</div><div class="balls">21</div><div class="balls">22</div>
+                <div class="balls">23</div><div class="balls">24</div><div class="balls">25</div>
+                <div class="balls">26</div><div class="balls">27</div><div class="balls">28</div>
+                <div class="balls">29</div>
+            </div>
+            <div class="row1">
+                <div class="balls">30</div><div class="balls">31</div><div class="balls">32</div>
+                <div class="balls">33</div><div class="balls">34</div><div class="balls">35</div>
+                <div class="balls">36</div><div class="balls">37</div><div class="balls">38</div>
+                <div class="balls">39</div>
+            </div>
+            <div class="row1">
+                <div class="balls">40</div><div class="balls">41</div><div class="balls">42</div>
+                <div class="balls">43</div><div class="balls">44</div><div class="balls">45</div>
+                <div class="balls">46</div><div class="balls">47</div><div class="balls">48</div>
+                <div class="balls">49</div>
+            </div>
+            <div class="row1">
+                <div class="balls">50</div><div class="balls">51</div><div class="balls">52</div>
+                <div class="balls">53</div><div class="balls">54</div><div class="balls">55</div>
+                <div class="balls">56</div><div class="balls">57</div><div class="balls">58</div>
+                <div class="balls">59</div>
+            </div>
+            <div class="row1">
+                <div class="balls">60</div><div class="balls">61</div><div class="balls">62</div>
+                <div class="balls">63</div><div class="balls">64</div><div class="balls">65</div>
+                <div class="balls">66</div><div class="balls">67</div><div class="balls">68</div>
+                <div class="balls">69</div>
+            </div>
+            <div class="row1">
+                <div class="balls">70</div><div class="balls">71</div><div class="balls">72</div>
+                <div class="balls">73</div><div class="balls">74</div><div class="balls">75</div>
+                <div class="balls">76</div><div class="balls">77</div><div class="balls">78</div>
+                <div class="balls">79</div>
+            </div>
+            <div class="row1">
+                <div class="balls">80</div><div class="balls">81</div><div class="balls">82</div>
+                <div class="balls">83</div><div class="balls">84</div><div class="balls">85</div>
+                <div class="balls">86</div><div class="balls">87</div><div class="balls">88</div>
+                <div class="balls">89</div>
+            </div>
+            <div class="row1">
+                <div class="balls">90</div>
+                <div class="balls spacer"></div>
+                <div class="balls spacer"></div>
+                <div class="balls spacer"></div>
+                <div class="balls grid-btn-cell" id="reset-btn-cell" data-skip-ball="true">
+                    <button id="reset-button">Reset</button>
+                </div>
+                <div class="balls spacer"></div>
+                <div class="balls grid-btn-cell" id="jackpot-btn-cell" data-skip-ball="true">
+                    <button id="jackpot-button">Jackpot</button>
+                </div>
+                <div class="balls spacer"></div>
+                <div class="balls spacer"></div>
+                <div class="balls spacer"></div>
+            </div>
+            <div class="stats-row">
+                <div class="statistics">
+                    <p>1 tall: <span id="chance1">0%</span></p>
+                    <p>2 tall: <span id="chance2">0%</span></p>
+                    <p>3 tall: <span id="chance3">0%</span></p>
+                </div>
+            </div>
+            <div class="theme-buttons">
+                <button class="theme-button active" data-theme="default">Orig</button>
+                <button class="theme-button" data-theme="blue">Spill 1</button>
+                <button class="theme-button" data-theme="yellow">Spill 2</button>
+                <button class="theme-button" data-theme="pink">Spill 3</button>
+                <button class="theme-button" data-theme="grey">Spill 4</button>
+            </div>
+        </div>
+
+    </div><!-- end .page-layout -->
+
+    <!-- REKKE CONFIRM MODAL -->
+    <div class="modal-overlay" id="rekke-modal" style="display:none">
+        <div class="modal">
+            <p class="modal-text" id="modal-text">Lagre Rekke 1: 23 tall?</p>
+        </div>
+    </div>
+
+    <!-- WINNER LOGGING MODAL -->
+    <div class="modal-overlay" id="winner-modal" style="display:none">
+        <div class="modal modal-wide">
+            <h2 class="modal-title" id="winner-modal-title">Logg vinner</h2>
+            <p class="modal-subtitle" id="winner-modal-subtitle"></p>
+
+            <!-- Quick-select players -->
+            <div class="player-quickselect" id="player-quickselect"></div>
+
+            <!-- Selected winners list (shows when split > 1) -->
+            <div class="winner-selected-list" id="winner-selected-list"></div>
+
+            <!-- New player input with add button -->
+            <div class="winner-name-row">
+                <input type="text" id="winner-name-input" class="session-input winner-name-input"
+                       placeholder="Nytt navn..." autocomplete="off">
+                <button class="modal-btn modal-btn-yes" id="winner-add-btn" style="padding:6px 14px;font-size:.9rem;flex-shrink:0;display:none">+</button>
+            </div>
+
+            <!-- Split count -->
+            <div class="winner-split-row">
+                <span class="winner-split-label">Antall vinnere:</span>
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <button class="rekke-adjust-btn" id="winner-split-minus">−</button>
+                    <span id="winner-split-display" style="font-size:1.3rem;font-weight:bold;color:var(--accent-color);min-width:1.5rem;text-align:center;">1</span>
+                    <button class="rekke-adjust-btn" id="winner-split-plus">+</button>
+                    <input type="hidden" id="winner-split-input" value="1">
+                </div>
+            </div>
+
+            <div class="modal-buttons">
+                <button class="modal-btn modal-btn-yes" id="winner-save">Lagre</button>
+                <button class="modal-btn modal-btn-no" id="winner-cancel">Avbryt</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PLAYER MANAGEMENT MODAL -->
+    <div class="modal-overlay" id="players-modal" style="display:none">
+        <div class="modal modal-wide">
+            <h2 class="modal-title">Spillere</h2>
+            <div class="players-list" id="players-list"></div>
+            <div class="winner-name-row" style="margin-top:12px;width:100%">
+                <input type="text" id="new-player-input" class="session-input winner-name-input"
+                       placeholder="Legg til spiller..." style="flex:1">
+                <button class="modal-btn modal-btn-yes" id="add-player-btn" style="padding:6px 16px;font-size:.9rem;flex-shrink:0">+</button>
+            </div>
+            <div class="modal-buttons" style="margin-top:16px">
+                <button class="modal-btn modal-btn-no" id="players-close">Lukk</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PLAYER DELETE CONFIRM MODAL -->
+    <div class="modal-overlay" id="player-delete-modal" style="display:none">
+        <div class="modal">
+            <h2 class="modal-title">Slett spiller?</h2>
+            <p class="modal-text" id="player-delete-text" style="font-size:1rem;color:rgba(255,255,255,.7);margin-bottom:20px;"></p>
+            <div class="modal-buttons">
+                <button class="modal-btn modal-btn-yes" id="player-delete-confirm"
+                        style="background:#ff4444;border-color:#ff4444;color:white">Slett</button>
+                <button class="modal-btn modal-btn-no" id="player-delete-cancel">Avbryt</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- LEADERBOARD MODAL -->
+    <div class="modal-overlay" id="leaderboard-modal" style="display:none">
+        <div class="modal modal-viewer">
+            <h2 class="modal-title">Ledertavle</h2>
+            <div class="leaderboard-list" id="leaderboard-list"></div>
+            <div class="modal-buttons" style="margin-top:14px">
+                <button class="modal-btn session-action-btn session-edit-btn" id="manage-players-btn">Administrer spillere</button>
+                <button class="modal-btn modal-btn-no" id="leaderboard-close">Lukk</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PLAYER SESSION HISTORY MODAL -->
+    <div class="modal-overlay" id="player-history-modal" style="display:none">
+        <div class="modal modal-viewer">
+            <h2 class="modal-title" id="player-history-title"></h2>
+            <p class="modal-subtitle" id="player-history-subtitle"></p>
+            <div class="session-list" id="player-history-list"></div>
+            <div class="modal-buttons" style="margin-top:14px">
+                <button class="modal-btn modal-btn-yes" id="add-prev-win-from-history">+ Legg til seier</button>
+                <button class="modal-btn modal-btn-no" id="player-history-close">Tilbake</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- GRAPH MODAL -->
+    <div class="modal-overlay" id="graph-modal" style="display:none">
+        <div class="modal modal-viewer modal-graph">
+            <h2 class="modal-title">Gjennomsnitt over tid</h2>
+            <canvas id="avg-graph-canvas"></canvas>
+            <div class="graph-legend" id="graph-legend"></div>
+            <div class="modal-buttons" style="margin-top:14px">
+                <button class="modal-btn modal-btn-no" id="graph-close">Lukk</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ADD PREVIOUS WIN MODAL -->
+    <div class="modal-overlay" id="add-win-modal" style="display:none">
+        <div class="modal modal-wide">
+            <h2 class="modal-title">Legg til seier</h2>
+            <p class="modal-subtitle" id="add-win-player-label"></p>
+
+            <!-- Prize presets -->
+            <div class="add-win-section-label">Premiebel&oslash;p</div>
+            <div class="add-win-presets" id="add-win-presets">
+                <button class="add-win-preset-btn" data-amount="300">300 kr</button>
+                <button class="add-win-preset-btn" data-amount="500">500 kr</button>
+                <button class="add-win-preset-btn" data-amount="1000">1000 kr</button>
+                <button class="add-win-preset-btn" data-amount="1500">1500 kr</button>
+                <button class="add-win-preset-btn" data-amount="2000">2000 kr</button>
+                <button class="add-win-preset-btn" data-amount="custom">Annet</button>
+            </div>
+            <div class="add-win-custom-row" id="add-win-custom-row" style="display:none">
+                <input type="number" id="add-win-custom-amount" class="session-input"
+                       placeholder="Bel&oslash;p i kr" min="1" style="width:140px;text-align:center">
+            </div>
+
+            <!-- Date: year + month -->  
+            <div class="add-win-section-label" style="margin-top:16px">År og måned</div>
+            <div class="add-win-date-row">
+                <input type="number" id="add-win-year" class="session-input"
+                       placeholder="År" min="2000" max="2100" style="width:100px;text-align:center">
+                <select id="add-win-month" class="session-input add-win-month-select">
+                    <option value="">Måned</option>
+                    <option value="1">Januar</option>
+                    <option value="2">Februar</option>
+                    <option value="3">Mars</option>
+                    <option value="4">April</option>
+                    <option value="5">Mai</option>
+                    <option value="6">Juni</option>
+                    <option value="7">Juli</option>
+                    <option value="8">August</option>
+                    <option value="9">September</option>
+                    <option value="10">Oktober</option>
+                    <option value="11">November</option>
+                    <option value="12">Desember</option>
+                </select>
+            </div>
+
+            <div class="modal-buttons" style="margin-top:20px">
+                <button class="modal-btn modal-btn-yes" id="add-win-save">Lagre seier</button>
+                <button class="modal-btn modal-btn-no" id="add-win-cancel">Avbryt</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- UNSAVED CHANGES CONFIRM -->
+    <div class="modal-overlay" id="unsaved-modal" style="display:none">
+        <div class="modal">
+            <h2 class="modal-title">Ulagrede endringer</h2>
+            <p class="modal-text" style="font-size:1rem;color:rgba(255,255,255,.7);margin-bottom:20px;">
+                Du har ulagrede endringer. Vil du lukke uten å lagre?
+            </p>
+            <div class="modal-buttons">
+                <button class="modal-btn modal-btn-yes" id="unsaved-discard"
+                        style="background:#ff4444;border-color:#ff4444;color:white">Lukk uten å lagre</button>
+                <button class="modal-btn modal-btn-no" id="unsaved-cancel">Avbryt</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- RESET ALL MODAL -->
+    <div class="modal-overlay" id="reset-all-modal" style="display:none">
+        <div class="modal">
+            <h2 class="modal-title">Nullstill alle spill?</h2>
+            <p class="modal-text" style="font-size:1rem;color:rgba(255,255,255,.7);margin-bottom:20px;">
+                Dette sletter kuler, rekke-fremgang og loggede rekker for alle 4 spill.
+            </p>
+            <div class="modal-buttons">
+                <button class="modal-btn modal-btn-yes" id="reset-all-confirm">Nullstill</button>
+                <button class="modal-btn modal-btn-no" id="reset-all-cancel">Avbryt</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SAVE SESSION MODAL -->
+    <div class="modal-overlay" id="session-modal" style="display:none">
+        <div class="modal modal-wide">
+            <h2 class="modal-title">Lagre sesjon</h2>
+            <p class="modal-subtitle" id="session-date-label"></p>
+            <div class="session-grid" id="session-grid">
+                <!-- Filled by JS -->
+            </div>
+            <div class="modal-buttons">
+                <button class="modal-btn modal-btn-yes" id="session-save">Lagre</button>
+                <button class="modal-btn modal-btn-no" id="session-cancel">Avbryt</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SESSION VIEWER MODAL -->
+    <div class="modal-overlay" id="viewer-modal" style="display:none">
+        <div class="modal modal-viewer">
+            <div class="viewer-header">
+                <h2 class="modal-title">Lagrede sesjoner</h2>
+                <div class="viewer-io-menu">
+                    <button class="viewer-io-toggle" id="viewer-io-toggle" title="Eksporter / Importer">⋮</button>
+                    <div class="viewer-io-dropdown" id="viewer-io-dropdown">
+                        <button class="viewer-io-item" id="export-btn">Eksporter</button>
+                        <label class="viewer-io-item" id="import-label" style="cursor:pointer">
+                            Importer
+                            <input type="file" id="import-input" accept=".json" style="display:none">
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stats + filter bar -->
+            <div class="viewer-stats-bar">
+                <div class="viewer-counts">
+                    <span id="viewer-session-count">0 sesjoner</span>
+                    <span class="viewer-counts-sep">·</span>
+                    <span id="viewer-game-count">0 spill</span>
+                </div>
+                <div class="viewer-filter">
+                    <label class="viewer-filter-label">Snitt basert på:</label>
+                    <button class="rekke-adjust-btn" id="avg-filter-minus">−</button>
+                    <input type="number" id="avg-filter-input" class="session-input avg-filter-input"
+                           min="1" placeholder="Alle">
+                    <button class="rekke-adjust-btn" id="avg-filter-plus">+</button>
+                    <button class="viewer-filter-all-btn" id="avg-filter-all">Alle</button>
+                </div>
+            </div>
+
+            <!-- Live averages (update with filter) -->
+            <div class="viewer-averages">
+                <div class="viewer-avg-box">
+                    <div class="viewer-avg-label">Rekke 1</div>
+                    <div class="viewer-avg-value" id="viewer-avg-1">—</div>
+                </div>
+                <div class="viewer-avg-box">
+                    <div class="viewer-avg-label">Rekke 2</div>
+                    <div class="viewer-avg-value" id="viewer-avg-2">—</div>
+                </div>
+                <div class="viewer-avg-box">
+                    <div class="viewer-avg-label">Rekke 3</div>
+                    <div class="viewer-avg-value" id="viewer-avg-3">—</div>
+                </div>
+            </div>
+
+            <div class="session-list" id="session-list"></div>
+            <div class="viewer-footer">
+                <button class="modal-btn session-action-btn session-edit-btn" id="graph-btn">Graf</button>
+                <button class="modal-btn session-action-btn session-edit-btn" id="leaderboard-btn">Ledertavle</button>
+                <button class="modal-btn modal-btn-no" id="viewer-close">Lukk</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- EDIT SESSION MODAL -->
+    <div class="modal-overlay" id="edit-session-modal" style="display:none">
+        <div class="modal modal-wide">
+            <h2 class="modal-title">Rediger sesjon</h2>
+            <p class="modal-subtitle" id="edit-session-date-label"></p>
+            <div class="session-grid" id="edit-session-grid"></div>
+            <div class="modal-buttons">
+                <button class="modal-btn modal-btn-yes" id="edit-session-save">Lagre</button>
+                <button class="modal-btn modal-btn-no" id="edit-session-cancel">Avbryt</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- DELETE CONFIRM MODAL -->
+    <div class="modal-overlay" id="delete-modal" style="display:none">
+        <div class="modal">
+            <h2 class="modal-title">Slett sesjon?</h2>
+            <p class="modal-text" id="delete-modal-text" style="font-size:1rem;color:rgba(255,255,255,.7);margin-bottom:20px;"></p>
+            <div class="modal-buttons">
+                <button class="modal-btn modal-btn-yes" id="delete-confirm" style="background-color:#ff4444;border-color:#ff4444;color:white">Slett</button>
+                <button class="modal-btn modal-btn-no" id="delete-cancel">Avbryt</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- FOOTER -->
+    <footer class="flex-container-bot">
+        <span class="footer-text">Apningstider:<br>Kun apent<br>tirsdag: 20:30 - 22:30</span>
+        <span class="footer-text">Adresse:<br>Markaveien 16, 3360<br>Geithus</span>
+        <iframe
+            src="https://www.google.com/maps/embed?pb=!1m14!1m8!1m3!1d1998.633824058956!2d9.9676541!3d59.9382181!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x4640e20570ee7763%3A0xa841d52c17d8fb84!2sMarkaveien%2016%2C%203360%20Geithus!5e0!3m2!1sno!2sno!4v1729581970566!5m2!1sno!2sno"
+            class="maps"
+            allowfullscreen
+            loading="lazy"
+            referrerpolicy="no-referrer-when-downgrade"
+            title="Kart til Geithus Bingo"
+        ></iframe>
+    </footer>
+
+    <footer class="flex-container-bottom">
+        <span class="footer-text-2">Entertainment purposes only</span>
+        <span class="footer-text-2">&copy; Geithus Bingo 2024</span>
+        <a id="terms" href="#termsofuse">Terms of use</a>
+    </footer>
+
+    <!-- Fullscreen toggle -->
+    <button class="fullscreen-btn" id="fullscreen-btn" title="Fullskjerm">⛶</button>
+
+    <!-- LAGRE SESJON SUGGESTION MODAL -->
+    <div class="modal-overlay" id="suggest-save-modal" style="display:none">
+        <div class="modal">
+            <h2 class="modal-title">Sesjon fullført! 🎉</h2>
+            <p class="modal-text" style="font-size:1rem;color:rgba(255,255,255,.7);margin-bottom:20px;">
+                Alle 4 spill er fullført. Vil du lagre sesjonen nå?
+            </p>
+            <div class="modal-buttons">
+                <button class="modal-btn modal-btn-yes" id="suggest-save-yes">Lagre sesjon</button>
+                <button class="modal-btn modal-btn-no" id="suggest-save-no">Ikke nå</button>
+            </div>
+        </div>
+    </div>
+
+
+
+    <!-- SETTINGS MODAL -->
+    <div class="modal-overlay" id="settings-modal" style="display:none">
+        <div class="modal modal-settings">
+            <div class="settings-layout">
+
+                <!-- Left nav -->
+                <div class="settings-nav">
+                    <div class="settings-nav-title">Innstillinger</div>
+                    <button class="settings-nav-item active" data-panel="sg-progress" data-label="Fremdriftslinje">Fremdriftslinje</button>
+                    <button class="settings-nav-item" data-panel="sg-countdown" data-label="Nedtelling">Nedtelling</button>
+                    <button class="settings-nav-item" data-panel="sg-themecolors" data-label="Spillfarger">Spillfarger</button>
+                    <button class="settings-nav-item" data-panel="sg-gameplay" data-label="Spillinnstillinger">Spillinnstillinger</button>
+                    <button class="settings-nav-item" data-panel="sg-sound" data-label="Lydeffekter">Lydeffekter</button>
+                    <div class="settings-nav-spacer"></div>
+                    <button class="modal-btn modal-btn-no settings-nav-close-btn" id="settings-close">Lukk</button>
+                </div>
+
+                <!-- Right panels -->
+                <div class="settings-content">
+
+                    <!-- Panel: Fremdriftslinje -->
+                    <div class="settings-panel active" id="sg-progress">
+                        <h3 class="settings-panel-title">Fremdriftslinje</h3>
+                        <div class="settings-row">
+                            <div class="settings-label">
+                                <span>Aktiver</span>
+                                <span class="settings-desc">Vis fyllanimasjon på tallballen</span>
+                            </div>
+                            <label class="settings-toggle">
+                                <input type="checkbox" id="setting-progress-enabled" checked>
+                                <span class="settings-toggle-track"></span>
+                            </label>
+                        </div>
+                        <div class="settings-row" id="progress-duration-row">
+                            <div class="settings-label">
+                                <span>Varighet (sekunder)</span>
+                                <span class="settings-desc">Tid fra tall klikkes til baren er full</span>
+                            </div>
+                            <div class="settings-stepper">
+                                <button class="rekke-adjust-btn" id="progress-dur-minus">−</button>
+                                <span class="settings-stepper-value" id="progress-dur-value">13</span>
+                                <button class="rekke-adjust-btn" id="progress-dur-plus">+</button>
+                            </div>
+                        </div>
+                        <div class="settings-row">
+                            <div class="settings-label">
+                                <span>Stil</span>
+                                <span class="settings-desc">Animasjonsstil for fyllingen</span>
+                            </div>
+                            <select id="setting-progress-style" class="session-input" style="width:160px;">
+                                <option value="wave">Bølge</option>
+                                <option value="doubleWave">Dobbel bølge</option>
+                                <option value="radialCW">Radial (med solen)</option>
+                                <option value="radialCCW">Radial (mot solen)</option>
+                                <option value="iris">Iris</option>
+                            </select>
+                        </div>
+                        <div class="settings-row">
+                            <div class="settings-label">
+                                <span>Tall-animasjon</span>
+                                <span class="settings-desc">Animasjon når et tall klikkes</span>
+                            </div>
+                            <select id="setting-ball-anim" class="session-input" style="width:130px;">
+                                <option value="spin">Spin (original)</option>
+                                <option value="flip">3D Flip</option>
+                                <option value="shockwave">Shockwave</option>
+                                <option value="ripple">Ripple</option>
+                                <option value="orbit">Orbit</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Panel: Nedtelling -->
+                    <div class="settings-panel" id="sg-countdown">
+                        <h3 class="settings-panel-title">Nedtelling</h3>
+                        <div class="settings-row">
+                            <div class="settings-label">
+                                <span>Vis nedtelling</span>
+                                <span class="settings-desc">Skjul nedtellingsklokken</span>
+                            </div>
+                            <label class="settings-toggle">
+                                <input type="checkbox" id="setting-countdown-visible" checked>
+                                <span class="settings-toggle-track"></span>
+                            </label>
+                        </div>
+                        <div class="settings-row">
+                            <div class="settings-label">
+                                <span>Fast klokkeslett</span>
+                                <span class="settings-desc">Fast klokkeslett eller dynamisk basert på historikk</span>
+                            </div>
+                            <label class="settings-toggle">
+                                <input type="checkbox" id="setting-countdown-fixed">
+                                <span class="settings-toggle-track"></span>
+                            </label>
+                        </div>
+                        <div class="settings-row" id="countdown-time-row" style="display:none">
+                            <div class="settings-label">
+                                <span>Mål-tidspunkt</span>
+                                <span class="settings-desc">Klokkeslett sesjonen skal slutte</span>
+                            </div>
+                            <input type="time" id="setting-countdown-time" class="session-input settings-time-input" value="22:08">
+                        </div>
+                        <div class="settings-row">
+                            <div class="settings-label">
+                                <span>Blink rød over gjennomsnitt</span>
+                                <span class="settings-desc">Blinkende rød sirkel når antall overstiger gjennomsnittet</span>
+                            </div>
+                            <label class="settings-toggle">
+                                <input type="checkbox" id="setting-over-average-blink" checked>
+                                <span class="settings-toggle-track"></span>
+                            </label>
+                        </div>
+                        <div class="settings-row">
+                            <div class="settings-label">
+                                <span>Neste spill nedtelling</span>
+                                <span class="settings-desc">Start nedtellingslinje etter Rekke 3 er lagret</span>
+                            </div>
+                            <label class="settings-toggle">
+                                <input type="checkbox" id="setting-next-game-countdown">
+                                <span class="settings-toggle-track"></span>
+                            </label>
+                        </div>
+                        <div class="settings-row" id="next-game-countdown-dur-row" style="display:none">
+                            <div class="settings-label">
+                                <span>Varighet</span>
+                                <span class="settings-desc">Tid for neste spill nedtelling</span>
+                            </div>
+                            <div style="display:flex;align-items:center;gap:6px;">
+                                <div class="settings-stepper">
+                                    <button class="rekke-adjust-btn" id="next-game-cd-min-minus">−</button>
+                                    <span class="settings-stepper-value" id="next-game-cd-min">3</span>
+                                    <button class="rekke-adjust-btn" id="next-game-cd-min-plus">+</button>
+                                </div>
+                                <span style="font-size:.85rem;opacity:.6">min</span>
+                                <div class="settings-stepper">
+                                    <button class="rekke-adjust-btn" id="next-game-cd-sec-minus">−</button>
+                                    <span class="settings-stepper-value" id="next-game-cd-sec">00</span>
+                                    <button class="rekke-adjust-btn" id="next-game-cd-sec-plus">+</button>
+                                </div>
+                                <span style="font-size:.85rem;opacity:.6">sek</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Panel: Spillfarger -->
+                    <div class="settings-panel" id="sg-themecolors">
+                        <h3 class="settings-panel-title">Spillfarger</h3>
+
+                        <!-- Theme switcher -->
+                        <div class="settings-row" style="border-bottom:1px solid rgba(255,255,255,.06);margin-bottom:8px;">
+                            <div class="settings-label">
+                                <span>Aktivt tema</span>
+                                <span class="settings-desc">Bytt spill/tema herfra</span>
+                            </div>
+                            <div class="settings-theme-switcher" id="settings-theme-switcher">
+                                <button class="settings-theme-btn" data-theme="default">Orig</button>
+                                <button class="settings-theme-btn" data-theme="blue">Spill 1</button>
+                                <button class="settings-theme-btn" data-theme="yellow">Spill 2</button>
+                                <button class="settings-theme-btn" data-theme="pink">Spill 3</button>
+                                <button class="settings-theme-btn" data-theme="grey">Spill 4</button>
+                            </div>
+                        </div>
+
+                        <div class="theme-color-block" data-theme="default">
+                            <div class="theme-color-row" data-theme="default">
+                                <span class="theme-color-label">Standard</span>
+                                <div class="theme-color-pickers">
+                                    <label class="theme-color-swatch-label" title="Aksentfarge">
+                                        <input type="color" class="theme-color-input" data-theme="default" data-key="accent" value="#F1B924">
+                                        <span>Aksent</span>
+                                    </label>
+                                    <label class="theme-color-swatch-label" title="Bakgrunnsfarge">
+                                        <input type="color" class="theme-color-input" data-theme="default" data-key="primary" value="#202834">
+                                        <span>Bakgrunn</span>
+                                    </label>
+                                    <label class="theme-color-swatch-label" title="Ballerfarge">
+                                        <input type="color" class="theme-color-input" data-theme="default" data-key="balls" value="#4c586b">
+                                        <span>Baller</span>
+                                    </label>
+                                    <label class="theme-color-swatch-label" title="Fare / rød farge">
+                                        <input type="color" class="theme-color-input" data-theme="default" data-key="danger" value="#ff4444">
+                                        <span>Fare</span>
+                                    </label>
+                                    <label class="theme-color-swatch-label" title="Vinner / gull farge">
+                                        <input type="color" class="theme-color-input" data-theme="default" data-key="winner" value="#f0c030">
+                                        <span>Vinner</span>
+                                    </label>
+                                </div>
+                                <button class="theme-color-reset-btn" data-theme="default" title="Tilbakestill Standard">↩</button>
+                            </div>
+                            <div class="color-preset-section" data-theme="default">
+                                <div class="color-preset-save-row">
+                                    <input type="text" class="color-preset-name-input" data-theme="default" placeholder="Navn på fargesett…" maxlength="30">
+                                    <button class="color-preset-save-btn" data-theme="default">💾 Lagre</button>
+                                </div>
+                                <div class="color-preset-list" data-theme="default"></div>
+                            </div>
+                        </div>
+                        <div class="theme-color-block" data-theme="blue">
+                            <div class="theme-color-row" data-theme="blue">
+                                <span class="theme-color-label">Spill 1</span>
+                                <div class="theme-color-pickers">
+                                    <label class="theme-color-swatch-label" title="Aksentfarge">
+                                        <input type="color" class="theme-color-input" data-theme="blue" data-key="accent" value="#00aeff">
+                                        <span>Aksent</span>
+                                    </label>
+                                    <label class="theme-color-swatch-label" title="Bakgrunnsfarge">
+                                        <input type="color" class="theme-color-input" data-theme="blue" data-key="primary" value="#141820">
+                                        <span>Bakgrunn</span>
+                                    </label>
+                                    <label class="theme-color-swatch-label" title="Ballerfarge">
+                                        <input type="color" class="theme-color-input" data-theme="blue" data-key="balls" value="#4c586b">
+                                        <span>Baller</span>
+                                    </label>
+                                    <label class="theme-color-swatch-label" title="Fare / rød farge">
+                                        <input type="color" class="theme-color-input" data-theme="blue" data-key="danger" value="#ff4444">
+                                        <span>Fare</span>
+                                    </label>
+                                    <label class="theme-color-swatch-label" title="Vinner / gull farge">
+                                        <input type="color" class="theme-color-input" data-theme="blue" data-key="winner" value="#f0c030">
+                                        <span>Vinner</span>
+                                    </label>
+                                </div>
+                                <button class="theme-color-reset-btn" data-theme="blue" title="Tilbakestill Spill 1">↩</button>
+                            </div>
+                            <div class="color-preset-section" data-theme="blue">
+                                <div class="color-preset-save-row">
+                                    <input type="text" class="color-preset-name-input" data-theme="blue" placeholder="Navn på fargesett…" maxlength="30">
+                                    <button class="color-preset-save-btn" data-theme="blue">💾 Lagre</button>
+                                </div>
+                                <div class="color-preset-list" data-theme="blue"></div>
+                            </div>
+                        </div>
+                        <div class="theme-color-block" data-theme="yellow">
+                            <div class="theme-color-row" data-theme="yellow">
+                                <span class="theme-color-label">Spill 2</span>
+                                <div class="theme-color-pickers">
+                                    <label class="theme-color-swatch-label" title="Aksentfarge">
+                                        <input type="color" class="theme-color-input" data-theme="yellow" data-key="accent" value="#F1B924">
+                                        <span>Aksent</span>
+                                    </label>
+                                    <label class="theme-color-swatch-label" title="Bakgrunnsfarge">
+                                        <input type="color" class="theme-color-input" data-theme="yellow" data-key="primary" value="#151515">
+                                        <span>Bakgrunn</span>
+                                    </label>
+                                    <label class="theme-color-swatch-label" title="Ballerfarge">
+                                        <input type="color" class="theme-color-input" data-theme="yellow" data-key="balls" value="#5c5858">
+                                        <span>Baller</span>
+                                    </label>
+                                    <label class="theme-color-swatch-label" title="Fare / rød farge">
+                                        <input type="color" class="theme-color-input" data-theme="yellow" data-key="danger" value="#ff4444">
+                                        <span>Fare</span>
+                                    </label>
+                                    <label class="theme-color-swatch-label" title="Vinner / gull farge">
+                                        <input type="color" class="theme-color-input" data-theme="yellow" data-key="winner" value="#f0c030">
+                                        <span>Vinner</span>
+                                    </label>
+                                </div>
+                                <button class="theme-color-reset-btn" data-theme="yellow" title="Tilbakestill Spill 2">↩</button>
+                            </div>
+                            <div class="color-preset-section" data-theme="yellow">
+                                <div class="color-preset-save-row">
+                                    <input type="text" class="color-preset-name-input" data-theme="yellow" placeholder="Navn på fargesett…" maxlength="30">
+                                    <button class="color-preset-save-btn" data-theme="yellow">💾 Lagre</button>
+                                </div>
+                                <div class="color-preset-list" data-theme="yellow"></div>
+                            </div>
+                        </div>
+                        <div class="theme-color-block" data-theme="pink">
+                            <div class="theme-color-row" data-theme="pink">
+                                <span class="theme-color-label">Spill 3</span>
+                                <div class="theme-color-pickers">
+                                    <label class="theme-color-swatch-label" title="Aksentfarge">
+                                        <input type="color" class="theme-color-input" data-theme="pink" data-key="accent" value="#ff0096">
+                                        <span>Aksent</span>
+                                    </label>
+                                    <label class="theme-color-swatch-label" title="Bakgrunnsfarge">
+                                        <input type="color" class="theme-color-input" data-theme="pink" data-key="primary" value="#211220">
+                                        <span>Bakgrunn</span>
+                                    </label>
+                                    <label class="theme-color-swatch-label" title="Ballerfarge">
+                                        <input type="color" class="theme-color-input" data-theme="pink" data-key="balls" value="#604b5f">
+                                        <span>Baller</span>
+                                    </label>
+                                    <label class="theme-color-swatch-label" title="Fare / rød farge">
+                                        <input type="color" class="theme-color-input" data-theme="pink" data-key="danger" value="#ff4444">
+                                        <span>Fare</span>
+                                    </label>
+                                    <label class="theme-color-swatch-label" title="Vinner / gull farge">
+                                        <input type="color" class="theme-color-input" data-theme="pink" data-key="winner" value="#f0c030">
+                                        <span>Vinner</span>
+                                    </label>
+                                </div>
+                                <button class="theme-color-reset-btn" data-theme="pink" title="Tilbakestill Spill 3">↩</button>
+                            </div>
+                            <div class="color-preset-section" data-theme="pink">
+                                <div class="color-preset-save-row">
+                                    <input type="text" class="color-preset-name-input" data-theme="pink" placeholder="Navn på fargesett…" maxlength="30">
+                                    <button class="color-preset-save-btn" data-theme="pink">💾 Lagre</button>
+                                </div>
+                                <div class="color-preset-list" data-theme="pink"></div>
+                            </div>
+                        </div>
+                        <div class="theme-color-block" data-theme="grey">
+                            <div class="theme-color-row" data-theme="grey">
+                                <span class="theme-color-label">Spill 4</span>
+                                <div class="theme-color-pickers">
+                                    <label class="theme-color-swatch-label" title="Aksentfarge">
+                                        <input type="color" class="theme-color-input" data-theme="grey" data-key="accent" value="#ffdcbc">
+                                        <span>Aksent</span>
+                                    </label>
+                                    <label class="theme-color-swatch-label" title="Bakgrunnsfarge">
+                                        <input type="color" class="theme-color-input" data-theme="grey" data-key="primary" value="#18181c">
+                                        <span>Bakgrunn</span>
+                                    </label>
+                                    <label class="theme-color-swatch-label" title="Ballerfarge">
+                                        <input type="color" class="theme-color-input" data-theme="grey" data-key="balls" value="#525150">
+                                        <span>Baller</span>
+                                    </label>
+                                    <label class="theme-color-swatch-label" title="Fare / rød farge">
+                                        <input type="color" class="theme-color-input" data-theme="grey" data-key="danger" value="#ff4444">
+                                        <span>Fare</span>
+                                    </label>
+                                    <label class="theme-color-swatch-label" title="Vinner / gull farge">
+                                        <input type="color" class="theme-color-input" data-theme="grey" data-key="winner" value="#f0c030">
+                                        <span>Vinner</span>
+                                    </label>
+                                </div>
+                                <button class="theme-color-reset-btn" data-theme="grey" title="Tilbakestill Spill 4">↩</button>
+                            </div>
+                            <div class="color-preset-section" data-theme="grey">
+                                <div class="color-preset-save-row">
+                                    <input type="text" class="color-preset-name-input" data-theme="grey" placeholder="Navn på fargesett…" maxlength="30">
+                                    <button class="color-preset-save-btn" data-theme="grey">💾 Lagre</button>
+                                </div>
+                                <div class="color-preset-list" data-theme="grey"></div>
+                            </div>
+                        </div>
+                        <div class="settings-row" style="margin-top:10px">
+                            <button class="modal-btn session-action-btn session-edit-btn" id="theme-colors-reset-all" style="font-size:.78rem;padding:5px 12px">↩ Tilbakestill alle farger</button>
+                        </div>
+                    </div>
+
+                    <!-- Panel: Spillinnstillinger -->
+                    <div class="settings-panel" id="sg-gameplay">
+                        <h3 class="settings-panel-title">Spillinnstillinger</h3>
+                        <div class="settings-row">
+                            <div class="settings-label">
+                                <span>Tallbane-layout</span>
+                                <span class="settings-desc">Horisontal: rader per tiår (10,20,30…). Vertikal: rader per siffer (1,2,3…)</span>
+                            </div>
+                            <select id="setting-grid-layout" class="session-input" style="width:130px;">
+                                <option value="horizontal">Horisontal</option>
+                                <option value="vertical">Vertikal</option>
+                            </select>
+                        </div>
+                        <div class="settings-row">
+                            <div class="settings-label">
+                                <span>Én-veis tallklikk</span>
+                                <span class="settings-desc">Hindrer av-klikking av tall. Viser angre-knapp i stedet</span>
+                            </div>
+                            <label class="settings-toggle">
+                                <input type="checkbox" id="setting-oneway">
+                                <span class="settings-toggle-track"></span>
+                            </label>
+                        </div>
+                        <div class="settings-row">
+                            <div class="settings-label">
+                                <span>«Bytt rekke!»-påminnelse</span>
+                                <span class="settings-desc">Vis påminnelse ved inaktivitet</span>
+                            </div>
+                            <label class="settings-toggle">
+                                <input type="checkbox" id="setting-tooltip" checked>
+                                <span class="settings-toggle-track"></span>
+                            </label>
+                        </div>
+                        <div class="settings-row">
+                            <div class="settings-label">
+                                <span>Vis sannsynligheter</span>
+                                <span class="settings-desc">Prosent-raden under tallrutenettet</span>
+                            </div>
+                            <label class="settings-toggle">
+                                <input type="checkbox" id="setting-chances" checked>
+                                <span class="settings-toggle-track"></span>
+                            </label>
+                        </div>
+                        <div class="settings-row">
+                            <div class="settings-label">
+                                <span>Tastatur-forsinkelse (1/10 sek)</span>
+                                <span class="settings-desc">Ventetid etter ett siffer før det registreres</span>
+                            </div>
+                            <div class="settings-stepper">
+                                <button class="rekke-adjust-btn" id="typing-delay-minus">−</button>
+                                <span class="settings-stepper-value" id="setting-typing-delay">8</span>
+                                <button class="rekke-adjust-btn" id="typing-delay-plus">+</button>
+                            </div>
+                        </div>
+                        <div class="settings-row">
+                            <div class="settings-label">
+                                <span>Overskriv enkeltsiffer</span>
+                                <span class="settings-desc">Registrer første siffer umiddelbart, erstatt med tosifret hvis neste kommer raskt nok</span>
+                            </div>
+                            <label class="settings-toggle">
+                                <input type="checkbox" id="setting-typing-overwrite">
+                                <span class="settings-toggle-track"></span>
+                            </label>
+                        </div>
+                        <div class="settings-row" id="overwrite-delay-row" style="display:none">
+                            <div class="settings-label">
+                                <span>Overskriv-vindu (1/10 sek)</span>
+                                <span class="settings-desc">Tid å skrive neste siffer for å overskrive</span>
+                            </div>
+                            <div class="settings-stepper">
+                                <button class="rekke-adjust-btn" id="overwrite-delay-minus">−</button>
+                                <span class="settings-stepper-value" id="setting-overwrite-delay">10</span>
+                                <button class="rekke-adjust-btn" id="overwrite-delay-plus">+</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Panel: Lydeffekter -->
+                    <div class="settings-panel" id="sg-sound">
+                        <h3 class="settings-panel-title">Lydeffekter</h3>
+                        <div class="settings-row">
+                            <div class="settings-label">
+                                <span>Lydeffekter på/av</span>
+                                <span class="settings-desc">Klikkelyd ved tall og hover</span>
+                            </div>
+                            <label class="settings-toggle">
+                                <input type="checkbox" id="setting-sound" checked>
+                                <span class="settings-toggle-track"></span>
+                            </label>
+                        </div>
+                        <div class="settings-row">
+                            <div class="settings-label">
+                                <span>Tall kalt</span>
+                                <span class="settings-desc">Når et tall klikkes</span>
+                            </div>
+                            <div class="sound-row-controls">
+                                <select id="setting-call-style" class="session-input" style="width:130px;">
+                                    <option value="synth">Synth (dobbel klokke)</option>
+                                    <option value="re4-inspired">RE4-inspirert</option>
+                                    <option value="re4-select-number">RE4 select number</option>
+                                    <option value="re4-select">RE4 select</option>
+                                    <option value="custom-click">Custom click</option>
+                                    <option value="custom-click-2">Custom click 2</option>
+                                </select>
+                                <input type="range" id="vol-call" class="vol-slider" min="0" max="1" step="0.05" value="0.9">
+                            </div>
+                        </div>
+                        <div class="settings-row">
+                            <div class="settings-label">
+                                <span>Hover-lyd</span>
+                                <span class="settings-desc">Stil for hover-effekten</span>
+                            </div>
+                            <div class="sound-row-controls">
+                                <select id="setting-hover-style" class="session-input" style="width:130px;">
+                                    <option value="click-air">Synth (click + air)</option>
+                                    <option value="re4">RE4 hover</option>
+                                    <option value="re4-loud">RE4 hover loud</option>
+                                    <option value="soft-tick">Synth (soft tick)</option>
+                                    <option value="tick-air">Synth (tick + air)</option>
+                                    <option value="air-tick">Synth (air + tick)</option>
+                                    <option value="air-click">Synth (air + click)</option>
+                                    <option value="air-puff">Synth (air puff)</option>
+                                    <option value="plastic-click">Synth (plastic click)</option>
+                                    <option value="custom-click-hover">Custom hover</option>
+                                    <option value="custom-click-hover-2">Custom hover 2</option>
+                                    <option value="custom-click-hover-3">Custom hover 3</option>
+                                </select>
+                                <input type="range" id="vol-hover" class="vol-slider" min="0" max="1" step="0.05" value="0.8">
+                            </div>
+                        </div>
+                        <div class="settings-row">
+                            <div class="settings-label">
+                                <span>Knapp valgt</span>
+                                <span class="settings-desc">Klikk på knapper (ikke tall)</span>
+                            </div>
+                            <div class="sound-row-controls">
+                                <select id="setting-select-style" class="session-input" style="width:130px;">
+                                    <option value="synth">Synth</option>
+                                    <option value="re4-select">RE4 select</option>
+                                    <option value="re4-select-number">RE4 select number</option>
+                                    <option value="custom-click-jackpot">Custom click jackpot</option>
+                                </select>
+                                <input type="range" id="vol-select" class="vol-slider" min="0" max="1" step="0.05" value="0.8">
+                            </div>
+                        </div>
+                        <div class="settings-row">
+                            <div class="settings-label">
+                                <span>Bytt spill</span>
+                                <span class="settings-desc">Når du bytter mellom spill</span>
+                            </div>
+                            <div class="sound-row-controls">
+                                <select id="setting-switch-style" class="session-input" style="width:130px;">
+                                    <option value="synth">Synth (blip)</option>
+                                    <option value="re4-switch">RE4 switch</option>
+                                    <option value="re4-switch-2">RE4 switch 2</option>
+                                </select>
+                                <input type="range" id="vol-switch" class="vol-slider" min="0" max="1" step="0.05" value="0.9">
+                            </div>
+                        </div>
+                        <div class="settings-row">
+                            <div class="settings-label">
+                                <span>Bekreft / lagre</span>
+                                <span class="settings-desc">Ja, lagre, bekreft</span>
+                            </div>
+                            <div class="sound-row-controls">
+                                <select id="setting-confirm-style" class="session-input" style="width:130px;">
+                                    <option value="synth">Synth (tre toner)</option>
+                                    <option value="re4-select">RE4 select</option>
+                                    <option value="custom-save-confirm-2">Custom bekreft 2</option>
+                                </select>
+                                <input type="range" id="vol-confirm" class="vol-slider" min="0" max="1" step="0.05" value="0.9">
+                            </div>
+                        </div>
+                        <div class="settings-row">
+                            <div class="settings-label">
+                                <span>Avbryt / lukk</span>
+                                <span class="settings-desc">Nei, avbryt, lukk</span>
+                            </div>
+                            <div class="sound-row-controls">
+                                <select id="setting-cancel-style" class="session-input" style="width:130px;">
+                                    <option value="synth">Synth (to-drop)</option>
+                                    <option value="re4-cancel">RE4 cancel</option>
+                                    <option value="re4-cancel-big">RE4 cancel big</option>
+                                    <option value="custom-close">Custom lukk</option>
+                                </select>
+                                <input type="range" id="vol-cancel" class="vol-slider" min="0" max="1" step="0.05" value="0.9">
+                            </div>
+                        </div>
+                        <div class="settings-row">
+                            <div class="settings-label">
+                                <span>Reset spill</span>
+                                <span class="settings-desc">Nullstill ett spill</span>
+                            </div>
+                            <div class="sound-row-controls">
+                                <select id="setting-reset-style" class="session-input" style="width:130px;">
+                                    <option value="synth">Synth (erase)</option>
+                                    <option value="re4-cancel-big">RE4 cancel big</option>
+                                    <option value="re4-cancel">RE4 cancel</option>
+                                </select>
+                                <input type="range" id="vol-reset" class="vol-slider" min="0" max="1" step="0.05" value="0.9">
+                            </div>
+                        </div>
+                        <div class="settings-row">
+                            <div class="settings-label">
+                                <span>Nullstill alle</span>
+                                <span class="settings-desc">Nullstill alle spill</span>
+                            </div>
+                            <div class="sound-row-controls">
+                                <select id="setting-reset-hard-style" class="session-input" style="width:130px;">
+                                    <option value="synth">Synth (crash)</option>
+                                    <option value="re4-cancel-big">RE4 cancel big</option>
+                                    <option value="re4-cancel">RE4 cancel</option>
+                                </select>
+                                <input type="range" id="vol-reset-hard" class="vol-slider" min="0" max="1" step="0.05" value="1.0">
+                            </div>
+                        </div>
+                        <div class="settings-row">
+                            <div class="settings-label">
+                                <span>Overtid</span>
+                                <span class="settings-desc">Spilles når du går over gjennomsnittet</span>
+                            </div>
+                            <div class="sound-row-controls">
+                                <select id="setting-overtime-style" class="session-input" style="width:130px;">
+                                    <option value="custom">Custom overtid</option>
+                                    <option value="synth">Synth</option>
+                                    <option value="off">Av</option>
+                                </select>
+                                <input type="range" id="vol-overtime" class="vol-slider" min="0" max="1" step="0.05" value="0.9">
+                            </div>
+                        </div>
+                        <div class="settings-row">
+                            <div class="settings-label">
+                                <span>Last opp lyd</span>
+                                <span class="settings-desc">Legg til egne lydeffekter</span>
+                            </div>
+                            <button class="modal-btn session-action-btn session-edit-btn" id="upload-sound-btn" style="flex-shrink:0">Last opp</button>
+                        </div>
+                    </div>
+
+                </div><!-- end .settings-content -->
+            </div><!-- end .settings-layout -->
+        </div>
+    </div>
+
+    <!-- UPLOAD SOUND MODAL -->
+    <div class="modal-overlay" id="upload-sound-modal" style="display:none">
+        <div class="modal modal-wide">
+            <h2 class="modal-title">Last opp lydeffekt</h2>
+            <p class="modal-subtitle">Velg kategorier, deretter fil</p>
+
+            <div class="add-win-section-label">Kategori</div>
+            <div class="upload-sound-categories" id="upload-sound-categories">
+                <label class="upload-cat-item"><input type="checkbox" value="hover"> Hover</label>
+                <label class="upload-cat-item"><input type="checkbox" value="call"> Tall kalt</label>
+                <label class="upload-cat-item"><input type="checkbox" value="select"> Knapp valgt</label>
+                <label class="upload-cat-item"><input type="checkbox" value="switch"> Bytt spill</label>
+                <label class="upload-cat-item"><input type="checkbox" value="confirm"> Bekreft / lagre</label>
+                <label class="upload-cat-item"><input type="checkbox" value="cancel"> Avbryt / lukk</label>
+                <label class="upload-cat-item"><input type="checkbox" value="reset"> Reset spill</label>
+                <label class="upload-cat-item"><input type="checkbox" value="reset-hard"> Nullstill alle</label>
+                <label class="upload-cat-item"><input type="checkbox" value="overtime"> Overtid</label>
+            </div>
+
+            <div class="modal-buttons" style="margin-top:20px">
+                <label class="modal-btn modal-btn-yes" id="upload-sound-label" style="cursor:pointer">
+                    Velg fil
+                    <input type="file" id="upload-sound-input" accept=".wav,.mp3,.ogg" style="display:none">
+                </label>
+                <button class="modal-btn modal-btn-no" id="upload-sound-cancel">Avbryt</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Jackpot flash notification -->
+    <div id="jackpot-flash" style="display:none"></div>
+
+    <script src="script.js"></script>
+<script src="flare.js" defer></script>
+</body>
+</html>
