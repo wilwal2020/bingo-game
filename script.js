@@ -1165,7 +1165,7 @@ class BingoApp {
     }
 
     exportSettings() {
-        const jsonKeys  = ['bingoSettings', 'bingoThemeColors', 'bingoColorPresets'];
+        const jsonKeys  = ['bingoSettings', 'bingoThemeColors', 'bingoColorPresets', 'bingoUserSounds'];
         const plainKeys = ['bingoTheme'];
         const data = {};
         jsonKeys.forEach(k => {
@@ -1193,7 +1193,7 @@ class BingoApp {
         reader.onload = (e) => {
             try {
                 const data = JSON.parse(e.target.result);
-                const jsonKeys  = ['bingoSettings', 'bingoThemeColors', 'bingoColorPresets'];
+                const jsonKeys  = ['bingoSettings', 'bingoThemeColors', 'bingoColorPresets', 'bingoUserSounds'];
                 const plainKeys = ['bingoTheme'];
                 let imported = 0;
                 jsonKeys.forEach(k => {
@@ -1209,8 +1209,13 @@ class BingoApp {
                 // Re-apply everything without a full reload
                 this.loadFromStorage();
                 this.applySettings();
-                this.applyThemeColors();
-                this.updateThemeButtonColors();
+                this.applySlotToDOM();
+                this.preloadSounds();
+                this.loadUserSoundsIntoPool();
+                // Resume AudioContext if it got suspended during the file dialog
+                if (this._audioCtx && this._audioCtx.state === 'suspended') {
+                    this._audioCtx.resume();
+                }
                 this.closeSettingsModal();
                 setTimeout(() => this.openSettingsModal(), 80);
             } catch {
