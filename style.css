@@ -13,6 +13,17 @@
     --danger-rgb:    255, 68, 68;
     --winner-color:  #f0c030;
     --winner-rgb:    240, 192, 48;
+
+    /* Button design tokens */
+    --btn-radius-pill: 999px;
+    --btn-radius-lg:   16px;
+    --btn-radius-md:   11px;
+    --btn-radius-sm:   8px;
+    --btn-glow:        0 0 18px rgba(var(--accent-rgb), .28), 0 4px 16px rgba(0,0,0,.4);
+    --btn-glow-hover:  0 0 28px rgba(var(--accent-rgb), .45), 0 6px 20px rgba(0,0,0,.5);
+    --btn-danger-glow: 0 0 16px rgba(var(--danger-rgb), .3), 0 4px 12px rgba(0,0,0,.4);
+    --btn-winner-glow: 0 0 18px rgba(var(--winner-rgb), .35), 0 4px 16px rgba(0,0,0,.4);
+    --btn-shine:       linear-gradient(160deg, rgba(255,255,255,.18) 0%, rgba(255,255,255,0) 55%);
 }
 
 .theme-blue {
@@ -92,20 +103,27 @@ body {
 
 .flex-item {
     width:            110px;
-    padding:          5px 10px;
+    padding:          6px 12px;
     margin:           0 15px;
     text-align:       center;
-    font-size:        20px;
+    font-size:        18px;
+    font-weight:      600;
     text-decoration:  none;
-    color:            rgba(255,255,255,.75);
-    background-color: rgba(255,255,255,.06);
-    border:           1px solid rgba(255,255,255,.12);
-    border-radius:    25px;
-    backdrop-filter:  blur(8px);
-    transition:       color .2s, border-color .2s, background-color .2s;
+    color:            rgba(255,255,255,.8);
+    background-color: rgba(255,255,255,.07);
+    border:           1px solid rgba(255,255,255,.15);
+    border-radius:    var(--btn-radius-pill);
+    backdrop-filter:  blur(10px);
+    box-shadow:       0 2px 10px rgba(0,0,0,.25);
+    transition:       color .2s, border-color .2s, background-color .2s, box-shadow .2s;
 }
 
-.flex-item:hover { color: var(--accent-color); border: 2px solid var(--accent-color); background-color: rgba(255,255,255,.1); }
+.flex-item:hover {
+    color:            var(--accent-color);
+    border-color:     var(--accent-color);
+    background-color: rgba(255,255,255,.11);
+    box-shadow:       0 0 14px rgba(var(--accent-rgb),.2), 0 2px 10px rgba(0,0,0,.3);
+}
 
 /* Dropdown */
 .dropdown { position: relative; }
@@ -341,19 +359,31 @@ body.layout-vertical .theme-buttons {
 .theme-button {
     width:            70px;
     height:           40px;
-    border:           1px solid;
-    border-radius:    10px;
+    border:           1.5px solid;
+    border-radius:    var(--btn-radius-pill);
     cursor:           pointer;
-    font-weight:      bold;
-    font-size:        14px;
-    color:            rgba(255,255,255,.7);
-    backdrop-filter:  blur(4px);
-    transition:       all .2s;
+    font-weight:      700;
+    font-size:        13px;
+    color:            rgba(255,255,255,.75);
+    backdrop-filter:  blur(6px);
+    box-shadow:       0 2px 8px rgba(0,0,0,.3);
+    transition:       all .18s ease;
 }
 
 .theme-button        { background-color: var(--btn-primary); border-color: var(--btn-accent); }
-.theme-button:hover  { background-color: var(--btn-accent);  border-color: var(--btn-accent); color: #111; transform: scale(1.05); }
-.theme-button.active { background-color: var(--btn-accent);  color: #111; }
+.theme-button:hover  {
+    background-color: var(--btn-accent);
+    border-color:     var(--btn-accent);
+    color:            #111;
+    transform:        scale(1.07);
+    box-shadow:       0 0 14px rgba(var(--accent-rgb),.3), 0 3px 10px rgba(0,0,0,.4);
+}
+.theme-button.active {
+    background-color: var(--btn-accent);
+    border-color:     var(--btn-accent);
+    color:            #111;
+    box-shadow:       0 0 16px rgba(var(--accent-rgb),.35), 0 3px 10px rgba(0,0,0,.4);
+}
 
 /* ===================================================
    COUNTER SECTION (column 2)
@@ -525,63 +555,79 @@ body.no-over-average-blink .circle.over-average { animation: none; }
     display:          block;
     width:            100%;
     margin-top:       16px;
-    padding:          12px;
+    padding:          13px;
     font-size:        1.2rem;
     font-weight:      bold;
-    color:            var(--primary-color);
+    color:            #111;
     background-color: var(--accent-color);
-    border:           1px solid var(--accent-color);
-    border-radius:    12px;
+    background-image: var(--btn-shine);
+    border:           1.5px solid var(--accent-color);
+    border-radius:    var(--btn-radius-pill);
     cursor:           pointer;
     transition:       all .2s ease;
-    box-shadow:       0 2px 12px rgba(0,0,0,.3);
+    box-shadow:       var(--btn-glow);
 }
 
 .save-session-btn:hover {
     color:            var(--accent-color);
-    background-color: rgba(255,255,255,.06);
+    background-color: rgba(var(--accent-rgb), .1);
+    background-image: none;
     border-color:     var(--accent-color);
-    box-shadow:       0 0 16px rgba(255,255,255,.08);
+    box-shadow:       var(--btn-glow-hover);
+    transform:        translateY(-1px);
 }
 
 .log-rekke3-btn {
     margin-top:       8px;
-    background-color: transparent;
+    background-color: rgba(var(--accent-rgb), .08);
+    background-image: none;
     color:            var(--accent-color);
-    border-color:     var(--accent-color);
+    border-color:     rgba(var(--accent-rgb), .5);
+    box-shadow:       none;
 }
 
 .log-rekke3-btn:hover {
     background-color: var(--accent-color);
-    color:            var(--primary-color);
+    background-image: var(--btn-shine);
+    color:            #111;
+    border-color:     var(--accent-color);
+    box-shadow:       var(--btn-glow);
+    transform:        translateY(-1px);
 }
 
 .view-sessions-btn {
     margin-top:       8px;
-    background-color: transparent;
-    color:            rgba(255,255,255,.7);
-    border-color:     rgba(255,255,255,.3);
+    background-color: rgba(255,255,255,.05);
+    background-image: none;
+    color:            rgba(255,255,255,.75);
+    border-color:     rgba(255,255,255,.2);
     font-size:        1rem;
+    box-shadow:       none;
 }
 
 .view-sessions-btn:hover {
     background-color: rgba(255,255,255,.1);
     color:            white;
-    border-color:     rgba(255,255,255,.6);
+    border-color:     rgba(255,255,255,.5);
+    transform:        translateY(-1px);
 }
 
 .reset-all-btn {
     margin-top:       8px;
-    background-color: transparent;
+    background-color: rgba(var(--danger-rgb), .07);
+    background-image: none;
     color:            var(--danger-color);
-    border-color:     var(--danger-color);
+    border-color:     rgba(var(--danger-rgb), .4);
     font-size:        1rem;
+    box-shadow:       none;
 }
 
 .reset-all-btn:hover {
-    background-color: var(--danger-color);
+    background-color: rgba(var(--danger-rgb), .18);
     border-color:     var(--danger-color);
-    color:            white;
+    color:            #ff7777;
+    box-shadow:       var(--btn-danger-glow);
+    transform:        translateY(-1px);
 }
 
 /* Session viewer */
@@ -1128,29 +1174,33 @@ body.no-over-average-blink .circle.over-average { animation: none; }
     padding:          10px;
     font-size:        2rem;
     font-weight:      bold;
-    color:            rgba(255,255,255,.6);
-    background-color: rgba(255,255,255,.04);
-    border:           2px solid rgba(255,255,255,.08);
-    border-radius:    14px;
+    color:            rgba(255,255,255,.65);
+    background-color: rgba(255,255,255,.05);
+    border:           2px solid rgba(255,255,255,.12);
+    border-radius:    var(--btn-radius-lg);
     cursor:           pointer;
-    backdrop-filter:  blur(4px);
+    backdrop-filter:  blur(8px);
     white-space:      nowrap;
     overflow:         hidden;
     min-width:        0;
-    transition:       background-color .2s ease, color .2s ease, transform .15s ease, border-color .2s ease, box-shadow .2s ease;
+    box-shadow:       0 2px 12px rgba(0,0,0,.25);
+    transition:       background-color .2s ease, color .2s ease, transform .18s ease, border-color .2s ease, box-shadow .2s ease;
 }
 
 .rekke-btn:hover {
-    transform:        scale(1.05);
+    transform:        scale(1.06);
     border-color:     var(--accent-color);
     color:            var(--accent-color);
+    background-color: rgba(var(--accent-rgb), .08);
+    box-shadow:       0 0 18px rgba(var(--accent-rgb), .2), 0 4px 14px rgba(0,0,0,.35);
 }
 
 .rekke-btn.active {
     background-color: var(--accent-color);
+    background-image: var(--btn-shine);
     color:            var(--primary-color);
     border-color:     var(--accent-color);
-    box-shadow:       0 0 16px rgba(255,255,255,.12);
+    box-shadow:       var(--btn-glow);
 }
 
 #big-number {
@@ -1355,10 +1405,10 @@ body.no-over-average-blink .circle.over-average { animation: none; }
 }
 
 .modal-btn {
-    padding:       10px 28px;
-    font-size:     1.2rem;
-    font-weight:   bold;
-    border-radius: 20px;
+    padding:       11px 32px;
+    font-size:     1.15rem;
+    font-weight:   700;
+    border-radius: var(--btn-radius-pill);
     border:        2px solid;
     cursor:        pointer;
     transition:    all .2s ease;
@@ -1366,24 +1416,32 @@ body.no-over-average-blink .circle.over-average { animation: none; }
 
 .modal-btn-yes {
     background-color: var(--accent-color);
+    background-image: var(--btn-shine);
     border-color:     var(--accent-color);
     color:            #111;
+    box-shadow:       var(--btn-glow);
 }
 
 .modal-btn-yes:hover {
-    background-color: transparent;
+    background-color: rgba(var(--accent-rgb), .12);
+    background-image: none;
     color:            var(--accent-color);
+    box-shadow:       var(--btn-glow-hover);
+    transform:        translateY(-2px);
 }
 
 .modal-btn-no {
-    background-color: transparent;
-    border-color:     var(--danger-color);
+    background-color: rgba(var(--danger-rgb), .08);
+    border-color:     rgba(var(--danger-rgb), .5);
     color:            var(--danger-color);
 }
 
 .modal-btn-no:hover {
-    background-color: var(--danger-color);
-    color:            white;
+    background-color: rgba(var(--danger-rgb), .18);
+    border-color:     var(--danger-color);
+    color:            #ff8080;
+    box-shadow:       var(--btn-danger-glow);
+    transform:        translateY(-2px);
 }
 
 /* Session edit grid */
@@ -1614,14 +1672,19 @@ body.fullscreen .page-layout {
 .log-winner-btn {
     margin-top:       8px;
     background-color: var(--winner-color);
+    background-image: var(--btn-shine);
     border-color:     var(--winner-color);
-    color:            white;
+    color:            #111;
+    box-shadow:       var(--btn-winner-glow);
 }
 
 .log-winner-btn:hover {
-    background-color: transparent;
+    background-color: rgba(var(--winner-rgb), .12);
+    background-image: none;
     color:            var(--winner-color);
     border-color:     var(--winner-color);
+    box-shadow:       0 0 26px rgba(var(--winner-rgb), .5), 0 6px 20px rgba(0,0,0,.5);
+    transform:        translateY(-1px);
 }
 
 /* Player quick-select chips */
@@ -1635,27 +1698,32 @@ body.fullscreen .page-layout {
 }
 
 .player-chip {
-    padding:          8px 20px;
+    padding:          8px 22px;
     font-size:        1rem;
-    font-weight:      bold;
-    color:            rgba(255,255,255,.75);
+    font-weight:      700;
+    color:            rgba(255,255,255,.8);
     background-color: rgba(255,255,255,.07);
-    border:           2px solid rgba(255,255,255,.2);
-    border-radius:    24px;
+    border:           1.5px solid rgba(255,255,255,.18);
+    border-radius:    var(--btn-radius-pill);
     cursor:           pointer;
-    transition:       all .15s;
+    box-shadow:       0 2px 8px rgba(0,0,0,.25);
+    transition:       all .18s ease;
 }
 
 .player-chip:hover {
     border-color:     var(--accent-color);
     color:            var(--accent-color);
-    background-color: rgba(255,255,255,.1);
+    background-color: rgba(var(--accent-rgb), .08);
+    box-shadow:       0 0 12px rgba(var(--accent-rgb), .2), 0 2px 8px rgba(0,0,0,.3);
+    transform:        translateY(-1px);
 }
 
 .player-chip.active {
     background-color: var(--accent-color);
+    background-image: var(--btn-shine);
     border-color:     var(--accent-color);
     color:            var(--primary-color);
+    box-shadow:       var(--btn-glow);
 }
 
 /* Winner name input row */
@@ -1946,32 +2014,41 @@ body.fullscreen .page-layout {
     font-size:        1.3rem;
     font-weight:      bold;
     padding:          12px 4px;
-    color:            var(--primary-color);
+    color:            #111;
     background-color: var(--accent-color);
+    background-image: var(--btn-shine);
     border:           2px solid var(--accent-color);
-    border-radius:    20px;
+    border-radius:    var(--btn-radius-pill);
     cursor:           pointer;
-    transition:       background-color .2s ease, color .2s ease, border-color .2s ease;
+    transition:       all .2s ease;
     white-space:      nowrap;
+    box-shadow:       var(--btn-glow);
 }
 
 #reset-button:hover,
 #jackpot-button:hover {
     color:            var(--accent-color);
-    background-color: var(--primary-color);
+    background-color: rgba(var(--accent-rgb), .1);
+    background-image: none;
     border-color:     var(--accent-color);
+    box-shadow:       var(--btn-glow-hover);
+    transform:        translateY(-1px);
 }
 
 #reset-button.confirm {
     background-color: var(--danger-color);
+    background-image: var(--btn-shine);
     border-color:     var(--danger-color);
     color:            white;
+    box-shadow:       var(--btn-danger-glow);
 }
 
 #jackpot-button.active {
     background-color: var(--danger-color);
+    background-image: var(--btn-shine);
     border-color:     var(--danger-color);
     color:            white;
+    box-shadow:       var(--btn-danger-glow);
 }
 
 /* Winner button wrapper - fixed at bottom of column 1 */
@@ -1990,33 +2067,42 @@ body.fullscreen .page-layout {
     font-size:        1.3rem;
     font-weight:      bold;
     padding:          12px 10px;
-    color:            var(--primary-color);
+    color:            #111;
     background-color: var(--winner-color);
+    background-image: var(--btn-shine);
     border:           2px solid var(--winner-color);
-    border-radius:    25px;
+    border-radius:    var(--btn-radius-pill);
     cursor:           pointer;
     transition:       all .2s ease;
     display:          none;
     align-items:      center;
     justify-content:  center;
     text-align:       center;
+    box-shadow:       var(--btn-winner-glow);
 }
 
 #log-winner-btn-2:hover {
     color:            var(--winner-color);
-    background-color: var(--primary-color);
+    background-color: rgba(var(--winner-rgb), .12);
+    background-image: none;
+    box-shadow:       0 0 26px rgba(var(--winner-rgb), .5), 0 6px 20px rgba(0,0,0,.5);
+    transform:        translateY(-1px);
 }
 
 /* Leaderboard button - gold color */
 #leaderboard-btn {
-    background-color: rgba(var(--winner-rgb),.15);
-    border-color:     var(--winner-color);
+    background-color: rgba(var(--winner-rgb), .1);
+    border-color:     rgba(var(--winner-rgb), .4);
     color:            var(--winner-color);
 }
 
 #leaderboard-btn:hover {
     background-color: var(--winner-color);
-    color:            var(--primary-color);
+    background-image: var(--btn-shine);
+    color:            #111;
+    border-color:     var(--winner-color);
+    box-shadow:       var(--btn-winner-glow);
+    transform:        translateY(-1px);
 }
 
 /* =====================================================
@@ -2053,15 +2139,18 @@ body.fullscreen .page-layout {
 
 /* Rekke3 ready-to-log state: checkmark only */
 .rekke-btn.rekke3-ready {
-    background:   var(--accent-color);
-    color:        var(--primary-color);
-    border-color: var(--accent-color);
-    font-weight:  bold;
+    background-color: var(--accent-color);
+    background-image: var(--btn-shine);
+    color:            var(--primary-color);
+    border-color:     var(--accent-color);
+    font-weight:      bold;
+    box-shadow:       var(--btn-glow);
 }
 
 .rekke-btn.rekke3-ready:hover {
-    filter:    brightness(1.15);
-    transform: scale(1.05);
+    filter:    brightness(1.12);
+    transform: scale(1.06);
+    box-shadow: var(--btn-glow-hover);
 }
 
 /* =====================================================
@@ -2111,34 +2200,39 @@ body.fullscreen .page-layout {
 
 .rekke-confirm-btn {
     flex:          1;
-    padding:       8px 0;
+    padding:       9px 0;
     font-size:     1rem;
     font-weight:   bold;
-    border-radius: 10px;
+    border-radius: var(--btn-radius-pill);
     border:        2px solid;
     cursor:        pointer;
-    transition:    all .15s ease;
+    transition:    all .18s ease;
 }
 
 .rekke-confirm-yes {
-    background:   var(--accent-color);
-    border-color: var(--accent-color);
-    color:        var(--primary-color);
+    background-color: var(--accent-color);
+    background-image: var(--btn-shine);
+    border-color:     var(--accent-color);
+    color:            var(--primary-color);
+    box-shadow:       var(--btn-glow);
 }
 
 .rekke-confirm-yes:hover {
-    filter: brightness(1.15);
+    filter:     brightness(1.12);
+    box-shadow: var(--btn-glow-hover);
+    transform:  translateY(-1px);
 }
 
 .rekke-confirm-no {
-    background:   transparent;
-    border-color: rgba(255,255,255,.3);
-    color:        rgba(255,255,255,.7);
+    background-color: rgba(255,255,255,.05);
+    border-color:     rgba(255,255,255,.25);
+    color:            rgba(255,255,255,.75);
 }
 
 .rekke-confirm-no:hover {
-    border-color: rgba(255,255,255,.6);
-    color:        white;
+    border-color:     rgba(255,255,255,.55);
+    color:            white;
+    background-color: rgba(255,255,255,.09);
 }
 
 .rekke-confirm-adjust {
@@ -2150,26 +2244,29 @@ body.fullscreen .page-layout {
 }
 
 .rekke-adjust-btn {
-    width:         36px;
-    height:        36px;
+    width:         38px;
+    height:        38px;
     font-size:     1.4rem;
     font-weight:   bold;
     line-height:   1;
     border-radius: 50%;
-    border:        2px solid rgba(255,255,255,.25);
-    background:    rgba(255,255,255,.08);
-    color:         white;
+    border:        2px solid rgba(255,255,255,.2);
+    background:    rgba(255,255,255,.07);
+    color:         rgba(255,255,255,.85);
     cursor:        pointer;
-    transition:    all .15s;
+    transition:    all .18s ease;
     display:       flex;
     align-items:   center;
     justify-content: center;
+    box-shadow:    0 2px 8px rgba(0,0,0,.3);
 }
 
 .rekke-adjust-btn:hover {
     border-color: var(--accent-color);
     color:        var(--accent-color);
-    background:   rgba(255,255,255,.12);
+    background:   rgba(var(--accent-rgb), .1);
+    box-shadow:   0 0 12px rgba(var(--accent-rgb), .25), 0 2px 8px rgba(0,0,0,.3);
+    transform:    scale(1.08);
 }
 
 .rekke-adjust-count {
@@ -2321,26 +2418,32 @@ body.fullscreen .page-layout {
 }
 
 .add-win-preset-btn {
-    padding:       8px 16px;
+    padding:       8px 18px;
     font-size:     .95rem;
-    font-weight:   bold;
-    color:         rgba(255,255,255,.7);
+    font-weight:   700;
+    color:         rgba(255,255,255,.78);
     background:    rgba(255,255,255,.06);
-    border:        2px solid rgba(255,255,255,.15);
-    border-radius: 20px;
+    border:        1.5px solid rgba(255,255,255,.16);
+    border-radius: var(--btn-radius-pill);
     cursor:        pointer;
-    transition:    all .15s;
+    box-shadow:    0 2px 8px rgba(0,0,0,.2);
+    transition:    all .18s ease;
 }
 
 .add-win-preset-btn:hover {
     border-color: var(--accent-color);
     color:        var(--accent-color);
+    background:   rgba(var(--accent-rgb), .08);
+    box-shadow:   0 0 10px rgba(var(--accent-rgb), .18), 0 2px 8px rgba(0,0,0,.25);
+    transform:    translateY(-1px);
 }
 
 .add-win-preset-btn.active {
-    background:   var(--accent-color);
-    border-color: var(--accent-color);
-    color:        var(--primary-color);
+    background:        var(--accent-color);
+    background-image:  var(--btn-shine);
+    border-color:      var(--accent-color);
+    color:             var(--primary-color);
+    box-shadow:        var(--btn-glow);
 }
 
 .add-win-custom-row {
@@ -2492,23 +2595,25 @@ body.fullscreen .page-layout {
    ===================================================== */
 .settings-nav-btn {
     width:            50px;
-    padding:          5px 10px;
+    padding:          6px 10px;
     margin:           0 15px;
     text-align:       center;
     font-size:        1.2rem;
-    color:            rgba(255,255,255,.75);
-    background-color: rgba(255,255,255,.06);
-    border:           1px solid rgba(255,255,255,.12);
-    border-radius:    25px;
-    backdrop-filter:  blur(8px);
+    color:            rgba(255,255,255,.8);
+    background-color: rgba(255,255,255,.07);
+    border:           1px solid rgba(255,255,255,.15);
+    border-radius:    var(--btn-radius-pill);
+    backdrop-filter:  blur(10px);
+    box-shadow:       0 2px 10px rgba(0,0,0,.25);
     cursor:           pointer;
-    transition:       color .2s, border-color .2s, background-color .2s;
+    transition:       color .2s, border-color .2s, background-color .2s, box-shadow .2s;
 }
 
 .settings-nav-btn:hover {
     color:            var(--accent-color);
     border-color:     var(--accent-color);
-    background-color: rgba(255,255,255,.1);
+    background-color: rgba(255,255,255,.11);
+    box-shadow:       0 0 14px rgba(var(--accent-rgb),.2), 0 2px 10px rgba(0,0,0,.3);
 }
 
 .modal-settings {
@@ -2555,29 +2660,30 @@ body.fullscreen .page-layout {
 .settings-nav-item {
     display:       block;
     width:         100%;
-    padding:       10px 12px;
+    padding:       10px 14px;
     background:    transparent;
     border:        none;
     border-left:   3px solid transparent;
-    border-radius: 0 10px 10px 0;
+    border-radius: var(--btn-radius-md);
     color:         rgba(255,255,255,.6);
     font-size:     .9rem;
     font-weight:   600;
     text-align:    left;
     cursor:        pointer;
-    transition:    background .15s, color .15s, border-color .15s;
+    transition:    background .15s, color .15s, border-color .15s, box-shadow .15s;
     box-sizing:    border-box;
 }
 
 .settings-nav-item:hover {
-    background: rgba(255,255,255,.07);
-    color:      white;
+    background: rgba(255,255,255,.08);
+    color:      rgba(255,255,255,.95);
 }
 
 .settings-nav-item.active {
-    background:   rgba(var(--accent-rgb), .18);
+    background:   rgba(var(--accent-rgb), .16);
     color:        var(--accent-color);
     border-color: var(--accent-color);
+    box-shadow:   inset 0 0 12px rgba(var(--accent-rgb), .06);
 }
 
 .settings-nav-spacer { flex: 1; }
