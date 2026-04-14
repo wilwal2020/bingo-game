@@ -1279,8 +1279,9 @@ body.no-over-average-blink .circle.over-average { animation: none; }
     font-size:             clamp(2rem, 4vw, 4rem);
 }
 
-#recent-numbers div            { transition: all .3s ease; }
-#recent-numbers div.new-number { animation: recentNumberSlide .6s ease-out; }
+#recent-numbers div              { transition: all .3s ease; }
+#recent-numbers div.new-number   { animation: recentNumberSlide .6s ease-out; }
+#recent-numbers div.prev-rekke   { opacity: 0.35; }
 
 
 

@@ -137,6 +137,8 @@ class BingoApp {
             volCancel:  0.9,
             volReset:   0.9,
             volResetHard: 1.0,
+            firstRekkeStyle: 'synth',
+            volFirstRekke: 0.9,
             overAverageBlinkEnabled: true,
             nextGameCountdownEnabled: false,
             nextGameCountdownMinutes: 3,
@@ -278,8 +280,10 @@ class BingoApp {
             volCancel:   document.getElementById('vol-cancel'),
             volReset:    document.getElementById('vol-reset'),
             volResetHard:document.getElementById('vol-reset-hard'),
-            settingOvertimeStyle: document.getElementById('setting-overtime-style'),
-            volOvertime: document.getElementById('vol-overtime'),
+            settingOvertimeStyle:    document.getElementById('setting-overtime-style'),
+            volOvertime:             document.getElementById('vol-overtime'),
+            settingFirstRekkeStyle:  document.getElementById('setting-first-rekke-style'),
+            volFirstRekke:           document.getElementById('vol-first-rekke'),
             settingTypingDelay:   document.getElementById('setting-typing-delay'),
             settingTypingDelayPlus:  document.getElementById('typing-delay-plus'),
             settingTypingDelayMinus: document.getElementById('typing-delay-minus'),
@@ -726,7 +730,8 @@ class BingoApp {
         bindSoundStyle(this.el.settingCancelStyle,    'cancelStyle',    'cancel');
         bindSoundStyle(this.el.settingResetStyle,     'resetStyle',     'reset');
         bindSoundStyle(this.el.settingResetHardStyle, 'resetHardStyle', 'reset-hard');
-        bindSoundStyle(this.el.settingOvertimeStyle,  'overtimeStyle',  'overtime');
+        bindSoundStyle(this.el.settingOvertimeStyle,   'overtimeStyle',   'overtime');
+        bindSoundStyle(this.el.settingFirstRekkeStyle, 'firstRekkeStyle', 'first-rekke');
 
         const bindVol = (el, key, type) => {
             if (!el) return;
@@ -744,7 +749,8 @@ class BingoApp {
         bindVol(this.el.volCancel,    'volCancel',    'cancel');
         bindVol(this.el.volReset,     'volReset',     'reset');
         bindVol(this.el.volResetHard, 'volResetHard', 'reset-hard');
-        bindVol(this.el.volOvertime,  'volOvertime',  'overtime');
+        bindVol(this.el.volOvertime,    'volOvertime',    'overtime');
+        bindVol(this.el.volFirstRekke,  'volFirstRekke',  'first-rekke');
         if (this.el.settingTypingDelayPlus) {
             this.el.settingTypingDelayPlus.addEventListener('click', () => {
                 this.settings.typingDelay = Math.min(30, (this.settings.typingDelay ?? 8) + 1);
@@ -1101,8 +1107,10 @@ class BingoApp {
         this.el.settingCancelStyle.value      = s.cancelStyle;
         this.el.settingResetStyle.value       = s.resetStyle;
         this.el.settingResetHardStyle.value   = s.resetHardStyle;
-        if (this.el.settingOvertimeStyle) this.el.settingOvertimeStyle.value = s.overtimeStyle;
-        if (this.el.volOvertime) this.el.volOvertime.value = s.volOvertime;
+        if (this.el.settingOvertimeStyle)   this.el.settingOvertimeStyle.value   = s.overtimeStyle;
+        if (this.el.volOvertime)            this.el.volOvertime.value            = s.volOvertime;
+        if (this.el.settingFirstRekkeStyle) this.el.settingFirstRekkeStyle.value = s.firstRekkeStyle;
+        if (this.el.volFirstRekke)          this.el.volFirstRekke.value          = s.volFirstRekke;
         if (this.el.settingTypingDelay) this.el.settingTypingDelay.textContent = s.typingDelay ?? 8;
         if (this.el.settingTypingOverwrite) {
             this.el.settingTypingOverwrite.checked = s.typingOverwrite ?? false;
@@ -1455,6 +1463,7 @@ class BingoApp {
                     this.saveSlotToStorage();
                 }, 400);
             }
+            const isFirstOfRekke = nums.length === (this.slot.countAtLastRekkeChange || 0);
             this.slot.selectedNumbers.push(number);
             // Remove last-clicked from previous ball
             if (this._lastClickedBall && this._lastClickedBall !== ball) {
@@ -1466,6 +1475,7 @@ class BingoApp {
             this.el.bigNumberText.textContent = number;
             this.el.bigNumber.classList.add('number-update');
             this.playSound('call');
+            if (isFirstOfRekke) setTimeout(() => this.playSound('first-rekke'), 80);
             this.checkOvertimeSound();
             this.startBigNumberProgress();
             setTimeout(() => {
@@ -1629,10 +1639,12 @@ class BingoApp {
         const recent = all.slice(0, 9);
         this.el.recentNumbers.innerHTML = '';
 
+        const cutoff = all.length - (this.slot.countAtLastRekkeChange || 0);
         recent.forEach((num, i) => {
             const div = document.createElement('div');
             div.textContent = num;
             if (i === 0) div.classList.add('new-number');
+            if (this.slot.countAtLastRekkeChange > 0 && i >= cutoff) div.classList.add('prev-rekke');
             this.el.recentNumbers.appendChild(div);
         });
 
@@ -3772,7 +3784,8 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             cancel:       'setting-cancel-style',
             reset:        'setting-reset-style',
             'reset-hard': 'setting-reset-hard-style',
-            overtime:     'setting-overtime-style',
+            overtime:      'setting-overtime-style',
+            'first-rekke': 'setting-first-rekke-style',
         };
         return map[cat] || null;
     }
@@ -3861,6 +3874,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                 hover: 'hoverStyle', call: 'callStyle', select: 'selectStyle',
                 switch: 'switchStyle', confirm: 'confirmStyle', cancel: 'cancelStyle',
                 reset: 'resetStyle', 'reset-hard': 'resetHardStyle', overtime: 'overtimeStyle',
+                'first-rekke': 'firstRekkeStyle',
             }[type];
             if (styleKey) {
                 const style = this.settings[styleKey];
@@ -3937,7 +3951,20 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                     noTail.connect(tailHp); tailHp.connect(tailLp); tailLp.connect(tailG); tailG.connect(md);
                     noTail.start(n+0.02); return;
                 }
-                // synth: double chime
+                if (s.callStyle === 'synth-inverse') {
+                    // synth: inverse double chime (low-high)
+                    const md = MD(s.volCall);
+                    [[660, 0], [880, 0.08]].forEach(([freq, delay]) => {
+                        const o = osc('sine', freq); const g = gn();
+                        const o2 = osc('sine', freq * 1.5); const g2 = gn();
+                        g.gain.setValueAtTime(0, n+delay); g.gain.linearRampToValueAtTime(0.25, n+delay+0.01); g.gain.exponentialRampToValueAtTime(0.001, n+delay+0.4);
+                        g2.gain.setValueAtTime(0, n+delay); g2.gain.linearRampToValueAtTime(0.08, n+delay+0.01); g2.gain.exponentialRampToValueAtTime(0.001, n+delay+0.22);
+                        o.connect(g); g.connect(md); o2.connect(g2); g2.connect(md);
+                        o.start(n+delay); o.stop(n+delay+0.4); o2.start(n+delay); o2.stop(n+delay+0.22);
+                    });
+                    return;
+                }
+                // synth: double chime (high-low)
                 { const md = MD(s.volCall);
                 [[880, 0], [660, 0.08]].forEach(([freq, delay]) => {
                     const o = osc('sine', freq); const g = gn();
@@ -3946,6 +3973,19 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                     g2.gain.setValueAtTime(0, n+delay); g2.gain.linearRampToValueAtTime(0.08, n+delay+0.01); g2.gain.exponentialRampToValueAtTime(0.001, n+delay+0.22);
                     o.connect(g); g.connect(md); o2.connect(g2); g2.connect(md);
                     o.start(n+delay); o.stop(n+delay+0.4); o2.start(n+delay); o2.stop(n+delay+0.22);
+                }); }
+
+            } else if (type === 'first-rekke') {
+                if (s.firstRekkeStyle === 'off') return;
+                // synth: rising three-note arpeggio to signal rekke start
+                { const md = MD(s.volFirstRekke);
+                [440, 554, 660].forEach((freq, i) => {
+                    const o = osc('sine', freq); const g = gn();
+                    const o2 = osc('sine', freq * 2); const g2 = gn();
+                    g.gain.setValueAtTime(0, n+i*0.09); g.gain.linearRampToValueAtTime(0.22, n+i*0.09+0.01); g.gain.exponentialRampToValueAtTime(0.001, n+i*0.09+0.35);
+                    g2.gain.setValueAtTime(0, n+i*0.09); g2.gain.linearRampToValueAtTime(0.06, n+i*0.09+0.01); g2.gain.exponentialRampToValueAtTime(0.001, n+i*0.09+0.2);
+                    o.connect(g); g.connect(md); o2.connect(g2); g2.connect(md);
+                    o.start(n+i*0.09); o.stop(n+i*0.09+0.35); o2.start(n+i*0.09); o2.stop(n+i*0.09+0.2);
                 }); }
 
             } else if (type === 'hover') {
