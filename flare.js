@@ -541,7 +541,8 @@
         btn.className    = 'settings-nav-item';
         btn.dataset.panel = 'sg-flare';
         btn.textContent  = '✨ Effekter';
-        nav.appendChild(btn);
+        const spacer = nav.querySelector('.settings-nav-spacer');
+        spacer ? nav.insertBefore(btn, spacer) : nav.appendChild(btn);
 
         // Panel
         const panel = document.createElement('div');

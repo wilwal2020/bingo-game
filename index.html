@@ -567,7 +567,7 @@
                     <button class="settings-nav-item" data-panel="sg-sound" data-label="Lydeffekter">Lydeffekter</button>
                     <div class="settings-nav-spacer"></div>
                     <div class="settings-io-menu">
-                        <button class="settings-io-toggle" id="settings-io-toggle" title="Eksporter / Importer">⋮</button>
+                        <button class="settings-io-toggle" id="settings-io-toggle">⬆⬇ Eksporter / Importer</button>
                         <div class="settings-io-dropdown" id="settings-io-dropdown">
                             <button class="viewer-io-item" id="settings-export-btn">⬆ Eksporter</button>
                             <label class="viewer-io-item" style="cursor:pointer">
@@ -1021,6 +1021,7 @@
                                     <option value="custom-click-2">Custom click 2</option>
                                 </select>
                                 <input type="range" id="vol-call" class="vol-slider" min="0" max="1" step="0.05" value="0.9">
+                                <button class="sound-mute-btn" data-sound-type="call" title="Mute">🔊</button>
                             </div>
                         </div>
                         <div class="settings-row">
@@ -1044,6 +1045,7 @@
                                     <option value="custom-click-hover-3">Custom hover 3</option>
                                 </select>
                                 <input type="range" id="vol-hover" class="vol-slider" min="0" max="1" step="0.05" value="0.8">
+                                <button class="sound-mute-btn" data-sound-type="hover" title="Mute">🔊</button>
                             </div>
                         </div>
                         <div class="settings-row">
@@ -1059,6 +1061,7 @@
                                     <option value="custom-click-jackpot">Custom click jackpot</option>
                                 </select>
                                 <input type="range" id="vol-select" class="vol-slider" min="0" max="1" step="0.05" value="0.8">
+                                <button class="sound-mute-btn" data-sound-type="select" title="Mute">🔊</button>
                             </div>
                         </div>
                         <div class="settings-row">
@@ -1073,6 +1076,7 @@
                                     <option value="re4-switch-2">RE4 switch 2</option>
                                 </select>
                                 <input type="range" id="vol-switch" class="vol-slider" min="0" max="1" step="0.05" value="0.9">
+                                <button class="sound-mute-btn" data-sound-type="switch" title="Mute">🔊</button>
                             </div>
                         </div>
                         <div class="settings-row">
@@ -1087,6 +1091,7 @@
                                     <option value="custom-save-confirm-2">Custom bekreft 2</option>
                                 </select>
                                 <input type="range" id="vol-confirm" class="vol-slider" min="0" max="1" step="0.05" value="0.9">
+                                <button class="sound-mute-btn" data-sound-type="confirm" title="Mute">🔊</button>
                             </div>
                         </div>
                         <div class="settings-row">
@@ -1102,6 +1107,7 @@
                                     <option value="custom-close">Custom lukk</option>
                                 </select>
                                 <input type="range" id="vol-cancel" class="vol-slider" min="0" max="1" step="0.05" value="0.9">
+                                <button class="sound-mute-btn" data-sound-type="cancel" title="Mute">🔊</button>
                             </div>
                         </div>
                         <div class="settings-row">
@@ -1116,6 +1122,7 @@
                                     <option value="re4-cancel">RE4 cancel</option>
                                 </select>
                                 <input type="range" id="vol-reset" class="vol-slider" min="0" max="1" step="0.05" value="0.9">
+                                <button class="sound-mute-btn" data-sound-type="reset" title="Mute">🔊</button>
                             </div>
                         </div>
                         <div class="settings-row">
@@ -1130,6 +1137,7 @@
                                     <option value="re4-cancel">RE4 cancel</option>
                                 </select>
                                 <input type="range" id="vol-reset-hard" class="vol-slider" min="0" max="1" step="0.05" value="1.0">
+                                <button class="sound-mute-btn" data-sound-type="reset-hard" title="Mute">🔊</button>
                             </div>
                         </div>
                         <div class="settings-row">
@@ -1144,6 +1152,7 @@
                                     <option value="off">Av</option>
                                 </select>
                                 <input type="range" id="vol-overtime" class="vol-slider" min="0" max="1" step="0.05" value="0.9">
+                                <button class="sound-mute-btn" data-sound-type="overtime" title="Mute">🔊</button>
                             </div>
                         </div>
                         <div class="settings-row">
@@ -1157,6 +1166,7 @@
                                     <option value="off">Av</option>
                                 </select>
                                 <input type="range" id="vol-first-rekke" class="vol-slider" min="0" max="1" step="0.05" value="0.9">
+                                <button class="sound-mute-btn" data-sound-type="first-rekke" title="Mute">🔊</button>
                             </div>
                         </div>
                         <div class="settings-row">

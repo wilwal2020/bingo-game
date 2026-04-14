@@ -2583,22 +2583,22 @@ body.fullscreen .page-layout {
 .settings-nav-spacer { flex: 1; }
 
 .settings-io-menu {
-    position:      relative;
-    margin-bottom: 8px;
+    position: relative;
 }
 
 .settings-io-toggle {
-    width:         36px;
-    height:        36px;
-    font-size:     1.4rem;
-    font-weight:   bold;
+    width:         100%;
+    padding:       8px 12px;
+    font-size:     .85rem;
+    font-weight:   600;
     border-radius: 8px;
     border:        1px solid rgba(255,255,255,.2);
     background:    rgba(255,255,255,.06);
     color:         rgba(255,255,255,.7);
     cursor:        pointer;
     transition:    all .15s;
-    line-height:   1;
+    text-align:    left;
+    box-sizing:    border-box;
 }
 
 .settings-io-toggle:hover {
@@ -2609,8 +2609,9 @@ body.fullscreen .page-layout {
 .settings-io-dropdown {
     display:       none;
     position:      absolute;
-    bottom:        calc(100% + 6px);
+    bottom:        calc(100% + 4px);
     left:          0;
+    width:         100%;
     background:    rgba(14,18,28,.95);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
@@ -2618,7 +2619,6 @@ body.fullscreen .page-layout {
     border-radius: 12px;
     box-shadow:    0 8px 32px rgba(0,0,0,.5);
     overflow:      hidden;
-    min-width:     150px;
     z-index:       20;
 }
 
@@ -2841,6 +2841,23 @@ body.no-blur *::after {
     gap:         8px;
     flex-shrink: 0;
 }
+
+.sound-mute-btn {
+    width:         28px;
+    height:        28px;
+    padding:       0;
+    font-size:     .9rem;
+    line-height:   1;
+    border-radius: 6px;
+    border:        1px solid rgba(255,255,255,.15);
+    background:    rgba(255,255,255,.06);
+    color:         rgba(255,255,255,.7);
+    cursor:        pointer;
+    transition:    all .15s;
+    flex-shrink:   0;
+}
+.sound-mute-btn:hover { border-color: var(--accent-color); color: var(--accent-color); }
+.sound-mute-btn.muted { background: rgba(255,80,80,.15); border-color: rgba(255,80,80,.4); color: rgba(255,100,100,.9); }
 
 /* ── Upload Sound Modal ─────────────────────────── */
 .upload-sound-categories {

@@ -161,6 +161,7 @@ class BingoApp {
             volResetHard: 1.0,
             firstRekkeStyle: 'synth',
             volFirstRekke: 0.9,
+            mutedSounds: {},
             overAverageBlinkEnabled: true,
             nextGameCountdownEnabled: false,
             nextGameCountdownMinutes: 3,
@@ -620,6 +621,18 @@ class BingoApp {
         this.el.uploadSoundInput.addEventListener('change', e => this.handleSoundUpload(e));
         this.el.bundledSoundPreviewBtn.addEventListener('click', () => this.previewBundledSound());
         this.el.bundledSoundUseBtn.addEventListener('click', () => this.useBundledSound());
+
+        // Mute buttons (event delegation)
+        document.getElementById('sg-sound').addEventListener('click', e => {
+            const btn = e.target.closest('.sound-mute-btn');
+            if (!btn) return;
+            const type = btn.dataset.soundType;
+            if (!this.settings.mutedSounds) this.settings.mutedSounds = {};
+            this.settings.mutedSounds[type] = !this.settings.mutedSounds[type];
+            btn.classList.toggle('muted', !!this.settings.mutedSounds[type]);
+            btn.textContent = this.settings.mutedSounds[type] ? '🔇' : '🔊';
+            this.saveSettings();
+        });
 
         // Fullscreen
         this.el.fullscreenBtn.addEventListener('click', () => { this.playSound('select'); this.toggleFullscreen(); });
@@ -1138,6 +1151,12 @@ class BingoApp {
         if (this.el.volOvertime)            this.el.volOvertime.value            = s.volOvertime;
         if (this.el.settingFirstRekkeStyle) this.el.settingFirstRekkeStyle.value = s.firstRekkeStyle;
         if (this.el.volFirstRekke)          this.el.volFirstRekke.value          = s.volFirstRekke;
+        // Restore mute button states
+        document.querySelectorAll('.sound-mute-btn').forEach(btn => {
+            const muted = !!(s.mutedSounds?.[btn.dataset.soundType]);
+            btn.classList.toggle('muted', muted);
+            btn.textContent = muted ? '🔇' : '🔊';
+        });
         if (this.el.settingTypingDelay) this.el.settingTypingDelay.textContent = s.typingDelay ?? 8;
         if (this.el.settingTypingOverwrite) {
             this.el.settingTypingOverwrite.checked = s.typingOverwrite ?? false;
@@ -3932,6 +3951,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
 
     playSound(type) {
         if (!this.settings.soundEnabled) return;
+        if (this.settings.mutedSounds?.[type]) return;
         try {
             // Check if the style for this type is a user-uploaded sound
             const styleKey = {
