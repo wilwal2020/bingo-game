@@ -389,6 +389,10 @@ class BingoApp {
         // O(1) number→element lookup — avoids spread+find across all 90 balls
         this.el.ballMap = new Map();
         this.el.balls.forEach(ball => this.el.ballMap.set(ball.textContent.trim(), ball));
+
+        // O(1) rekke/theme button lookups — avoids spread+find on every keypress
+        this.el.rekkeBtnMap    = new Map([...this.el.rekkeBtns].map(b => [b.dataset.rekke, b]));
+        this.el.themeButtonMap = new Map([...this.el.themeButtons].map(b => [b.dataset.theme, b]));
     }
 
     bindEvents() {
@@ -1856,8 +1860,8 @@ class BingoApp {
         });
     }
 
-    updateAverages() {
-        const sessions = this.getSessions();
+    updateAverages(sessions = null) {
+        if (!sessions) sessions = this.getSessions();
         const avgs = this.computeAverages(sessions, this.avgFilter);
 
         // Resolved averages (fall back to defaults if no data yet)
@@ -2638,16 +2642,17 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
 
         // ── Detect open modal context ──────────────────
+        // All references are cached this.el.* — no DOM traversal on every keypress
         const rekkeConfirmOpen = this.el.rekkeConfirm.style.display !== 'none';
         const winnerOpen       = this.el.winnerModal?.style.display === 'flex';
-        const sessionOpen      = document.getElementById('session-modal')?.style.display === 'flex';
-        const editSessionOpen  = document.getElementById('edit-session-modal')?.style.display === 'flex';
-        const deleteOpen       = document.getElementById('delete-modal')?.style.display === 'flex';
-        const resetAllOpen     = document.getElementById('reset-all-modal')?.style.display === 'flex';
-        const viewerOpen       = document.getElementById('viewer-modal')?.style.display === 'flex';
+        const sessionOpen      = this.el.sessionModal?.style.display === 'flex';
+        const editSessionOpen  = this.el.editSessionModal?.style.display === 'flex';
+        const deleteOpen       = this.el.deleteModal?.style.display === 'flex';
+        const resetAllOpen     = this.el.resetAllModal?.style.display === 'flex';
+        const viewerOpen       = this.el.viewerModal?.style.display === 'flex';
         const settingsOpen     = this.el.settingsModal?.style.display === 'flex';
-        const leaderboardOpen  = document.getElementById('leaderboard-modal')?.style.display === 'flex';
-        const graphOpen        = document.getElementById('graph-modal')?.style.display === 'flex';
+        const leaderboardOpen  = this.el.leaderboardModal?.style.display === 'flex';
+        const graphOpen        = this.el.graphModal?.style.display === 'flex';
         const suggestSaveOpen  = this.el.suggestSaveModal?.style.display === 'flex';
         const anyModal = rekkeConfirmOpen || winnerOpen || sessionOpen || editSessionOpen ||
                          deleteOpen || resetAllOpen || viewerOpen || settingsOpen ||
@@ -2750,7 +2755,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             const order = ['Rekke1', 'Rekke2', 'Rekke3'];
             const idx = order.indexOf(this.slot.currentRekke);
             const nextRekke = order[Math.min(idx + 1, order.length - 1)];
-            const btn = [...this.el.rekkeBtns].find(b => b.dataset.rekke === nextRekke);
+            const btn = this.el.rekkeBtnMap.get(nextRekke);
             if (btn) btn.click();
             return;
         }
@@ -2776,7 +2781,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             const themes = ['default', ...['blue','yellow','pink','grey']];
             const idx = themes.indexOf(this.currentTheme);
             const next = themes[(idx + 1) % themes.length];
-            const btn = [...this.el.themeButtons].find(b => b.dataset.theme === next);
+            const btn = this.el.themeButtonMap.get(next);
             if (btn) btn.click();
             return;
         }
@@ -2797,7 +2802,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                 const firstStr = String(firstNum);
                 if (this.slot.selectedNumbers.includes(firstStr)) {
                     this.slot.selectedNumbers = this.slot.selectedNumbers.filter(n => n !== firstStr);
-                    const prevBall = [...this.el.balls].find(b => b.textContent.trim() === firstStr);
+                    const prevBall = this.el.ballMap.get(firstStr);
                     if (prevBall) prevBall.classList.remove('clicked', 'recently-selected', 'last-clicked');
                     if (this._lastClickedBall && this._lastClickedBall.textContent.trim() === firstStr) {
                         this._lastClickedBall = null;
@@ -3196,10 +3201,12 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
     openViewerModal() {
         this.playSound('select');
         this._viewerMode = null; // 'edit' | 'delete' | null
-        this.updateViewerCounts();
+        // Parse once and pass to all consumers
+        const sessions = this.getSessions();
+        this.updateViewerCounts(sessions);
         this.syncFilterUI();
-        this.updateViewerAverages();
-        this.renderSessionList();
+        this.updateViewerAverages(sessions);
+        this.renderSessionList(sessions);
         this.updateViewerModeButtons();
         document.body.style.overflow = 'hidden';
         this.el.viewerModal.style.display = 'flex';
@@ -3209,8 +3216,8 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         // No-op: edit/delete buttons are now inline per session item
     }
 
-    updateViewerCounts() {
-        const sessions = this.getSessions();
+    updateViewerCounts(sessions = null) {
+        if (!sessions) sessions = this.getSessions();
         const totalGames = sessions.reduce((sum, s) => {
             return sum + (s.games ? s.games.filter(g =>
                 g && (g.rekke1 !== null || g.rekke2 !== null || g.rekke3 !== null)
@@ -3245,9 +3252,11 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         this.avgFilter = n;
         localStorage.setItem('bingoAvgFilter', n === null ? '' : String(n));
         this.syncFilterUI();
-        this.updateAverages();
-        this.updateViewerAverages();
-        this.renderSessionList();
+        // Parse once and pass to all three consumers
+        const sessions = this.getSessions();
+        this.updateAverages(sessions);
+        this.updateViewerAverages(sessions);
+        this.renderSessionList(sessions);
     }
 
     stepAvgFilter(delta) {
@@ -3262,9 +3271,9 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         }
     }
 
-    updateViewerAverages() {
+    updateViewerAverages(sessions = null) {
         if (!this.el.viewerAvg1) return;
-        const sessions = this.getSessions();
+        if (!sessions) sessions = this.getSessions();
         const avgs     = this.computeAverages(sessions, this.avgFilter);
         const defaults = [16, 39, 57];
         [1, 2, 3].forEach((n, i) => {
@@ -3278,8 +3287,8 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         this.restoreBodyScroll();
     }
 
-    renderSessionList() {
-        const sessions = this.getSessions();
+    renderSessionList(sessions = null) {
+        if (!sessions) sessions = this.getSessions();
         const list = this.el.sessionList;
         list.innerHTML = '';
 
@@ -3658,6 +3667,8 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
 
     // ── Countdown ────────────────────────────────────
     startCountdown() {
+        // Clear any existing interval so calling this more than once doesn't stack timers
+        if (this._countdownInterval) clearInterval(this._countdownInterval);
         const getNextTarget = () => {
             let hours, minutes;
             if (this.settings.countdownFixed && this.settings.countdownTime) {
@@ -3680,7 +3691,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                 `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
         };
         tick();
-        setInterval(tick, 1000);
+        this._countdownInterval = setInterval(tick, 1000);
     }
 
     // ── Sound Engine ─────────────────────────────────
