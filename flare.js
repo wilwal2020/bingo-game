@@ -95,6 +95,9 @@
         return m ? [parseInt(m[1],16), parseInt(m[2],16), parseInt(m[3],16)] : [241,185,36];
     }
 
+    // Cached RGB — avoids per-frame getComputedStyle calls in the animation loop
+    let cachedRGB = [241, 185, 36];
+
     // ════════════════════════════════════════════════════════
     //  APPLY ALL SETTINGS  (CSS vars + body classes + timers)
     // ════════════════════════════════════════════════════════
@@ -110,6 +113,11 @@
 
         // CSS-controlled toggle
         document.body.classList.toggle('flare-no-pulse-ring', !S.ballPulseRing);
+
+        // Refresh cached accent colour and aurora blob backgrounds
+        cachedRGB = hexToRgb(getAccent());
+        const [r, g, b] = cachedRGB;
+        blobs.forEach(blob => { blob.el.style.background = `rgba(${r},${g},${b},1)`; });
 
         // Restart schedulers so frequency changes take effect immediately
         scheduleNextStar();
@@ -170,9 +178,9 @@
         starTimer = setTimeout(() => { spawnStar(); scheduleNextStar(); }, delay);
     }
 
-    function drawLoop() {
+    function mainLoop() {
         ctx.clearRect(0, 0, W, H);
-        const [r, g, b] = hexToRgb(getAccent());
+        const [r, g, b] = cachedRGB;
 
         // Particles
         const pCount = S.particles
@@ -225,9 +233,16 @@
             }
         }
 
-        requestAnimationFrame(drawLoop);
+        // Aurora blob position animation (merged here to share a single rAF + cachedRGB)
+        blobs.forEach(blob => {
+            blob.phase += 0.004;
+            blob.el.style.left = `${blob.baseX + Math.sin(blob.phase) * 10}%`;
+            blob.el.style.top  = `${blob.baseY + Math.cos(blob.phase * 0.65) * 5}%`;
+        });
+
+        requestAnimationFrame(mainLoop);
     }
-    drawLoop();
+    // mainLoop() is started after blobs are initialised below
 
     // ════════════════════════════════════════════════════════
     //  OVERLAY  (vignette + scanlines — opacity via CSS vars)
@@ -250,16 +265,7 @@
         return { el, phase: (i / 3) * Math.PI * 2, baseX: 18 + i * 28, baseY: 80 };
     });
 
-    (function animAurora() {
-        const [r, g, b] = hexToRgb(getAccent());
-        blobs.forEach(blob => {
-            blob.phase += 0.004;
-            blob.el.style.left       = `${blob.baseX + Math.sin(blob.phase) * 10}%`;
-            blob.el.style.top        = `${blob.baseY + Math.cos(blob.phase * 0.65) * 5}%`;
-            blob.el.style.background = `rgba(${r},${g},${b},1)`;
-        });
-        requestAnimationFrame(animAurora);
-    })();
+    mainLoop(); // Unified animation loop (canvas + aurora)
 
     // ════════════════════════════════════════════════════════
     //  HEADER SHIMMER
@@ -375,23 +381,26 @@
 
     function spawnConfetti() {
         const count = S.confettiCount;
-        for (let i = 0; i < count; i++) {
-            setTimeout(() => {
-                const clr = CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)];
-                const c   = document.createElement('div');
-                c.className     = 'flare-confetti';
-                c.style.cssText = `left:${Math.random()*100}vw;top:-20px;`
-                    + `width:${Math.random()*9+4}px;height:${Math.random()*5+3}px;`
-                    + `background:${clr};border-radius:${Math.random()>.5?'50%':'2px'};`
-                    + `--fall:${Math.random()*55+65}vh;`
-                    + `--drift:${(Math.random()-.5)*130}px;`
-                    + `--rot:${Math.random()*720-360}deg;`
-                    + `animation-duration:${Math.random()*1.8+1.4}s;`
-                    + `animation-delay:${Math.random()*0.6}s`;
-                document.body.appendChild(c);
-                c.addEventListener('animationend', () => c.remove(), { once: true });
-            }, i * 20);
+        let i = 0;
+        function next() {
+            if (i >= count) return;
+            const clr = CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)];
+            const c   = document.createElement('div');
+            c.className     = 'flare-confetti';
+            c.style.cssText = `left:${Math.random()*100}vw;top:-20px;`
+                + `width:${Math.random()*9+4}px;height:${Math.random()*5+3}px;`
+                + `background:${clr};border-radius:${Math.random()>.5?'50%':'2px'};`
+                + `--fall:${Math.random()*55+65}vh;`
+                + `--drift:${(Math.random()-.5)*130}px;`
+                + `--rot:${Math.random()*720-360}deg;`
+                + `animation-duration:${Math.random()*1.8+1.4}s;`
+                + `animation-delay:${Math.random()*0.6}s`;
+            document.body.appendChild(c);
+            c.addEventListener('animationend', () => c.remove(), { once: true });
+            i++;
+            setTimeout(next, 20);
         }
+        next();
     }
 
     const winnerModal = document.getElementById('winner-modal');
@@ -419,14 +428,11 @@
     //  SETTINGS PANEL  (injected into the existing modal)
     // ════════════════════════════════════════════════════════
 
-    function sliderUnit(key) {
-        for (const sec of SCHEMA)
-            for (const item of sec.items)
-                if (item.sliders)
-                    for (const sl of item.sliders)
-                        if (sl.key === key) return sl.unit || '';
-        return '';
-    }
+    const SLIDER_UNITS = new Map(
+        SCHEMA.flatMap(sec => sec.items)
+              .flatMap(item => (item.sliders || []).map(sl => [sl.key, sl.unit || '']))
+    );
+    function sliderUnit(key) { return SLIDER_UNITS.get(key) ?? ''; }
 
     function buildPanelHTML() {
         let h = '<h3 class="settings-panel-title">✨ Visuelle effekter</h3>';

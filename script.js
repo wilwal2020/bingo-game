@@ -86,8 +86,9 @@ class BingoApp {
         this.pendingRekke = null;
 
         // Keyboard input state
-        this.typingBuffer = '';
-        this.typingTimer  = null;
+        this.typingBuffer        = '';
+        this.typingTimer         = null;
+        this._typingHighlighted  = new Set(); // tracks balls with typing-preview/digit-match
 
         // Winner logging state
         this.winnerSplitCount      = 1;
@@ -140,6 +141,7 @@ class BingoApp {
             nextGameCountdownEnabled: false,
             nextGameCountdownMinutes: 3,
             nextGameCountdownSeconds: 0,
+            blurEnabled: true,
         };
 
         // Init all slots
@@ -370,6 +372,7 @@ class BingoApp {
             unsavedCancel:       document.getElementById('unsaved-cancel'),
             // Over-average blink + next-game countdown
             settingOverAverageBlink:    document.getElementById('setting-over-average-blink'),
+            settingBlur:                document.getElementById('setting-blur'),
             settingNextGameCountdown:   document.getElementById('setting-next-game-countdown'),
             nextGameCdDurRow:           document.getElementById('next-game-countdown-dur-row'),
             nextGameCdMin:              document.getElementById('next-game-cd-min'),
@@ -382,6 +385,10 @@ class BingoApp {
             nextGameCdDisplay:          document.getElementById('next-game-cd-display'),
             nextGameCdBar:              document.getElementById('next-game-cd-bar'),
         };
+
+        // O(1) number→element lookup — avoids spread+find across all 90 balls
+        this.el.ballMap = new Map();
+        this.el.balls.forEach(ball => this.el.ballMap.set(ball.textContent.trim(), ball));
     }
 
     bindEvents() {
@@ -416,10 +423,15 @@ class BingoApp {
         );
 
         // Global delegated hover — covers every button/anchor on the page
+        // Throttled to avoid audio spam when moving quickly across many balls/buttons
+        let _lastHoverSound = 0;
         document.addEventListener('mouseenter', e => {
             const t = e.target;
             if (t && t.classList && (t.tagName === 'BUTTON' || t.tagName === 'A' ||
                 t.tagName === 'LABEL' || (t.classList.contains('balls') && !t.classList.contains('clicked')))) {
+                const now = Date.now();
+                if (now - _lastHoverSound < 50) return;
+                _lastHoverSound = now;
                 this.playSound('hover');
             }
         }, true);
@@ -788,6 +800,15 @@ class BingoApp {
             });
         }
 
+        // Blur toggle
+        if (this.el.settingBlur) {
+            this.el.settingBlur.addEventListener('change', () => {
+                this.settings.blurEnabled = this.el.settingBlur.checked;
+                document.body.classList.toggle('no-blur', !this.settings.blurEnabled);
+                this.saveSettings();
+            });
+        }
+
         // Next-game countdown settings
         if (this.el.settingNextGameCountdown) {
             this.el.settingNextGameCountdown.addEventListener('change', () => {
@@ -1104,6 +1125,12 @@ class BingoApp {
             document.body.classList.toggle('no-over-average-blink', !(s.overAverageBlinkEnabled ?? true));
         }
 
+        // Blur
+        if (this.el.settingBlur) {
+            this.el.settingBlur.checked = s.blurEnabled ?? true;
+            document.body.classList.toggle('no-blur', !(s.blurEnabled ?? true));
+        }
+
         // Next-game countdown
         if (this.el.settingNextGameCountdown) {
             this.el.settingNextGameCountdown.checked = s.nextGameCountdownEnabled ?? false;
@@ -1117,14 +1144,18 @@ class BingoApp {
         this.playSound('select');
         document.body.style.overflow = 'hidden';
 
+        // Cache once — this function is called every time the modal opens
+        const navItems    = document.querySelectorAll('.settings-nav-item[data-panel]');
+        const navPanels   = document.querySelectorAll('.settings-panel');
+
         // Wire up nav item panel switching (idempotent)
-        document.querySelectorAll('.settings-nav-item[data-panel]').forEach(btn => {
+        navItems.forEach(btn => {
             if (btn._navBound) return;
             btn._navBound = true;
             btn.addEventListener('click', () => {
                 // Deactivate all
-                document.querySelectorAll('.settings-nav-item[data-panel]').forEach(b => b.classList.remove('active'));
-                document.querySelectorAll('.settings-panel').forEach(p => p.classList.remove('active'));
+                navItems.forEach(b => b.classList.remove('active'));
+                navPanels.forEach(p => p.classList.remove('active'));
                 // Activate clicked
                 btn.classList.add('active');
                 const panel = document.getElementById(btn.dataset.panel);
@@ -1136,16 +1167,16 @@ class BingoApp {
 
         // Restore last active panel
         const lastPanel = localStorage.getItem('bingoSettingsPanel') || 'sg-progress';
-        document.querySelectorAll('.settings-nav-item[data-panel]').forEach(b => {
+        navItems.forEach(b => {
             b.classList.toggle('active', b.dataset.panel === lastPanel);
         });
-        document.querySelectorAll('.settings-panel').forEach(p => {
+        navPanels.forEach(p => {
             p.classList.toggle('active', p.id === lastPanel);
         });
         this.el.settingsModal.classList.toggle('color-preview-mode', lastPanel === 'sg-themecolors');
 
         // Save active panel on switch
-        document.querySelectorAll('.settings-nav-item[data-panel]').forEach(btn => {
+        navItems.forEach(btn => {
             if (btn._navPersistBound) return;
             btn._navPersistBound = true;
             btn.addEventListener('click', () => {
@@ -1483,6 +1514,10 @@ class BingoApp {
         const canvas = document.createElement('canvas');
         fill.appendChild(canvas);
 
+        // Read dimensions once — avoids a forced reflow on every animation frame
+        canvas.width  = fill.offsetWidth;
+        canvas.height = fill.offsetHeight;
+
         const ctx = canvas.getContext('2d');
         const startTime = performance.now();
 
@@ -1561,9 +1596,6 @@ class BingoApp {
         const draw = (now) => {
             const elapsed  = (now - startTime) / 1000;
             const progress = Math.min(elapsed / duration, 1);
-
-            canvas.width  = fill.offsetWidth;
-            canvas.height = fill.offsetHeight;
 
             drawFrame(progress, elapsed);
 
@@ -2812,18 +2844,25 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
 
     updateTypingPreview() {
         const buf = this.typingBuffer;
+
+        // Clear only the balls that were previously highlighted (not all 90)
+        this._typingHighlighted.forEach(ball => ball.classList.remove('typing-preview', 'digit-match'));
+        this._typingHighlighted.clear();
+
+        if (buf === '') return;
+
         const exactNum = parseInt(buf, 10);
         this.el.balls.forEach(ball => {
-            ball.classList.remove('typing-preview', 'digit-match');
-            if (buf === '') return;
-            const ballText = ball.textContent.trim();
             if (ball.classList.contains('clicked')) return;
+            const ballText = ball.textContent.trim();
             // Exact match — full highlight
             if (ballText === String(exactNum)) {
                 ball.classList.add('typing-preview');
+                this._typingHighlighted.add(ball);
             // Digit match — ball number starts with the typed buffer
             } else if (ballText.startsWith(buf)) {
                 ball.classList.add('digit-match');
+                this._typingHighlighted.add(ball);
             }
         });
     }
@@ -2833,7 +2872,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         if (!isNaN(num) && num >= 1 && num <= 90) {
             const numStr = String(num);
             if (!this.slot.selectedNumbers.includes(numStr)) {
-                const ball = [...this.el.balls].find(b => b.textContent.trim() === numStr);
+                const ball = this.el.ballMap.get(numStr);
                 if (ball) this.handleNormalClick(ball, numStr);
             }
         }
@@ -2842,14 +2881,15 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
 
     clearTypingBuffer() {
         this.typingBuffer = '';
-        this.el.balls.forEach(b => b.classList.remove('typing-preview', 'digit-match'));
+        this._typingHighlighted.forEach(b => b.classList.remove('typing-preview', 'digit-match'));
+        this._typingHighlighted.clear();
     }
 
     undoLastNumber() {
         const nums = this.slot.selectedNumbers;
         if (nums.length === 0) return;
         const lastNum = nums[nums.length - 1];
-        const ball = [...this.el.balls].find(b => b.textContent.trim() === lastNum);
+        const ball = this.el.ballMap.get(lastNum);
         if (ball) {
             this.slot.selectedNumbers = nums.slice(0, -1);
             ball.classList.remove('clicked', 'recently-selected', 'last-clicked');
@@ -2859,7 +2899,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             this.slot.bigNumber = prev.length > 0 ? prev[prev.length - 1] : '';
             this.el.bigNumberText.textContent = this.slot.bigNumber;
             if (this.slot.bigNumber) {
-                const newLast = [...this.el.balls].find(b => b.textContent.trim() === this.slot.bigNumber);
+                const newLast = this.el.ballMap.get(this.slot.bigNumber);
                 if (newLast) {
                     newLast.classList.add('last-clicked');
                     this._lastClickedBall = newLast;
@@ -3253,6 +3293,14 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         const totalSessions  = sessions.length;
         const activeStartIdx = filterN ? Math.max(0, totalSessions - filterN) : 0;
 
+        // Compute averages once before the loop (not once per session)
+        const dynAvgs = this.computeAverages(sessions);
+        const thresholds = [
+            dynAvgs[0] !== null ? dynAvgs[0] : 16,
+            dynAvgs[1] !== null ? dynAvgs[1] : 39,
+            dynAvgs[2] !== null ? dynAvgs[2] : 57,
+        ];
+
         // Newest first
         [...sessions].reverse().forEach((session, reversedIdx) => {
             const realIdx    = sessions.length - 1 - reversedIdx;
@@ -3293,14 +3341,6 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             // Game values
             const valuesEl = document.createElement('div');
             valuesEl.className = 'session-item-values';
-
-            // Get current dynamic averages for color coding
-            const dynAvgs = this.computeAverages(this.getSessions());
-            const thresholds = [
-                dynAvgs[0] !== null ? dynAvgs[0] : 16,
-                dynAvgs[1] !== null ? dynAvgs[1] : 39,
-                dynAvgs[2] !== null ? dynAvgs[2] : 57,
-            ];
 
             GAME_THEMES.forEach((theme, gi) => {
                 const game = session.games[gi];
