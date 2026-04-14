@@ -1177,7 +1177,7 @@
     <div class="modal-overlay" id="upload-sound-modal" style="display:none">
         <div class="modal modal-wide">
             <h2 class="modal-title">Last opp lydeffekt</h2>
-            <p class="modal-subtitle">Velg kategorier, deretter fil</p>
+            <p class="modal-subtitle">Velg kategorier, deretter lyd</p>
 
             <div class="add-win-section-label">Kategori</div>
             <div class="upload-sound-categories" id="upload-sound-categories">
@@ -1193,10 +1193,38 @@
                 <label class="upload-cat-item"><input type="checkbox" value="first-rekke"> Første tall i rekke</label>
             </div>
 
-            <div class="modal-buttons" style="margin-top:20px">
+            <div class="add-win-section-label" style="margin-top:18px">Fra lydmappen</div>
+            <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+                <select id="bundled-sound-select" class="session-input" style="flex:1;min-width:0">
+                    <option value="">-- Velg lyd --</option>
+                    <option value="Sounds/click.wav">Click</option>
+                    <option value="Sounds/click_2.wav">Click 2</option>
+                    <option value="Sounds/click_and_hover.wav">Click + Hover</option>
+                    <option value="Sounds/click_and_hover_2.wav">Click + Hover 2</option>
+                    <option value="Sounds/click_and_hover_3.wav">Click + Hover 3</option>
+                    <option value="Sounds/click__and_for_clicking_on_a_number_with_jackpot_active.wav">Click (jackpot)</option>
+                    <option value="Sounds/close.wav">Close</option>
+                    <option value="Sounds/re4-hover.wav">RE4 Hover</option>
+                    <option value="Sounds/re4-hover-loud.wav">RE4 Hover Loud</option>
+                    <option value="Sounds/re4-select.wav">RE4 Select</option>
+                    <option value="Sounds/re4-select-number.wav">RE4 Select Number</option>
+                    <option value="Sounds/re4-switch.wav">RE4 Switch</option>
+                    <option value="Sounds/re4-switch-2.wav">RE4 Switch 2</option>
+                    <option value="Sounds/re4-cancel.wav">RE4 Cancel</option>
+                    <option value="Sounds/re4-cancel-big.wav">RE4 Cancel Big</option>
+                    <option value="Sounds/save_and_confirm_2.wav">Save / Confirm 2</option>
+                    <option value="Sounds/when_you_enter_overtime__should_play_after_the_number_click_sound_is_done.wav">Overtid</option>
+                    <option value="Sounds/62274159.wav">62274159</option>
+                </select>
+                <button class="modal-btn session-action-btn" id="bundled-sound-preview-btn" title="Forhåndsvis">▶</button>
+                <button class="modal-btn modal-btn-yes" id="bundled-sound-use-btn">Bruk</button>
+            </div>
+
+            <div class="add-win-section-label" style="margin-top:18px">Last opp egen fil</div>
+            <div class="modal-buttons" style="margin-top:8px">
                 <label class="modal-btn modal-btn-yes" id="upload-sound-label" style="cursor:pointer">
                     Velg fil
-                    <input type="file" id="upload-sound-input" accept=".wav,.mp3,.ogg" style="display:none">
+                    <input type="file" id="upload-sound-input" accept=".wav,.mp3,.ogg,audio/wav,audio/mpeg,audio/ogg" style="display:none">
                 </label>
                 <button class="modal-btn modal-btn-no" id="upload-sound-cancel">Avbryt</button>
             </div>

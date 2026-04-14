@@ -16,6 +16,28 @@ const CLOSE_WAV = 'Sounds/close.wav';
 const SAVE_CONFIRM_2_WAV = 'Sounds/save_and_confirm_2.wav';
 const OVERTIME_WAV = 'Sounds/when_you_enter_overtime__should_play_after_the_number_click_sound_is_done.wav';
 
+// All bundled sounds available for selection in the upload modal
+const BUNDLED_SOUNDS = [
+    { src: CLICK_WAV,             name: 'Click' },
+    { src: CLICK_2_WAV,           name: 'Click 2' },
+    { src: CLICK_AND_HOVER_WAV,   name: 'Click + Hover' },
+    { src: CLICK_AND_HOVER_2_WAV, name: 'Click + Hover 2' },
+    { src: CLICK_AND_HOVER_3_WAV, name: 'Click + Hover 3' },
+    { src: CLICK_JACKPOT_WAV,     name: 'Click (jackpot)' },
+    { src: CLOSE_WAV,             name: 'Close' },
+    { src: RE4_HOVER_WAV,         name: 'RE4 Hover' },
+    { src: RE4_HOVER_LOUD_WAV,    name: 'RE4 Hover Loud' },
+    { src: RE4_SELECT_WAV,        name: 'RE4 Select' },
+    { src: RE4_SELECT_NUMBER_WAV, name: 'RE4 Select Number' },
+    { src: RE4_SWITCH_WAV,        name: 'RE4 Switch' },
+    { src: RE4_SWITCH_2_WAV,      name: 'RE4 Switch 2' },
+    { src: RE4_CANCEL_WAV,        name: 'RE4 Cancel' },
+    { src: RE4_CANCEL_BIG_WAV,    name: 'RE4 Cancel Big' },
+    { src: SAVE_CONFIRM_2_WAV,    name: 'Save / Confirm 2' },
+    { src: OVERTIME_WAV,          name: 'Overtid' },
+    { src: 'Sounds/62274159.wav', name: '62274159' },
+];
+
 /* =====================================================
    GEITHUS BINGO — script.js
    ===================================================== */
@@ -307,7 +329,10 @@ class BingoApp {
             uploadSoundModal:    document.getElementById('upload-sound-modal'),
             uploadSoundInput:    document.getElementById('upload-sound-input'),
             uploadSoundCancel:   document.getElementById('upload-sound-cancel'),
-            uploadSoundCats:     document.getElementById('upload-sound-categories'),
+            uploadSoundCats:        document.getElementById('upload-sound-categories'),
+            bundledSoundSelect:     document.getElementById('bundled-sound-select'),
+            bundledSoundPreviewBtn: document.getElementById('bundled-sound-preview-btn'),
+            bundledSoundUseBtn:     document.getElementById('bundled-sound-use-btn'),
             // Winner system
             logWinnerBtn:        document.getElementById('log-winner-btn-2'),
             winnerAddBtn:        document.getElementById('winner-add-btn'),
@@ -593,6 +618,8 @@ class BingoApp {
         this.el.uploadSoundBtn.addEventListener('click', () => this.openUploadSoundModal());
         this.el.uploadSoundCancel.addEventListener('click', () => this.closeUploadSoundModal());
         this.el.uploadSoundInput.addEventListener('change', e => this.handleSoundUpload(e));
+        this.el.bundledSoundPreviewBtn.addEventListener('click', () => this.previewBundledSound());
+        this.el.bundledSoundUseBtn.addEventListener('click', () => this.useBundledSound());
 
         // Fullscreen
         this.el.fullscreenBtn.addEventListener('click', () => { this.playSound('select'); this.toggleFullscreen(); });
@@ -1812,6 +1839,7 @@ class BingoApp {
             btn.classList.toggle('active', i <= idx)
         );
 
+        this.updateRecentNumbers();
         this.updateCounter();
         this.updateAverageHighlight();
         this.checkSaveSessionButton();
@@ -3721,6 +3749,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         this.el.uploadSoundCats.querySelectorAll('input[type="checkbox"]')
             .forEach(cb => cb.checked = false);
         this.el.uploadSoundInput.value = '';
+        this.el.bundledSoundSelect.value = '';
         this.el.uploadSoundModal.style.display = 'flex';
     }
 
@@ -3766,6 +3795,41 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         };
         reader.readAsDataURL(file);
         e.target.value = '';
+    }
+
+    previewBundledSound() {
+        const src = this.el.bundledSoundSelect.value;
+        if (!src) return;
+        new Audio(src).play().catch(() => {});
+    }
+
+    useBundledSound() {
+        const src = this.el.bundledSoundSelect.value;
+        if (!src) { alert('Velg en lyd fra listen.'); return; }
+
+        const categories = [...this.el.uploadSoundCats.querySelectorAll('input:checked')]
+            .map(cb => cb.value);
+        if (categories.length === 0) {
+            alert('Velg minst én kategori før du bruker lyden.');
+            return;
+        }
+
+        const name = this.el.bundledSoundSelect.options[this.el.bundledSoundSelect.selectedIndex].text;
+        const filename = src.split('/').pop().replace(/\.[^.]+$/, '');
+        const key = 'bundled_' + filename.replace(/[^a-zA-Z0-9]/g, '_');
+
+        const stored = this.getUserSounds();
+        stored[key] = { src, name, categories };
+        localStorage.setItem('bingoUserSounds', JSON.stringify(stored));
+
+        if (!this._audioPool) this._audioPool = {};
+        const audio = new Audio(src);
+        audio.preload = 'auto';
+        this._audioPool[key] = audio;
+
+        this.injectUserSoundOptions();
+        this.closeUploadSoundModal();
+        this.playSound('confirm');
     }
 
     getUserSounds() {
@@ -3878,7 +3942,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             }[type];
             if (styleKey) {
                 const style = this.settings[styleKey];
-                if (style && style.startsWith('user_')) {
+                if (style) {
                     const sounds = this.getUserSounds();
                     if (sounds[style]) {
                         this.playWav(sounds[style].src, style, this.settings['vol' + styleKey.replace('Style','').replace(/^\w/, c => c.toUpperCase())] || 0.8);
