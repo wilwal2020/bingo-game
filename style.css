@@ -383,6 +383,7 @@ body.layout-vertical .theme-buttons {
     background-color: var(--btn-accent, var(--accent-color));
     border-color:     var(--btn-accent, var(--accent-color));
     color:            #111;
+    font-weight:      700;
     transform:        translate(-1px, -1px);
     box-shadow:       3px 3px 0 rgba(0,0,0,.5);
 }
