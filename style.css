@@ -360,7 +360,7 @@ body.layout-vertical .theme-buttons {
     border-radius: var(--btn-radius-sm);
     cursor:        pointer;
     font-weight:   500;
-    font-size:     12px;
+    font-size:     14px;
     white-space:   nowrap;
     color:         rgba(255,255,255,.8);
     box-shadow:    var(--btn-shadow);
