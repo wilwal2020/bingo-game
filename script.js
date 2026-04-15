@@ -384,6 +384,8 @@ class BingoApp {
             addWinCustomRow:     document.getElementById('add-win-custom-row'),
             addWinCustomAmount:  document.getElementById('add-win-custom-amount'),
             addWinYear:          document.getElementById('add-win-year'),
+            addWinYearMinus:     document.getElementById('add-win-year-minus'),
+            addWinYearPlus:      document.getElementById('add-win-year-plus'),
             addWinMonth:         document.getElementById('add-win-month'),
             addWinSave:          document.getElementById('add-win-save'),
             addWinCancel:        document.getElementById('add-win-cancel'),
@@ -580,6 +582,14 @@ class BingoApp {
         this.el.addPrevWinFromHistory.addEventListener('click', () => this.openAddWinModal(this.currentHistoryPlayer));
         this.el.addWinSave.addEventListener('click',   () => { this.playSound('confirm'); this.saveManualWin(); });
         this.el.addWinCancel.addEventListener('click', () => this.closeAddWinModal());
+        this.el.addWinYearMinus.addEventListener('click', () => {
+            const v = parseInt(this.el.addWinYear.value) || new Date().getFullYear();
+            this.el.addWinYear.value = Math.max(2000, v - 1);
+        });
+        this.el.addWinYearPlus.addEventListener('click', () => {
+            const v = parseInt(this.el.addWinYear.value) || new Date().getFullYear();
+            this.el.addWinYear.value = Math.min(2100, v + 1);
+        });
 
         // Recent numbers expand
         this.el.recentExpandBtn.addEventListener('click', () => { this.playSound('select'); this.toggleRecentExpand(); });

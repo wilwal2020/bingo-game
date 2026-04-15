@@ -359,8 +359,12 @@
             <!-- Date: year + month -->  
             <div class="add-win-section-label" style="margin-top:16px">År og måned</div>
             <div class="add-win-date-row">
-                <input type="number" id="add-win-year" class="session-input"
-                       placeholder="År" min="2000" max="2100" style="width:100px;text-align:center">
+                <div class="add-win-year-row">
+                    <button class="rekke-adjust-btn" id="add-win-year-minus">−</button>
+                    <input type="number" id="add-win-year" class="session-input"
+                           placeholder="År" min="2000" max="2100" style="width:80px;text-align:center">
+                    <button class="rekke-adjust-btn" id="add-win-year-plus">+</button>
+                </div>
                 <select id="add-win-month" class="session-input add-win-month-select">
                     <option value="">Måned</option>
                     <option value="1">Januar</option>

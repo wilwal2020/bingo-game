@@ -2457,8 +2457,15 @@ body.fullscreen .page-layout {
 }
 
 .add-win-date-row {
-    display: flex;
-    gap:     10px;
+    display:     flex;
+    gap:         10px;
+    align-items: center;
+}
+
+.add-win-year-row {
+    display:     flex;
+    align-items: center;
+    gap:         6px;
 }
 
 .add-win-month-select {
