@@ -14,16 +14,12 @@
     --winner-color:  #f0c030;
     --winner-rgb:    240, 192, 48;
 
-    /* Button design tokens */
-    --btn-radius-pill: 999px;
-    --btn-radius-lg:   16px;
-    --btn-radius-md:   11px;
-    --btn-radius-sm:   8px;
-    --btn-glow:        0 0 18px rgba(var(--accent-rgb), .28), 0 4px 16px rgba(0,0,0,.4);
-    --btn-glow-hover:  0 0 28px rgba(var(--accent-rgb), .45), 0 6px 20px rgba(0,0,0,.5);
-    --btn-danger-glow: 0 0 16px rgba(var(--danger-rgb), .3), 0 4px 12px rgba(0,0,0,.4);
-    --btn-winner-glow: 0 0 18px rgba(var(--winner-rgb), .35), 0 4px 16px rgba(0,0,0,.4);
-    --btn-shine:       linear-gradient(160deg, rgba(255,255,255,.18) 0%, rgba(255,255,255,0) 55%);
+    /* Button design tokens — no variable-in-variable so themes resolve correctly */
+    --btn-radius:     10px;
+    --btn-radius-lg:  14px;
+    --btn-radius-sm:  6px;
+    --btn-shadow:     4px 4px 0 rgba(0,0,0,.5);
+    --btn-shadow-lg:  6px 6px 0 rgba(0,0,0,.5);
 }
 
 .theme-blue {
@@ -106,23 +102,24 @@ body {
     padding:          6px 12px;
     margin:           0 15px;
     text-align:       center;
-    font-size:        18px;
-    font-weight:      600;
+    font-size:        16px;
+    font-weight:      700;
+    letter-spacing:   0.04em;
     text-decoration:  none;
-    color:            rgba(255,255,255,.8);
+    color:            rgba(255,255,255,.85);
     background-color: rgba(255,255,255,.07);
-    border:           1px solid rgba(255,255,255,.15);
-    border-radius:    var(--btn-radius-pill);
-    backdrop-filter:  blur(10px);
-    box-shadow:       0 2px 10px rgba(0,0,0,.25);
-    transition:       color .2s, border-color .2s, background-color .2s, box-shadow .2s;
+    border:           2px solid rgba(255,255,255,.2);
+    border-radius:    var(--btn-radius);
+    box-shadow:       var(--btn-shadow);
+    transition:       color .15s, border-color .15s, background-color .15s, transform .12s, box-shadow .12s;
 }
 
 .flex-item:hover {
     color:            var(--accent-color);
     border-color:     var(--accent-color);
-    background-color: rgba(255,255,255,.11);
-    box-shadow:       0 0 14px rgba(var(--accent-rgb),.2), 0 2px 10px rgba(0,0,0,.3);
+    background-color: rgba(var(--accent-rgb), .1);
+    transform:        translate(-2px, -2px);
+    box-shadow:       var(--btn-shadow-lg);
 }
 
 /* Dropdown */
@@ -358,31 +355,33 @@ body.layout-vertical .theme-buttons {
 
 .theme-button {
     width:            70px;
-    height:           40px;
-    border:           1.5px solid;
-    border-radius:    var(--btn-radius-pill);
+    height:           38px;
+    border:           2.5px solid;
+    border-radius:    var(--btn-radius-sm);
     cursor:           pointer;
-    font-weight:      700;
-    font-size:        13px;
-    color:            rgba(255,255,255,.75);
-    backdrop-filter:  blur(6px);
-    box-shadow:       0 2px 8px rgba(0,0,0,.3);
-    transition:       all .18s ease;
+    font-weight:      800;
+    font-size:        12px;
+    letter-spacing:   0.05em;
+    text-transform:   uppercase;
+    color:            rgba(255,255,255,.7);
+    box-shadow:       var(--btn-shadow);
+    transition:       all .12s ease;
 }
 
-.theme-button        { background-color: var(--btn-primary); border-color: var(--btn-accent); }
+.theme-button        { background-color: rgba(255,255,255,.07); border-color: rgba(255,255,255,.22); }
 .theme-button:hover  {
-    background-color: var(--btn-accent);
-    border-color:     var(--btn-accent);
-    color:            #111;
-    transform:        scale(1.07);
-    box-shadow:       0 0 14px rgba(var(--accent-rgb),.3), 0 3px 10px rgba(0,0,0,.4);
+    background-color: var(--accent-color);
+    border-color:     var(--accent-color);
+    color:            var(--primary-color);
+    transform:        translate(-2px, -2px);
+    box-shadow:       var(--btn-shadow-lg);
 }
 .theme-button.active {
-    background-color: var(--btn-accent);
-    border-color:     var(--btn-accent);
-    color:            #111;
-    box-shadow:       0 0 16px rgba(var(--accent-rgb),.35), 0 3px 10px rgba(0,0,0,.4);
+    background-color: var(--accent-color);
+    border-color:     var(--accent-color);
+    color:            var(--primary-color);
+    transform:        translate(-1px, -1px);
+    box-shadow:       3px 3px 0 rgba(0,0,0,.5);
 }
 
 /* ===================================================
@@ -556,78 +555,71 @@ body.no-over-average-blink .circle.over-average { animation: none; }
     width:            100%;
     margin-top:       16px;
     padding:          13px;
-    font-size:        1.2rem;
-    font-weight:      bold;
-    color:            #111;
+    font-size:        1.1rem;
+    font-weight:      900;
+    letter-spacing:   0.05em;
+    color:            var(--primary-color);
     background-color: var(--accent-color);
-    background-image: var(--btn-shine);
-    border:           1.5px solid var(--accent-color);
-    border-radius:    var(--btn-radius-pill);
+    border:           none;
+    border-radius:    var(--btn-radius);
     cursor:           pointer;
-    transition:       all .2s ease;
-    box-shadow:       var(--btn-glow);
+    transition:       all .12s ease;
+    box-shadow:       var(--btn-shadow);
 }
 
 .save-session-btn:hover {
-    color:            var(--accent-color);
-    background-color: rgba(var(--accent-rgb), .1);
-    background-image: none;
-    border-color:     var(--accent-color);
-    box-shadow:       var(--btn-glow-hover);
-    transform:        translateY(-1px);
+    transform:        translate(-2px, -2px);
+    box-shadow:       var(--btn-shadow-lg);
+    filter:           brightness(1.1);
 }
 
 .log-rekke3-btn {
     margin-top:       8px;
-    background-color: rgba(var(--accent-rgb), .08);
-    background-image: none;
+    background-color: transparent;
     color:            var(--accent-color);
-    border-color:     rgba(var(--accent-rgb), .5);
-    box-shadow:       none;
+    border:           2.5px solid var(--accent-color);
+    box-shadow:       3px 3px 0 rgba(var(--accent-rgb), .35);
 }
 
 .log-rekke3-btn:hover {
     background-color: var(--accent-color);
-    background-image: var(--btn-shine);
-    color:            #111;
-    border-color:     var(--accent-color);
-    box-shadow:       var(--btn-glow);
-    transform:        translateY(-1px);
+    color:            var(--primary-color);
+    transform:        translate(-2px, -2px);
+    box-shadow:       var(--btn-shadow-lg);
 }
 
 .view-sessions-btn {
     margin-top:       8px;
-    background-color: rgba(255,255,255,.05);
-    background-image: none;
+    background-color: transparent;
     color:            rgba(255,255,255,.75);
-    border-color:     rgba(255,255,255,.2);
+    border:           2px solid rgba(255,255,255,.28);
     font-size:        1rem;
-    box-shadow:       none;
+    box-shadow:       3px 3px 0 rgba(0,0,0,.4);
 }
 
 .view-sessions-btn:hover {
-    background-color: rgba(255,255,255,.1);
+    border-color:     rgba(255,255,255,.6);
     color:            white;
-    border-color:     rgba(255,255,255,.5);
-    transform:        translateY(-1px);
+    background-color: rgba(255,255,255,.07);
+    transform:        translate(-2px, -2px);
+    box-shadow:       var(--btn-shadow-lg);
 }
 
 .reset-all-btn {
     margin-top:       8px;
-    background-color: rgba(var(--danger-rgb), .07);
-    background-image: none;
+    background-color: transparent;
     color:            var(--danger-color);
-    border-color:     rgba(var(--danger-rgb), .4);
+    border:           2px solid rgba(var(--danger-rgb), .5);
     font-size:        1rem;
-    box-shadow:       none;
+    box-shadow:       3px 3px 0 rgba(var(--danger-rgb), .3);
 }
 
 .reset-all-btn:hover {
-    background-color: rgba(var(--danger-rgb), .18);
+    background-color: var(--danger-color);
     border-color:     var(--danger-color);
-    color:            #ff7777;
-    box-shadow:       var(--btn-danger-glow);
-    transform:        translateY(-1px);
+    color:            white;
+    transform:        translate(-2px, -2px);
+    box-shadow:       6px 6px 0 rgba(var(--danger-rgb), .4);
 }
 
 /* Session viewer */
@@ -1173,34 +1165,32 @@ body.no-over-average-blink .circle.over-average { animation: none; }
     flex:             1;
     padding:          10px;
     font-size:        2rem;
-    font-weight:      bold;
+    font-weight:      900;
     color:            rgba(255,255,255,.65);
     background-color: rgba(255,255,255,.05);
-    border:           2px solid rgba(255,255,255,.12);
-    border-radius:    var(--btn-radius-lg);
+    border:           2px solid rgba(255,255,255,.2);
+    border-radius:    var(--btn-radius);
     cursor:           pointer;
-    backdrop-filter:  blur(8px);
     white-space:      nowrap;
     overflow:         hidden;
     min-width:        0;
-    box-shadow:       0 2px 12px rgba(0,0,0,.25);
-    transition:       background-color .2s ease, color .2s ease, transform .18s ease, border-color .2s ease, box-shadow .2s ease;
+    box-shadow:       4px 4px 0 rgba(0,0,0,.45);
+    transition:       background-color .12s ease, color .12s ease, transform .12s ease, border-color .12s ease, box-shadow .12s ease;
 }
 
 .rekke-btn:hover {
-    transform:        scale(1.06);
+    transform:        translate(-2px, -2px);
     border-color:     var(--accent-color);
     color:            var(--accent-color);
     background-color: rgba(var(--accent-rgb), .08);
-    box-shadow:       0 0 18px rgba(var(--accent-rgb), .2), 0 4px 14px rgba(0,0,0,.35);
+    box-shadow:       6px 6px 0 rgba(var(--accent-rgb), .35);
 }
 
 .rekke-btn.active {
     background-color: var(--accent-color);
-    background-image: var(--btn-shine);
     color:            var(--primary-color);
     border-color:     var(--accent-color);
-    box-shadow:       var(--btn-glow);
+    box-shadow:       4px 4px 0 rgba(0,0,0,.5);
 }
 
 #big-number {
@@ -1405,43 +1395,43 @@ body.no-over-average-blink .circle.over-average { animation: none; }
 }
 
 .modal-btn {
-    padding:       11px 32px;
-    font-size:     1.15rem;
-    font-weight:   700;
-    border-radius: var(--btn-radius-pill);
-    border:        2px solid;
-    cursor:        pointer;
-    transition:    all .2s ease;
+    padding:        11px 32px;
+    font-size:      1.1rem;
+    font-weight:    900;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    border-radius:  var(--btn-radius);
+    border:         2px solid;
+    cursor:         pointer;
+    transition:     transform .12s ease, box-shadow .12s ease, background-color .12s, color .12s, border-color .12s;
 }
 
 .modal-btn-yes {
     background-color: var(--accent-color);
-    background-image: var(--btn-shine);
     border-color:     var(--accent-color);
     color:            #111;
-    box-shadow:       var(--btn-glow);
+    box-shadow:       4px 4px 0 rgba(0,0,0,.5);
 }
 
 .modal-btn-yes:hover {
-    background-color: rgba(var(--accent-rgb), .12);
-    background-image: none;
-    color:            var(--accent-color);
-    box-shadow:       var(--btn-glow-hover);
-    transform:        translateY(-2px);
+    transform:  translate(-2px, -2px);
+    box-shadow: 6px 6px 0 rgba(0,0,0,.55);
+    filter:     brightness(1.1);
 }
 
 .modal-btn-no {
-    background-color: rgba(var(--danger-rgb), .08);
-    border-color:     rgba(var(--danger-rgb), .5);
+    background-color: transparent;
+    border-color:     rgba(var(--danger-rgb), .6);
     color:            var(--danger-color);
+    box-shadow:       4px 4px 0 rgba(var(--danger-rgb), .3);
 }
 
 .modal-btn-no:hover {
-    background-color: rgba(var(--danger-rgb), .18);
+    background-color: var(--danger-color);
     border-color:     var(--danger-color);
-    color:            #ff8080;
-    box-shadow:       var(--btn-danger-glow);
-    transform:        translateY(-2px);
+    color:            white;
+    transform:        translate(-2px, -2px);
+    box-shadow:       6px 6px 0 rgba(var(--danger-rgb), .4);
 }
 
 /* Session edit grid */
@@ -1670,21 +1660,17 @@ body.fullscreen .page-layout {
 
 /* Winner button */
 .log-winner-btn {
-    margin-top:       8px;
+    margin-top:     8px;
     background-color: var(--winner-color);
-    background-image: var(--btn-shine);
-    border-color:     var(--winner-color);
-    color:            #111;
-    box-shadow:       var(--btn-winner-glow);
+    border-color:   var(--winner-color);
+    color:          #111;
+    box-shadow:     4px 4px 0 rgba(0,0,0,.5);
 }
 
 .log-winner-btn:hover {
-    background-color: rgba(var(--winner-rgb), .12);
-    background-image: none;
-    color:            var(--winner-color);
-    border-color:     var(--winner-color);
-    box-shadow:       0 0 26px rgba(var(--winner-rgb), .5), 0 6px 20px rgba(0,0,0,.5);
-    transform:        translateY(-1px);
+    transform:  translate(-2px, -2px);
+    box-shadow: 6px 6px 0 rgba(0,0,0,.55);
+    filter:     brightness(1.1);
 }
 
 /* Player quick-select chips */
@@ -1698,32 +1684,32 @@ body.fullscreen .page-layout {
 }
 
 .player-chip {
-    padding:          8px 22px;
-    font-size:        1rem;
-    font-weight:      700;
-    color:            rgba(255,255,255,.8);
+    padding:        8px 20px;
+    font-size:      .95rem;
+    font-weight:    700;
+    letter-spacing: 0.03em;
+    color:          rgba(255,255,255,.8);
     background-color: rgba(255,255,255,.07);
-    border:           1.5px solid rgba(255,255,255,.18);
-    border-radius:    var(--btn-radius-pill);
-    cursor:           pointer;
-    box-shadow:       0 2px 8px rgba(0,0,0,.25);
-    transition:       all .18s ease;
+    border:         2px solid rgba(255,255,255,.22);
+    border-radius:  var(--btn-radius-sm);
+    cursor:         pointer;
+    box-shadow:     3px 3px 0 rgba(0,0,0,.4);
+    transition:     transform .12s ease, box-shadow .12s ease, background-color .12s, color .12s, border-color .12s;
 }
 
 .player-chip:hover {
     border-color:     var(--accent-color);
     color:            var(--accent-color);
-    background-color: rgba(var(--accent-rgb), .08);
-    box-shadow:       0 0 12px rgba(var(--accent-rgb), .2), 0 2px 8px rgba(0,0,0,.3);
-    transform:        translateY(-1px);
+    background-color: rgba(var(--accent-rgb), .1);
+    transform:        translate(-2px, -2px);
+    box-shadow:       5px 5px 0 rgba(var(--accent-rgb), .3);
 }
 
 .player-chip.active {
     background-color: var(--accent-color);
-    background-image: var(--btn-shine);
     border-color:     var(--accent-color);
     color:            var(--primary-color);
-    box-shadow:       var(--btn-glow);
+    box-shadow:       3px 3px 0 rgba(0,0,0,.5);
 }
 
 /* Winner name input row */
@@ -2010,45 +1996,46 @@ body.fullscreen .page-layout {
 
 #reset-button,
 #jackpot-button {
-    width:            100%;
-    font-size:        1.3rem;
-    font-weight:      bold;
-    padding:          12px 4px;
-    color:            #111;
+    width:          100%;
+    font-size:      1.2rem;
+    font-weight:    900;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding:        12px 4px;
+    color:          var(--primary-color);
     background-color: var(--accent-color);
-    background-image: var(--btn-shine);
-    border:           2px solid var(--accent-color);
-    border-radius:    var(--btn-radius-pill);
-    cursor:           pointer;
-    transition:       all .2s ease;
-    white-space:      nowrap;
-    box-shadow:       var(--btn-glow);
+    border:         2.5px solid var(--accent-color);
+    border-radius:  var(--btn-radius);
+    cursor:         pointer;
+    transition:     transform .12s ease, box-shadow .12s ease, background-color .12s, color .12s, border-color .12s, filter .12s;
+    white-space:    nowrap;
+    box-shadow:     4px 4px 0 rgba(0,0,0,.5);
 }
 
 #reset-button:hover,
 #jackpot-button:hover {
-    color:            var(--accent-color);
-    background-color: rgba(var(--accent-rgb), .1);
-    background-image: none;
-    border-color:     var(--accent-color);
-    box-shadow:       var(--btn-glow-hover);
-    transform:        translateY(-1px);
+    transform:  translate(-2px, -2px);
+    box-shadow: 6px 6px 0 rgba(0,0,0,.55);
+    filter:     brightness(1.08);
 }
 
 #reset-button.confirm {
     background-color: var(--danger-color);
-    background-image: var(--btn-shine);
     border-color:     var(--danger-color);
     color:            white;
-    box-shadow:       var(--btn-danger-glow);
+    box-shadow:       4px 4px 0 rgba(var(--danger-rgb), .45);
+}
+
+#reset-button.confirm:hover {
+    box-shadow: 6px 6px 0 rgba(var(--danger-rgb), .5);
+    filter:     brightness(1.1);
 }
 
 #jackpot-button.active {
     background-color: var(--danger-color);
-    background-image: var(--btn-shine);
     border-color:     var(--danger-color);
     color:            white;
-    box-shadow:       var(--btn-danger-glow);
+    box-shadow:       4px 4px 0 rgba(var(--danger-rgb), .45);
 }
 
 /* Winner button wrapper - fixed at bottom of column 1 */
@@ -2063,46 +2050,45 @@ body.fullscreen .page-layout {
 
 /* Logg vinner in button-group */
 #log-winner-btn-2 {
-    width:            50%;
-    font-size:        1.3rem;
-    font-weight:      bold;
-    padding:          12px 10px;
-    color:            #111;
+    width:          50%;
+    font-size:      1.2rem;
+    font-weight:    900;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding:        12px 10px;
+    color:          #111;
     background-color: var(--winner-color);
-    background-image: var(--btn-shine);
-    border:           2px solid var(--winner-color);
-    border-radius:    var(--btn-radius-pill);
-    cursor:           pointer;
-    transition:       all .2s ease;
-    display:          none;
-    align-items:      center;
-    justify-content:  center;
-    text-align:       center;
-    box-shadow:       var(--btn-winner-glow);
+    border:         2.5px solid var(--winner-color);
+    border-radius:  var(--btn-radius);
+    cursor:         pointer;
+    transition:     transform .12s ease, box-shadow .12s ease, filter .12s;
+    display:        none;
+    align-items:    center;
+    justify-content: center;
+    text-align:     center;
+    box-shadow:     4px 4px 0 rgba(0,0,0,.5);
 }
 
 #log-winner-btn-2:hover {
-    color:            var(--winner-color);
-    background-color: rgba(var(--winner-rgb), .12);
-    background-image: none;
-    box-shadow:       0 0 26px rgba(var(--winner-rgb), .5), 0 6px 20px rgba(0,0,0,.5);
-    transform:        translateY(-1px);
+    transform:  translate(-2px, -2px);
+    box-shadow: 6px 6px 0 rgba(0,0,0,.55);
+    filter:     brightness(1.1);
 }
 
-/* Leaderboard button - gold color */
+/* Leaderboard button - outlined winner color */
 #leaderboard-btn {
-    background-color: rgba(var(--winner-rgb), .1);
-    border-color:     rgba(var(--winner-rgb), .4);
+    background-color: transparent;
+    border-color:     rgba(var(--winner-rgb), .55);
     color:            var(--winner-color);
+    box-shadow:       4px 4px 0 rgba(var(--winner-rgb), .3);
 }
 
 #leaderboard-btn:hover {
     background-color: var(--winner-color);
-    background-image: var(--btn-shine);
     color:            #111;
     border-color:     var(--winner-color);
-    box-shadow:       var(--btn-winner-glow);
-    transform:        translateY(-1px);
+    transform:        translate(-2px, -2px);
+    box-shadow:       6px 6px 0 rgba(var(--winner-rgb), .4);
 }
 
 /* =====================================================
@@ -2140,17 +2126,16 @@ body.fullscreen .page-layout {
 /* Rekke3 ready-to-log state: checkmark only */
 .rekke-btn.rekke3-ready {
     background-color: var(--accent-color);
-    background-image: var(--btn-shine);
     color:            var(--primary-color);
     border-color:     var(--accent-color);
-    font-weight:      bold;
-    box-shadow:       var(--btn-glow);
+    font-weight:      900;
+    box-shadow:       4px 4px 0 rgba(0,0,0,.5);
 }
 
 .rekke-btn.rekke3-ready:hover {
     filter:    brightness(1.12);
-    transform: scale(1.06);
-    box-shadow: var(--btn-glow-hover);
+    transform: translate(-2px, -2px);
+    box-shadow: 6px 6px 0 rgba(0,0,0,.55);
 }
 
 /* =====================================================
@@ -2199,40 +2184,44 @@ body.fullscreen .page-layout {
 }
 
 .rekke-confirm-btn {
-    flex:          1;
-    padding:       9px 0;
-    font-size:     1rem;
-    font-weight:   bold;
-    border-radius: var(--btn-radius-pill);
-    border:        2px solid;
-    cursor:        pointer;
-    transition:    all .18s ease;
+    flex:           1;
+    padding:        9px 0;
+    font-size:      1rem;
+    font-weight:    900;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    border-radius:  var(--btn-radius-sm);
+    border:         2px solid;
+    cursor:         pointer;
+    transition:     transform .12s ease, box-shadow .12s ease, background-color .12s, color .12s, border-color .12s, filter .12s;
 }
 
 .rekke-confirm-yes {
     background-color: var(--accent-color);
-    background-image: var(--btn-shine);
     border-color:     var(--accent-color);
     color:            var(--primary-color);
-    box-shadow:       var(--btn-glow);
+    box-shadow:       4px 4px 0 rgba(0,0,0,.5);
 }
 
 .rekke-confirm-yes:hover {
-    filter:     brightness(1.12);
-    box-shadow: var(--btn-glow-hover);
-    transform:  translateY(-1px);
+    filter:     brightness(1.1);
+    transform:  translate(-2px, -2px);
+    box-shadow: 6px 6px 0 rgba(0,0,0,.55);
 }
 
 .rekke-confirm-no {
-    background-color: rgba(255,255,255,.05);
-    border-color:     rgba(255,255,255,.25);
+    background-color: transparent;
+    border-color:     rgba(255,255,255,.28);
     color:            rgba(255,255,255,.75);
+    box-shadow:       4px 4px 0 rgba(0,0,0,.35);
 }
 
 .rekke-confirm-no:hover {
-    border-color:     rgba(255,255,255,.55);
+    border-color:     rgba(255,255,255,.6);
     color:            white;
-    background-color: rgba(255,255,255,.09);
+    background-color: rgba(255,255,255,.07);
+    transform:        translate(-2px, -2px);
+    box-shadow:       6px 6px 0 rgba(0,0,0,.45);
 }
 
 .rekke-confirm-adjust {
@@ -2247,26 +2236,26 @@ body.fullscreen .page-layout {
     width:         38px;
     height:        38px;
     font-size:     1.4rem;
-    font-weight:   bold;
+    font-weight:   900;
     line-height:   1;
-    border-radius: 50%;
-    border:        2px solid rgba(255,255,255,.2);
+    border-radius: var(--btn-radius-sm);
+    border:        2px solid rgba(255,255,255,.22);
     background:    rgba(255,255,255,.07);
     color:         rgba(255,255,255,.85);
     cursor:        pointer;
-    transition:    all .18s ease;
+    transition:    transform .12s ease, box-shadow .12s ease, background .12s, color .12s, border-color .12s;
     display:       flex;
     align-items:   center;
     justify-content: center;
-    box-shadow:    0 2px 8px rgba(0,0,0,.3);
+    box-shadow:    3px 3px 0 rgba(0,0,0,.4);
 }
 
 .rekke-adjust-btn:hover {
     border-color: var(--accent-color);
     color:        var(--accent-color);
     background:   rgba(var(--accent-rgb), .1);
-    box-shadow:   0 0 12px rgba(var(--accent-rgb), .25), 0 2px 8px rgba(0,0,0,.3);
-    transform:    scale(1.08);
+    transform:    translate(-2px, -2px);
+    box-shadow:   5px 5px 0 rgba(var(--accent-rgb), .3);
 }
 
 .rekke-adjust-count {
@@ -2418,32 +2407,32 @@ body.fullscreen .page-layout {
 }
 
 .add-win-preset-btn {
-    padding:       8px 18px;
-    font-size:     .95rem;
-    font-weight:   700;
-    color:         rgba(255,255,255,.78);
-    background:    rgba(255,255,255,.06);
-    border:        1.5px solid rgba(255,255,255,.16);
-    border-radius: var(--btn-radius-pill);
-    cursor:        pointer;
-    box-shadow:    0 2px 8px rgba(0,0,0,.2);
-    transition:    all .18s ease;
+    padding:        8px 16px;
+    font-size:      .92rem;
+    font-weight:    700;
+    letter-spacing: 0.03em;
+    color:          rgba(255,255,255,.78);
+    background:     rgba(255,255,255,.06);
+    border:         2px solid rgba(255,255,255,.2);
+    border-radius:  var(--btn-radius-sm);
+    cursor:         pointer;
+    box-shadow:     3px 3px 0 rgba(0,0,0,.38);
+    transition:     transform .12s ease, box-shadow .12s ease, background .12s, color .12s, border-color .12s;
 }
 
 .add-win-preset-btn:hover {
     border-color: var(--accent-color);
     color:        var(--accent-color);
-    background:   rgba(var(--accent-rgb), .08);
-    box-shadow:   0 0 10px rgba(var(--accent-rgb), .18), 0 2px 8px rgba(0,0,0,.25);
-    transform:    translateY(-1px);
+    background:   rgba(var(--accent-rgb), .1);
+    transform:    translate(-2px, -2px);
+    box-shadow:   5px 5px 0 rgba(var(--accent-rgb), .28);
 }
 
 .add-win-preset-btn.active {
-    background:        var(--accent-color);
-    background-image:  var(--btn-shine);
-    border-color:      var(--accent-color);
-    color:             var(--primary-color);
-    box-shadow:        var(--btn-glow);
+    background:   var(--accent-color);
+    border-color: var(--accent-color);
+    color:        var(--primary-color);
+    box-shadow:   3px 3px 0 rgba(0,0,0,.5);
 }
 
 .add-win-custom-row {
@@ -2594,26 +2583,27 @@ body.fullscreen .page-layout {
    SETTINGS MODAL
    ===================================================== */
 .settings-nav-btn {
-    width:            50px;
-    padding:          6px 10px;
+    width:            44px;
+    height:           36px;
+    padding:          0;
     margin:           0 15px;
     text-align:       center;
-    font-size:        1.2rem;
-    color:            rgba(255,255,255,.8);
+    font-size:        1.1rem;
+    color:            rgba(255,255,255,.85);
     background-color: rgba(255,255,255,.07);
-    border:           1px solid rgba(255,255,255,.15);
-    border-radius:    var(--btn-radius-pill);
-    backdrop-filter:  blur(10px);
-    box-shadow:       0 2px 10px rgba(0,0,0,.25);
+    border:           2px solid rgba(255,255,255,.2);
+    border-radius:    var(--btn-radius);
+    box-shadow:       var(--btn-shadow);
     cursor:           pointer;
-    transition:       color .2s, border-color .2s, background-color .2s, box-shadow .2s;
+    transition:       color .15s, border-color .15s, background-color .15s, transform .12s, box-shadow .12s;
 }
 
 .settings-nav-btn:hover {
     color:            var(--accent-color);
     border-color:     var(--accent-color);
-    background-color: rgba(255,255,255,.11);
-    box-shadow:       0 0 14px rgba(var(--accent-rgb),.2), 0 2px 10px rgba(0,0,0,.3);
+    background-color: rgba(var(--accent-rgb), .1);
+    transform:        translate(-2px, -2px);
+    box-shadow:       var(--btn-shadow-lg);
 }
 
 .modal-settings {
@@ -2664,7 +2654,7 @@ body.fullscreen .page-layout {
     background:    transparent;
     border:        none;
     border-left:   3px solid transparent;
-    border-radius: var(--btn-radius-md);
+    border-radius: var(--btn-radius);
     color:         rgba(255,255,255,.6);
     font-size:     .9rem;
     font-weight:   600;
@@ -2792,8 +2782,8 @@ body.no-blur *::after {
 }
 
 .settings-theme-btn.active {
-    background:   var(--btn-accent, var(--accent-color));
-    border-color: var(--btn-accent, var(--accent-color));
+    background:   var(--accent-color);
+    border-color: var(--accent-color);
     color:        #111;
 }
 
