@@ -354,32 +354,35 @@ body.layout-vertical .theme-buttons {
 }
 
 .theme-button {
-    width:            70px;
-    height:           38px;
-    border:           2.5px solid;
-    border-radius:    var(--btn-radius-sm);
-    cursor:           pointer;
-    font-weight:      800;
-    font-size:        12px;
-    letter-spacing:   0.05em;
-    text-transform:   uppercase;
-    color:            rgba(255,255,255,.7);
-    box-shadow:       var(--btn-shadow);
-    transition:       all .12s ease;
+    width:         70px;
+    height:        38px;
+    border:        2px solid;
+    border-radius: var(--btn-radius-sm);
+    cursor:        pointer;
+    font-weight:   500;
+    font-size:     12px;
+    white-space:   nowrap;
+    color:         rgba(255,255,255,.8);
+    box-shadow:    var(--btn-shadow);
+    transition:    transform .12s ease, box-shadow .12s ease, background-color .12s, color .12s, border-color .12s;
 }
 
-.theme-button        { background-color: rgba(255,255,255,.07); border-color: rgba(255,255,255,.22); }
-.theme-button:hover  {
-    background-color: var(--accent-color);
-    border-color:     var(--accent-color);
-    color:            var(--primary-color);
+/* Each button shows its own theme's colors via JS-injected --btn-accent / --btn-primary */
+.theme-button {
+    background-color: var(--btn-primary, rgba(255,255,255,.07));
+    border-color:     var(--btn-accent,  rgba(255,255,255,.3));
+}
+.theme-button:hover {
+    background-color: transparent;
+    border-color:     var(--btn-accent, var(--accent-color));
+    color:            var(--btn-accent, var(--accent-color));
     transform:        translate(-2px, -2px);
     box-shadow:       var(--btn-shadow-lg);
 }
 .theme-button.active {
-    background-color: var(--accent-color);
-    border-color:     var(--accent-color);
-    color:            var(--primary-color);
+    background-color: var(--btn-accent, var(--accent-color));
+    border-color:     var(--btn-accent, var(--accent-color));
+    color:            #111;
     transform:        translate(-1px, -1px);
     box-shadow:       3px 3px 0 rgba(0,0,0,.5);
 }
@@ -1395,15 +1398,13 @@ body.no-over-average-blink .circle.over-average { animation: none; }
 }
 
 .modal-btn {
-    padding:        11px 32px;
-    font-size:      1.1rem;
-    font-weight:    900;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    border-radius:  var(--btn-radius);
-    border:         2px solid;
-    cursor:         pointer;
-    transition:     transform .12s ease, box-shadow .12s ease, background-color .12s, color .12s, border-color .12s;
+    padding:      11px 32px;
+    font-size:    1.1rem;
+    font-weight:  700;
+    border-radius: var(--btn-radius);
+    border:       2px solid;
+    cursor:       pointer;
+    transition:   transform .12s ease, box-shadow .12s ease, background-color .12s, color .12s, border-color .12s;
 }
 
 .modal-btn-yes {
@@ -1414,9 +1415,11 @@ body.no-over-average-blink .circle.over-average { animation: none; }
 }
 
 .modal-btn-yes:hover {
-    transform:  translate(-2px, -2px);
-    box-shadow: 6px 6px 0 rgba(0,0,0,.55);
-    filter:     brightness(1.1);
+    background-color: transparent;
+    color:            var(--accent-color);
+    border-color:     var(--accent-color);
+    transform:        translate(-2px, -2px);
+    box-shadow:       6px 6px 0 rgba(var(--accent-rgb), .35);
 }
 
 .modal-btn-no {
@@ -1660,17 +1663,19 @@ body.fullscreen .page-layout {
 
 /* Winner button */
 .log-winner-btn {
-    margin-top:     8px;
+    margin-top:       8px;
     background-color: var(--winner-color);
-    border-color:   var(--winner-color);
-    color:          #111;
-    box-shadow:     4px 4px 0 rgba(0,0,0,.5);
+    border-color:     var(--winner-color);
+    color:            #111;
+    box-shadow:       4px 4px 0 rgba(0,0,0,.5);
 }
 
 .log-winner-btn:hover {
-    transform:  translate(-2px, -2px);
-    box-shadow: 6px 6px 0 rgba(0,0,0,.55);
-    filter:     brightness(1.1);
+    background-color: transparent;
+    color:            var(--winner-color);
+    border-color:     var(--winner-color);
+    transform:        translate(-2px, -2px);
+    box-shadow:       6px 6px 0 rgba(var(--winner-rgb), .35);
 }
 
 /* Player quick-select chips */
@@ -1996,27 +2001,27 @@ body.fullscreen .page-layout {
 
 #reset-button,
 #jackpot-button {
-    width:          100%;
-    font-size:      1.2rem;
-    font-weight:    900;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    padding:        12px 4px;
-    color:          var(--primary-color);
+    width:            100%;
+    font-size:        1.3rem;
+    font-weight:      bold;
+    padding:          12px 4px;
+    color:            var(--primary-color);
     background-color: var(--accent-color);
-    border:         2.5px solid var(--accent-color);
-    border-radius:  var(--btn-radius);
-    cursor:         pointer;
-    transition:     transform .12s ease, box-shadow .12s ease, background-color .12s, color .12s, border-color .12s, filter .12s;
-    white-space:    nowrap;
-    box-shadow:     4px 4px 0 rgba(0,0,0,.5);
+    border:           2.5px solid var(--accent-color);
+    border-radius:    var(--btn-radius);
+    cursor:           pointer;
+    transition:       transform .12s ease, box-shadow .12s ease, background-color .12s, color .12s, border-color .12s;
+    white-space:      nowrap;
+    box-shadow:       4px 4px 0 rgba(0,0,0,.5);
 }
 
 #reset-button:hover,
 #jackpot-button:hover {
-    transform:  translate(-2px, -2px);
-    box-shadow: 6px 6px 0 rgba(0,0,0,.55);
-    filter:     brightness(1.08);
+    background-color: transparent;
+    color:            var(--accent-color);
+    border-color:     var(--accent-color);
+    transform:        translate(-2px, -2px);
+    box-shadow:       6px 6px 0 rgba(var(--accent-rgb), .35);
 }
 
 #reset-button.confirm {
@@ -2027,8 +2032,10 @@ body.fullscreen .page-layout {
 }
 
 #reset-button.confirm:hover {
-    box-shadow: 6px 6px 0 rgba(var(--danger-rgb), .5);
-    filter:     brightness(1.1);
+    background-color: transparent;
+    color:            var(--danger-color);
+    border-color:     var(--danger-color);
+    box-shadow:       6px 6px 0 rgba(var(--danger-rgb), .4);
 }
 
 #jackpot-button.active {
@@ -2036,6 +2043,13 @@ body.fullscreen .page-layout {
     border-color:     var(--danger-color);
     color:            white;
     box-shadow:       4px 4px 0 rgba(var(--danger-rgb), .45);
+}
+
+#jackpot-button.active:hover {
+    background-color: transparent;
+    color:            var(--danger-color);
+    border-color:     var(--danger-color);
+    box-shadow:       6px 6px 0 rgba(var(--danger-rgb), .4);
 }
 
 /* Winner button wrapper - fixed at bottom of column 1 */
@@ -2050,29 +2064,29 @@ body.fullscreen .page-layout {
 
 /* Logg vinner in button-group */
 #log-winner-btn-2 {
-    width:          50%;
-    font-size:      1.2rem;
-    font-weight:    900;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    padding:        12px 10px;
-    color:          #111;
+    width:            50%;
+    font-size:        1.3rem;
+    font-weight:      bold;
+    padding:          12px 10px;
+    color:            #111;
     background-color: var(--winner-color);
-    border:         2.5px solid var(--winner-color);
-    border-radius:  var(--btn-radius);
-    cursor:         pointer;
-    transition:     transform .12s ease, box-shadow .12s ease, filter .12s;
-    display:        none;
-    align-items:    center;
-    justify-content: center;
-    text-align:     center;
-    box-shadow:     4px 4px 0 rgba(0,0,0,.5);
+    border:           2.5px solid var(--winner-color);
+    border-radius:    var(--btn-radius);
+    cursor:           pointer;
+    transition:       transform .12s ease, box-shadow .12s ease, background-color .12s, color .12s, border-color .12s;
+    display:          none;
+    align-items:      center;
+    justify-content:  center;
+    text-align:       center;
+    box-shadow:       4px 4px 0 rgba(0,0,0,.5);
 }
 
 #log-winner-btn-2:hover {
-    transform:  translate(-2px, -2px);
-    box-shadow: 6px 6px 0 rgba(0,0,0,.55);
-    filter:     brightness(1.1);
+    background-color: transparent;
+    color:            var(--winner-color);
+    border-color:     var(--winner-color);
+    transform:        translate(-2px, -2px);
+    box-shadow:       6px 6px 0 rgba(var(--winner-rgb), .35);
 }
 
 /* Leaderboard button - outlined winner color */
@@ -2133,9 +2147,11 @@ body.fullscreen .page-layout {
 }
 
 .rekke-btn.rekke3-ready:hover {
-    filter:    brightness(1.12);
-    transform: translate(-2px, -2px);
-    box-shadow: 6px 6px 0 rgba(0,0,0,.55);
+    background-color: transparent;
+    color:            var(--accent-color);
+    border-color:     var(--accent-color);
+    transform:        translate(-2px, -2px);
+    box-shadow:       6px 6px 0 rgba(var(--accent-rgb), .35);
 }
 
 /* =====================================================
@@ -2184,16 +2200,14 @@ body.fullscreen .page-layout {
 }
 
 .rekke-confirm-btn {
-    flex:           1;
-    padding:        9px 0;
-    font-size:      1rem;
-    font-weight:    900;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    border-radius:  var(--btn-radius-sm);
-    border:         2px solid;
-    cursor:         pointer;
-    transition:     transform .12s ease, box-shadow .12s ease, background-color .12s, color .12s, border-color .12s, filter .12s;
+    flex:         1;
+    padding:      9px 0;
+    font-size:    1rem;
+    font-weight:  700;
+    border-radius: var(--btn-radius-sm);
+    border:       2px solid;
+    cursor:       pointer;
+    transition:   transform .12s ease, box-shadow .12s ease, background-color .12s, color .12s, border-color .12s, filter .12s;
 }
 
 .rekke-confirm-yes {
@@ -2204,9 +2218,11 @@ body.fullscreen .page-layout {
 }
 
 .rekke-confirm-yes:hover {
-    filter:     brightness(1.1);
-    transform:  translate(-2px, -2px);
-    box-shadow: 6px 6px 0 rgba(0,0,0,.55);
+    background-color: transparent;
+    color:            var(--accent-color);
+    border-color:     var(--accent-color);
+    transform:        translate(-2px, -2px);
+    box-shadow:       6px 6px 0 rgba(var(--accent-rgb), .35);
 }
 
 .rekke-confirm-no {
