@@ -46,13 +46,13 @@ const BUNDLED_SOUNDS = [
 const GAME_THEMES = ['blue', 'yellow', 'pink', 'grey'];
 const COLOR_THEMES = ['default', 'blue', 'yellow', 'pink', 'grey']; // includes editable default
 const GAME_NAMES  = { default: 'Standard', blue: 'Spill 1', yellow: 'Spill 2', pink: 'Spill 3', grey: 'Spill 4' };
-const THEME_COLORS = { blue: '#00aeff', yellow: '#F1B924', pink: '#ff0096', grey: '#ffdcbc' };
+const THEME_COLORS = { blue: '#007bff', yellow: '#ffdd00', pink: '#ff0095', grey: '#ffcd9e' };
 const DEFAULT_THEME_COLORS = {
-    default: { accent: '#F1B924', primary: '#202834', balls: '#4c586b', danger: '#ff4444', winner: '#f0c030' },
-    blue:    { accent: '#00aeff', primary: '#141820', balls: '#4c586b', danger: '#ff4444', winner: '#f0c030' },
-    yellow:  { accent: '#F1B924', primary: '#151515', balls: '#5c5858', danger: '#ff4444', winner: '#f0c030' },
-    pink:    { accent: '#ff0096', primary: '#211220', balls: '#604b5f', danger: '#ff4444', winner: '#f0c030' },
-    grey:    { accent: '#ffdcbc', primary: '#18181c', balls: '#525150', danger: '#ff4444', winner: '#f0c030' },
+    default: { accent: '#F1B924', primary: '#101c2d', balls: '#4c586b', danger: '#ff4444', winner: '#f0c030' },
+    blue:    { accent: '#007bff', primary: '#0c0d32', balls: '#323867', danger: '#fe345c', winner: '#f9da3e' },
+    yellow:  { accent: '#ffdd00', primary: '#121216', balls: '#42424d', danger: '#ff4444', winner: '#d58907' },
+    pink:    { accent: '#ff0095', primary: '#140c27', balls: '#60395e', danger: '#ff2450', winner: '#ef8c2e' },
+    grey:    { accent: '#ffcd9e', primary: '#16161d', balls: '#4b464e', danger: '#ff4444', winner: '#f0c030' },
 };
 function hexToRgb(hex) {
     const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex.trim());
@@ -126,45 +126,45 @@ class BingoApp {
         // Settings
         this.settings = {
             progressEnabled: true,
-            progressDuration: 13,
-            progressStyle: 'wave',
+            progressDuration: 14,
+            progressStyle: 'doubleWave',
             countdownFixed:  false,
             countdownTime:   '22:08',
             oneWay:          false,
             tooltipEnabled:  true,
-            chancesVisible:  true,
+            chancesVisible:  false,
             countdownVisible: true,
             soundEnabled:    true,
-            hoverStyle:      'click-air',
-            callStyle:       'synth',
-            selectStyle:     'synth',
-            switchStyle:     'synth',
-            confirmStyle:    'synth',
-            cancelStyle:     'synth',
-            resetStyle:      'synth',
-            resetHardStyle:  'synth',
-            overtimeStyle:   'custom',
+            hoverStyle:      're4-loud',
+            callStyle:       're4-select-number',
+            selectStyle:     're4-select',
+            switchStyle:     're4-switch',
+            confirmStyle:    'user_re4_switch',
+            cancelStyle:     're4-cancel',
+            resetStyle:      're4-cancel-big',
+            resetHardStyle:  're4-cancel-big',
+            overtimeStyle:   'user_62274159',
             overtimeEnabled: true,
-            volOvertime: 0.9,
-            typingDelay: 8,
+            volOvertime: 1,
+            typingDelay: 5,
             typingOverwrite: false,
             typingOverwriteDelay: 10,
             ballAnimStyle: 'spin',
             gridLayout: 'horizontal',
-            volHover:   0.8,
-            volCall:    0.9,
-            volSelect:  0.8,
-            volSwitch:  0.9,
-            volConfirm: 0.9,
-            volCancel:  0.9,
-            volReset:   0.9,
-            volResetHard: 1.0,
-            firstRekkeStyle: 'synth',
-            volFirstRekke: 0.9,
-            mutedSounds: {},
+            volHover:   1,
+            volCall:    1,
+            volSelect:  1,
+            volSwitch:  1,
+            volConfirm: 1,
+            volCancel:  1,
+            volReset:   1,
+            volResetHard: 1,
+            firstRekkeStyle: 'user_fxprosound_metal_plate_gong_4_248610',
+            volFirstRekke: 1,
+            mutedSounds: { 'first-rekke': false },
             overAverageBlinkEnabled: true,
-            nextGameCountdownEnabled: false,
-            nextGameCountdownMinutes: 3,
+            nextGameCountdownEnabled: true,
+            nextGameCountdownMinutes: 4,
             nextGameCountdownSeconds: 0,
             blurEnabled: true,
         };
@@ -173,6 +173,11 @@ class BingoApp {
         ['default', ...GAME_THEMES].forEach(t => {
             this.slots[t] = freshSlotState();
         });
+
+        // Debounced-write registry: key → { timer, build }. Coalesces bursts of
+        // writes (e.g. dragging a slider fires input events every frame) into a
+        // single setItem per key. Flushed on pagehide so no state is lost.
+        this._pendingWrites = new Map();
 
         this.init();
     }
@@ -192,6 +197,30 @@ class BingoApp {
         this.checkSaveSessionButton();
         this.startCountdown();
         this.resetInactivityTimer();
+
+        // Ensure any pending debounced writes are persisted before unload.
+        window.addEventListener('pagehide', () => this.flushPendingWrites());
+    }
+
+    // Schedule a localStorage write, coalescing rapid repeat calls for the same
+    // key into one setItem ~300ms after the last call. build() is invoked at
+    // flush time so the value reflects the latest state, not state at call time.
+    scheduleWrite(key, build, delay = 300) {
+        const existing = this._pendingWrites.get(key);
+        if (existing) clearTimeout(existing.timer);
+        const timer = setTimeout(() => {
+            this._pendingWrites.delete(key);
+            try { localStorage.setItem(key, build()); } catch(e) {}
+        }, delay);
+        this._pendingWrites.set(key, { timer, build });
+    }
+
+    flushPendingWrites() {
+        this._pendingWrites.forEach(({ timer, build }, key) => {
+            clearTimeout(timer);
+            try { localStorage.setItem(key, build()); } catch(e) {}
+        });
+        this._pendingWrites.clear();
     }
 
     cacheElements() {
@@ -951,11 +980,11 @@ class BingoApp {
 
     // ── Settings ─────────────────────────────────────
     saveSettings() {
-        localStorage.setItem('bingoSettings', JSON.stringify(this.settings));
+        this.scheduleWrite('bingoSettings', () => JSON.stringify(this.settings));
     }
 
     saveThemeColors() {
-        localStorage.setItem('bingoThemeColors', JSON.stringify(this.themeColors));
+        this.scheduleWrite('bingoThemeColors', () => JSON.stringify(this.themeColors));
         this.updateThemeButtonColors();
     }
 
@@ -1011,44 +1040,52 @@ class BingoApp {
     renderColorPresets(theme) {
         const themes = theme ? [theme] : COLOR_THEMES;
         const all = this.getAllColorPresets();
+
+        // Cache list containers once and reuse across re-renders. Also wire a
+        // single delegated click listener per list instead of 2N listeners
+        // (load + delete) every time the list re-renders.
+        if (!this._colorPresetLists) {
+            this._colorPresetLists = new Map();
+            document.querySelectorAll('.color-preset-list').forEach(list => {
+                const t = list.dataset.theme;
+                this._colorPresetLists.set(t, list);
+                list.addEventListener('click', e => {
+                    const item = e.target.closest('.color-preset-item');
+                    if (!item) return;
+                    const name = item.dataset.presetName;
+                    if (e.target.closest('.color-preset-load-btn')) {
+                        this.loadColorPreset(t, name);
+                    } else if (e.target.closest('.color-preset-delete-btn')) {
+                        this.deleteColorPreset(t, name);
+                        this.renderColorPresets(t);
+                    }
+                });
+            });
+        }
+
         themes.forEach(t => {
-            const list = document.querySelector(`.color-preset-list[data-theme="${t}"]`);
+            const list = this._colorPresetLists.get(t);
             if (!list) return;
             const presets = all[t] || [];
-            list.innerHTML = '';
-            presets.forEach(preset => {
-                const item = document.createElement('div');
-                item.className = 'color-preset-item';
-
-                const swatch = document.createElement('span');
-                swatch.className = 'color-preset-swatch';
-                swatch.style.background = preset.colors.accent || DEFAULT_THEME_COLORS[t].accent;
-
-                const nameEl = document.createElement('span');
-                nameEl.className = 'color-preset-name';
-                nameEl.textContent = preset.name;
-
-                const loadBtn = document.createElement('button');
-                loadBtn.className = 'color-preset-load-btn';
-                loadBtn.textContent = 'Last inn';
-                loadBtn.addEventListener('click', () => this.loadColorPreset(t, preset.name));
-
-                const delBtn = document.createElement('button');
-                delBtn.className = 'color-preset-delete-btn';
-                delBtn.textContent = '✕';
-                delBtn.title = 'Slett';
-                delBtn.addEventListener('click', () => {
-                    this.deleteColorPreset(t, preset.name);
-                    this.renderColorPresets(t);
-                });
-
-                item.appendChild(swatch);
-                item.appendChild(nameEl);
-                item.appendChild(loadBtn);
-                item.appendChild(delBtn);
-                list.appendChild(item);
-            });
+            const fallbackAccent = DEFAULT_THEME_COLORS[t].accent;
+            // Build markup as a single string to avoid N createElement passes.
+            list.innerHTML = presets.map(p => {
+                const swatch = p.colors.accent || fallbackAccent;
+                const name = this._escapeHtml(p.name);
+                return `<div class="color-preset-item" data-preset-name="${name}">`
+                     + `<span class="color-preset-swatch" style="background:${swatch}"></span>`
+                     + `<span class="color-preset-name">${name}</span>`
+                     + `<button class="color-preset-load-btn">Last inn</button>`
+                     + `<button class="color-preset-delete-btn" title="Slett">✕</button>`
+                     + `</div>`;
+            }).join('');
         });
+    }
+
+    _escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, c => ({
+            '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+        }[c]));
     }
 
     applyThemeColors() {
@@ -1103,14 +1140,13 @@ class BingoApp {
         const undoCell = this.el.undoBtnCell;
 
         if (isVertical) {
-            if (undoCell.parentElement !== row1Last) {
-                // Insert undo right after the 90-ball (first .balls child of last row)
-                const ninetyBall = row1Last.querySelector('.balls:first-child');
-                if (ninetyBall) row1Last.insertBefore(undoCell, ninetyBall.nextSibling);
+            // Move undo to the END of column 1 (after number 9) so all 10 columns have equal cell count
+            if (undoCell !== row1First.lastElementChild) {
+                row1First.appendChild(undoCell);
             }
         } else {
             // Restore undo to the very front of the first row
-            if (undoCell.parentElement !== row1First) {
+            if (undoCell !== row1First.firstElementChild) {
                 row1First.insertBefore(undoCell, row1First.firstChild);
             }
         }
@@ -1345,8 +1381,8 @@ class BingoApp {
     get slot() { return this.slots[this.currentTheme]; }
 
     saveSlotToStorage() {
-        localStorage.setItem('bingoSlots', JSON.stringify(this.slots));
-        localStorage.setItem('bingoTheme', this.currentTheme);
+        this.scheduleWrite('bingoSlots', () => JSON.stringify(this.slots));
+        this.scheduleWrite('bingoTheme', () => this.currentTheme);
     }
 
     loadFromStorage() {
@@ -3319,7 +3355,8 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
 
     setAvgFilter(n) {
         this.avgFilter = n;
-        localStorage.setItem('bingoAvgFilter', n === null ? '' : String(n));
+        this.scheduleWrite('bingoAvgFilter', () =>
+            this.avgFilter === null ? '' : String(this.avgFilter));
         this.syncFilterUI();
         // Parse once and pass to all three consumers
         const sessions = this.getSessions();

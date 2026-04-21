@@ -5,7 +5,7 @@
 /* CSS Variables / Themes */
 :root {
     --balls-color:   #4c586b;
-    --primary-color: #202834;
+    --primary-color: #101c2d;
     --accent-color:  #F1B924;
     --accent-rgb:    241, 185, 36;
     --jackpot-color: transparent;
@@ -23,35 +23,35 @@
 }
 
 .theme-blue {
-    --balls-color:   #4c586b;
-    --primary-color: #141820;
-    --accent-color:  #00aeff;
-    --accent-rgb:    0, 174, 255;
+    --balls-color:   #323867;
+    --primary-color: #0c0d32;
+    --accent-color:  #007bff;
+    --accent-rgb:    0, 123, 255;
     --jackpot-color: transparent;
 }
 
 .theme-yellow {
-    --balls-color:   #5c5858;
-    --primary-color: #151515;
-    --accent-color:  #F1B924;
-    --accent-rgb:    241, 185, 36;
+    --balls-color:   #42424d;
+    --primary-color: #121216;
+    --accent-color:  #ffdd00;
+    --accent-rgb:    255, 221, 0;
     --jackpot-color: transparent;
 }
 
 .theme-pink {
-    --balls-color:   #604b5f;
-    --primary-color: #211220;
-    --accent-color:  #ff0096;
-    --accent-rgb:    255, 0, 150;
+    --balls-color:   #60395e;
+    --primary-color: #140c27;
+    --accent-color:  #ff0095;
+    --accent-rgb:    255, 0, 149;
     --jackpot-color: transparent;
 }
 
 .theme-grey {
-    --balls-color:   #525150;
-    --primary-color: #18181c;
-    --accent-color:  #ffdcbc;
-    --accent-rgb:    255, 220, 188;
-    --jackpot-color: #ffdcbc;
+    --balls-color:   #4b464e;
+    --primary-color: #16161d;
+    --accent-color:  #ffcd9e;
+    --accent-rgb:    255, 205, 158;
+    --jackpot-color: #ffcd9e;
 }
 
 /* Global */
@@ -232,33 +232,37 @@ body {
 
 /* ── Vertical layout: each decade-group is a flex column ── */
 
-/* ball-grid switches to a row-wrap flex so .row1 divs sit side by side */
+/* ball-grid becomes a 10-column CSS grid.
+   grid-template-rows: the number columns fill all remaining height (1fr),
+   stats and theme rows take only what they need (auto). */
 body.layout-vertical .ball-grid {
-    flex-direction: row;
-    flex-wrap:      wrap;
+    display:               grid;
+    grid-template-columns: repeat(10, 1fr);
+    grid-template-rows:    1fr auto auto;
 }
 
-/* The 9 number-decade rows (row1 #1–9) become vertical columns.
-   flex: 1 0 10% → each starts at 10% and grows equally to fill 100% (9 × 11.11%) */
+/* Each decade-group is a flex column filling its grid cell */
 body.layout-vertical .row1 {
+    display:        flex;
     flex-direction: column;
-    flex:           1 0 10%;
+    min-width:      0;
 }
 
-/* The last row1 (#10, contains 90 + Reset + Jackpot) stays horizontal,
-   spanning the full width as a bottom strip */
-body.layout-vertical .ball-grid > .row1:nth-child(10) {
-    flex-direction: row;
-    flex:           0 0 100%;
-}
-
-/* Stats and theme-buttons each take a full-width row below the grid.
-   Do NOT set display here — let .stats-row.hidden { display:none } keep working. */
-body.layout-vertical .stats-row {
-    flex: 0 0 100%;
-}
+/* Stats and theme-buttons each span all 10 columns at the bottom */
+body.layout-vertical .stats-row,
 body.layout-vertical .theme-buttons {
-    flex: 0 0 100%;
+    grid-column: 1 / -1;
+}
+
+/* Reset/Jackpot buttons shrink to fit inside the narrow 10th column */
+body.layout-vertical #reset-button,
+body.layout-vertical #jackpot-button {
+    font-size: 0.75rem;
+    padding:   6px 2px;
+}
+body.layout-vertical #reset-btn-cell,
+body.layout-vertical #jackpot-btn-cell {
+    overflow: hidden;
 }
 
 
