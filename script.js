@@ -278,6 +278,7 @@ class BingoApp {
             // Edit session modal
             editSessionModal:     document.getElementById('edit-session-modal'),
             editSessionDateLabel: document.getElementById('edit-session-date-label'),
+            editSessionDateInput: document.getElementById('edit-session-date-input'),
             editSessionGrid:      document.getElementById('edit-session-grid'),
             editSessionSave:      document.getElementById('edit-session-save'),
             editSessionCancel:    document.getElementById('edit-session-cancel'),
@@ -758,6 +759,7 @@ class BingoApp {
             this.settings.countdownFixed = this.el.settingCountdownFixed.checked;
             this.el.countdownTimeRow.style.display = this.settings.countdownFixed ? '' : 'none';
             this.saveSettings();
+            this.startCountdown(); // apply new mode immediately without requiring a reload
         });
         this.el.settingCountdownVisible.addEventListener('change', () => {
             this.settings.countdownVisible = this.el.settingCountdownVisible.checked;
@@ -769,6 +771,7 @@ class BingoApp {
         this.el.settingCountdownTime.addEventListener('change', () => {
             this.settings.countdownTime = this.el.settingCountdownTime.value;
             this.saveSettings();
+            if (this.settings.countdownFixed) this.startCountdown(); // reflect new fixed time live
         });
         this.el.settingOneway.addEventListener('change', () => {
             this.settings.oneWay = this.el.settingOneway.checked;
@@ -1109,7 +1112,7 @@ class BingoApp {
 
         // Sync completed ball fill with new colour (no RAF is running after completion)
         if (this._progressCompleted) {
-            if (this._progressWhiteState) {
+            if (this._fillIsWhite) {
                 // State: white fill on canvas, accent-coloured bg
                 this.el.bigNumber.style.backgroundColor = c.accent;
             } else {
@@ -1603,7 +1606,12 @@ class BingoApp {
         clearTimeout(this._progressTimer);
         if (this._progressRaf) cancelAnimationFrame(this._progressRaf);
 
-        const isWhite = this._progressCompleted === true;
+        // Flip the fill direction on every call. Using a dedicated toggle
+        // rather than _progressCompleted avoids the bug where _progressCompleted
+        // is always true from the 2nd completed animation onwards, making every
+        // subsequent fill white instead of alternating.
+        this._fillIsWhite = !this._fillIsWhite;
+        const isWhite = !!this._fillIsWhite;
         this._progressCompleted = false;
 
         // Read initial colours for background setup (will also be read live per-frame)
@@ -1709,8 +1717,7 @@ class BingoApp {
                 this._progressRaf = requestAnimationFrame(draw);
             } else {
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
-                this._progressCompleted  = true;
-                this._progressWhiteState = isWhite;
+                this._progressCompleted = true;
             }
         };
 
@@ -1947,9 +1954,9 @@ class BingoApp {
     resetProgressBar() {
         if (this._progressRaf) cancelAnimationFrame(this._progressRaf);
         clearTimeout(this._progressTimer);
-        this._progressRaf       = null;
-        this._progressCompleted  = false;
-        this._progressWhiteState = false;
+        this._progressRaf      = null;
+        this._progressCompleted = false;
+        this._fillIsWhite       = false;  // next fill starts with theme colour
         this.el.bigNumberFill.innerHTML = '';
         this.el.bigNumber.style.transition = 'none';
         this.el.bigNumber.style.backgroundColor = 'white';
@@ -2173,6 +2180,8 @@ class BingoApp {
         this.updateAverages();
         this.updateGameIndicator();
         this.updateViewerCounts();
+        // If dynamic mode, the new session shifts the average — restart so it's live
+        if (!this.settings.countdownFixed) this.startCountdown();
         this.updateWinnerIndicator();
     }
 
@@ -3546,6 +3555,12 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         this.el.editSessionDateLabel.textContent = date.toLocaleDateString('no-NO', {
             weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
         });
+        // Populate the datetime-local input. The value format is YYYY-MM-DDTHH:MM
+        // in local time; we build that from the stored ISO string.
+        const pad = n => String(n).padStart(2, '0');
+        const localDt = `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}`
+                      + `T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+        this.el.editSessionDateInput.value = localDt;
 
         const grid = this.el.editSessionGrid;
         grid.innerHTML = '';
@@ -3599,12 +3614,21 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         });
 
         sessions[this.editingSessionIdx].games = GAME_THEMES.map(t => games[t]);
+
+        // Save edited date if the user changed it
+        const rawDt = this.el.editSessionDateInput.value;
+        if (rawDt) {
+            sessions[this.editingSessionIdx].date = new Date(rawDt).toISOString();
+        }
+
         localStorage.setItem('bingoSessions', JSON.stringify(sessions));
 
         this.closeEditSessionModal();
         this.renderSessionList();
         this.updateAverages();
         this.updateViewerCounts();
+        // Refresh dynamic countdown in case the edited time affects the average
+        if (!this.settings.countdownFixed) this.startCountdown();
     }
 
     closeEditSessionModal() {

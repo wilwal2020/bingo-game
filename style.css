@@ -1490,6 +1490,41 @@ body.no-over-average-blink .circle.over-average { animation: none; }
 
 .session-input::placeholder { color: rgba(255,255,255,.2); }
 
+/* Edit-session date/time row */
+.edit-session-time-row {
+    display:     flex;
+    align-items: center;
+    gap:         10px;
+    margin:      0 0 18px;
+}
+
+.edit-session-time-label {
+    color:       rgba(255,255,255,.7);
+    font-size:   .9rem;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.edit-session-date-input {
+    background:    rgba(255,255,255,.07);
+    border:        1px solid rgba(255,255,255,.15);
+    border-radius: var(--btn-radius-sm);
+    color:         white;
+    font-family:   inherit;
+    font-size:     .9rem;
+    padding:       6px 10px;
+    cursor:        pointer;
+    flex:          1;
+    max-width:     220px;
+    color-scheme:  dark;   /* makes browser date picker use dark UI */
+}
+
+.edit-session-date-input:focus {
+    outline:      none;
+    border-color: var(--accent-color);
+    box-shadow:   0 0 0 2px rgba(var(--accent-rgb),.25);
+}
+
 /* Fullscreen button */
 .fullscreen-btn {
     position:         fixed;
