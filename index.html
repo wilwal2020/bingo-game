@@ -5,17 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Geithus Bingo</title>
     <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="flare.css">
 </head>
 <body>
 
     <!-- HEADER / NAV -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
     <header>
         <nav class="flex-container">
             <img src="" class="logo" alt="Geithus Bingo logo">
             <a class="flex-item" href="#" aria-label="90ball bingo">90ball</a>
             <a class="flex-item" href="#" aria-label="Bingoark">Bingoark</a>
             <a class="flex-item" href="#" aria-label="Hjelp">Hjelp</a>
+            <button class="flex-item settings-nav-btn" id="bingoview-btn" aria-label="BingoView telefon" title="Koble til telefon">📱</button>
             <button class="flex-item settings-nav-btn" id="settings-btn" aria-label="Innstillinger">⚙</button>
             <div class="dropdown">
                 <button class="dropbtn flex-item" aria-label="Apne meny" style="font-size:1.3rem;">
@@ -1252,7 +1253,37 @@
     <!-- Jackpot flash notification -->
     <div id="jackpot-flash" style="display:none"></div>
 
+    <!-- BingoView modal -->
+    <div class="modal-overlay" id="bingoview-modal" style="display:none">
+        <div class="modal modal-wide">
+            <div class="modal-title">BingoView</div>
+            <div class="modal-subtitle">Koble iPad til telefon</div>
+
+            <div class="bv-field-group">
+                <label class="bv-label">Kode fra telefonen</label>
+                <div class="bv-input-row">
+                    <input id="bingoview-code-input"
+                           class="bv-code-input"
+                           type="text" maxlength="6"
+                           placeholder="F.EKS. K7X2MQ"
+                           autocomplete="off" autocorrect="off" spellcheck="false">
+                    <button class="modal-btn modal-btn-yes bv-connect-btn" id="bingoview-connect-btn">
+                        Koble til
+                    </button>
+                </div>
+            </div>
+
+            <div class="bv-status-row">
+                <div class="bv-dot" id="bingoview-dot"></div>
+                <span class="bv-status-text" id="bingoview-status-text">Ikke tilkoblet</span>
+            </div>
+
+            <div class="modal-buttons">
+                <button class="modal-btn modal-btn-no" id="bingoview-close-btn">Lukk</button>
+            </div>
+        </div>
+    </div>
+
     <script src="script.js"></script>
-<script src="flare.js" defer></script>
 </body>
 </html>
