@@ -4327,21 +4327,39 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
 
         this.bvSetStatus('connecting', 'Kobler til\u2026');
 
+        // Clear any previous connection
+        if (this._bvGun) {
+            try { this._bvChannel.get('phone').off(); } catch(e) {}
+        }
+        clearTimeout(this._bvConnTimeout);
+
         const tryConnect = () => {
             this._bvGun = Gun(['https://gun-manhattan.herokuapp.com/gun',
                                'https://gun-us.herokuapp.com/gun']);
             this._bvChannel = this._bvGun.get('bingoview-' + code);
 
-            // Write a heartbeat so the phone can confirm iPad is live
-            this._bvChannel.get('ipad').put({ ts: Date.now(), connected: true });
-
-            // Gun has no formal "connected" event — assume live after 1.5s
-            clearTimeout(this._bvConnTimeout);
-            this._bvConnTimeout = setTimeout(() => {
+            // Listen for phone acknowledgement — this is the only way
+            // we confirm the phone is actually on the other end
+            let confirmed = false;
+            this._bvChannel.get('phone').on((data) => {
+                if (!data || !data.ack) return;
+                if (confirmed) return;
+                confirmed = true;
+                clearTimeout(this._bvConnTimeout);
                 this.bvSetStatus('connected', 'Telefon tilkoblet \u2713');
                 document.getElementById('bingoview-btn').style.opacity = '1';
                 document.getElementById('bingoview-btn').title = 'BingoView \u2014 tilkoblet';
-            }, 1500);
+            });
+
+            // Write heartbeat — phone will see this and ack back
+            this._bvChannel.get('ipad').put({ ts: Date.now(), ping: true });
+
+            // Timeout if phone never acks
+            this._bvConnTimeout = setTimeout(() => {
+                if (!confirmed) {
+                    this.bvSetStatus('error', 'Ingen telefon fant — sjekk koden');
+                }
+            }, 8000);
         };
 
         if (window.Gun) {
