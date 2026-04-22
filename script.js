@@ -4335,24 +4335,45 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         const c = this._bvPeer.connect(code, { reliable: true });
         this._bvConn = c;
 
-        c.on('open', () => {
+        const onOpen = () => {
+            clearInterval(pollTimer);
+            clearTimeout(timeoutTimer);
             this.bvSetStatus('connected', 'Telefon tilkoblet ✓');
-            // Update nav button to show connected state
             document.getElementById('bingoview-btn').style.opacity = '1';
             document.getElementById('bingoview-btn').title = 'BingoView — tilkoblet';
-        });
+        };
 
-        c.on('close', () => {
+        const onClose = () => {
+            clearInterval(pollTimer);
+            clearTimeout(timeoutTimer);
             this._bvConn = null;
             this.bvSetStatus('disconnected', 'Telefon koblet fra');
             document.getElementById('bingoview-btn').style.opacity = '0.5';
             document.getElementById('bingoview-btn').title = 'BingoView — ikke tilkoblet';
-        });
+        };
 
-        c.on('error', () => {
+        const onError = () => {
+            clearInterval(pollTimer);
+            clearTimeout(timeoutTimer);
             this._bvConn = null;
             this.bvSetStatus('error', 'Kunne ikke koble til — sjekk koden');
-        });
+        };
+
+        c.on('open', onOpen);
+        c.on('close', onClose);
+        c.on('error', onError);
+
+        // PeerJS sometimes misses the 'open' event on the initiating side.
+        // Poll the connection state every 300ms as a fallback.
+        const pollTimer = setInterval(() => {
+            if (c.open) { onOpen(); clearInterval(pollTimer); }
+        }, 300);
+
+        // Give up after 10 seconds
+        const timeoutTimer = setTimeout(() => {
+            clearInterval(pollTimer);
+            if (!c.open) onError();
+        }, 10000);
     }
 
     bvSetStatus(state, text) {
