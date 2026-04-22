@@ -4332,11 +4332,23 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             try { this._bvChannel.get('phone').off(); } catch(e) {}
         }
         clearTimeout(this._bvConnTimeout);
+        clearInterval(this._bvPingTimer);
 
         const tryConnect = () => {
-            this._bvGun = Gun(['https://gun-manhattan.herokuapp.com/gun',
-                               'https://gun-us.herokuapp.com/gun']);
+            this._bvGun = Gun({
+                peers: [
+                    'https://gun-manhattan.herokuapp.com/gun',
+                    'https://peer.wallie.io/gun',
+                    'https://gundb-multiserver.glitch.me/gun'
+                ],
+                localStorage: false,
+                radisk: false
+            });
+            this._bvGun.on('hi',  p => console.log('[BV] relay connected:',    p && (p.url || p.id || p)));
+            this._bvGun.on('bye', p => console.log('[BV] relay disconnected:', p && (p.url || p.id || p)));
+
             this._bvChannel = this._bvGun.get('bingoview-' + code);
+            console.log('[BV] joining channel bingoview-' + code);
 
             // Listen for phone acknowledgement — this is the only way
             // we confirm the phone is actually on the other end
@@ -4346,20 +4358,32 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                 if (confirmed) return;
                 confirmed = true;
                 clearTimeout(this._bvConnTimeout);
+                clearInterval(this._bvPingTimer);
+                console.log('[BV] ack received from phone');
                 this.bvSetStatus('connected', 'Telefon tilkoblet \u2713');
                 document.getElementById('bingoview-btn').style.opacity = '1';
                 document.getElementById('bingoview-btn').title = 'BingoView \u2014 tilkoblet';
             });
 
-            // Write heartbeat — phone will see this and ack back
-            this._bvChannel.get('ipad').put({ ts: Date.now(), ping: true });
+            // Ping until ack — relays can drop the first message while syncing
+            const sendPing = () => {
+                console.log('[BV] sending ping');
+                this._bvChannel.get('ipad').put({ ts: Date.now(), ping: true });
+            };
+            sendPing();
+            this._bvPingTimer = setInterval(() => {
+                if (confirmed) { clearInterval(this._bvPingTimer); return; }
+                sendPing();
+            }, 2000);
 
             // Timeout if phone never acks
             this._bvConnTimeout = setTimeout(() => {
+                clearInterval(this._bvPingTimer);
                 if (!confirmed) {
-                    this.bvSetStatus('error', 'Ingen telefon fant — sjekk koden');
+                    console.warn('[BV] timeout — no ack after 12s');
+                    this.bvSetStatus('error', 'Ingen telefon fant \u2014 sjekk koden');
                 }
-            }, 8000);
+            }, 12000);
         };
 
         if (window.Gun) {
