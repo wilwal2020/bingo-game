@@ -4301,11 +4301,29 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             if (e.target === modal) this.closeBingoViewModal();
         });
 
-        // Load Gun.js dynamically
-        if (!window.Gun) {
-            const s = document.createElement('script');
-            s.src = 'https://cdn.jsdelivr.net/npm/gun/gun.js';
-            document.head.appendChild(s);
+        // Load Firebase SDK dynamically
+        if (!window.firebase) {
+            const cfg = {
+                apiKey: "AIzaSyAmfLA07M4KSTnZJ8fF8VZ4Y96FLygv-Ps",
+                authDomain: "bingoview-2b95c.firebaseapp.com",
+                databaseURL: "https://bingoview-2b95c-default-rtdb.europe-west1.firebasedatabase.app",
+                projectId: "bingoview-2b95c",
+                storageBucket: "bingoview-2b95c.firebasestorage.app",
+                messagingSenderId: "1010336105188",
+                appId: "1:1010336105188:web:a28e58f68272150306e2f1"
+            };
+            const s1 = document.createElement('script');
+            s1.src = 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js';
+            s1.onload = () => {
+                const s2 = document.createElement('script');
+                s2.src = 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js';
+                s2.onload = () => {
+                    firebase.initializeApp(cfg);
+                    console.log('[BV] Firebase initialized');
+                };
+                document.head.appendChild(s2);
+            };
+            document.head.appendChild(s1);
         }
     }
 
@@ -4328,69 +4346,48 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         this.bvSetStatus('connecting', 'Kobler til\u2026');
 
         // Clear any previous connection
-        if (this._bvGun) {
-            try { this._bvChannel.get('phone').off(); } catch(e) {}
+        if (this._bvChannelRef) {
+            try { this._bvChannelRef.child('phone').off(); } catch(e) {}
         }
         clearTimeout(this._bvConnTimeout);
-        clearInterval(this._bvPingTimer);
 
         const tryConnect = () => {
-            this._bvGun = Gun({
-                peers: [
-                    'https://gun-manhattan.herokuapp.com/gun',
-                    'https://peer.wallie.io/gun',
-                    'https://gundb-multiserver.glitch.me/gun'
-                ],
-                localStorage: false,
-                radisk: false
-            });
-            this._bvGun.on('hi',  p => console.log('[BV] relay connected:',    p && (p.url || p.id || p)));
-            this._bvGun.on('bye', p => console.log('[BV] relay disconnected:', p && (p.url || p.id || p)));
-
-            this._bvChannel = this._bvGun.get('bingoview-' + code);
-            console.log('[BV] joining channel bingoview-' + code);
+            this._bvChannelRef = firebase.database().ref('bingoview/' + code);
+            console.log('[BV] joining channel bingoview/' + code);
 
             // Listen for phone acknowledgement — this is the only way
             // we confirm the phone is actually on the other end
             let confirmed = false;
-            this._bvChannel.get('phone').on((data) => {
+            this._bvChannelRef.child('phone').on('value', (snap) => {
+                const data = snap.val();
                 if (!data || !data.ack) return;
                 if (confirmed) return;
                 confirmed = true;
                 clearTimeout(this._bvConnTimeout);
-                clearInterval(this._bvPingTimer);
                 console.log('[BV] ack received from phone');
                 this.bvSetStatus('connected', 'Telefon tilkoblet \u2713');
                 document.getElementById('bingoview-btn').style.opacity = '1';
                 document.getElementById('bingoview-btn').title = 'BingoView \u2014 tilkoblet';
             });
 
-            // Ping until ack — relays can drop the first message while syncing
-            const sendPing = () => {
-                console.log('[BV] sending ping');
-                this._bvChannel.get('ipad').put({ ts: Date.now(), ping: true });
-            };
-            sendPing();
-            this._bvPingTimer = setInterval(() => {
-                if (confirmed) { clearInterval(this._bvPingTimer); return; }
-                sendPing();
-            }, 2000);
+            // Send ping — phone will ack back
+            console.log('[BV] sending ping');
+            this._bvChannelRef.child('ipad').set({ ts: Date.now(), ping: true });
 
             // Timeout if phone never acks
             this._bvConnTimeout = setTimeout(() => {
-                clearInterval(this._bvPingTimer);
                 if (!confirmed) {
-                    console.warn('[BV] timeout — no ack after 12s');
+                    console.warn('[BV] timeout \u2014 no ack after 10s');
                     this.bvSetStatus('error', 'Ingen telefon fant \u2014 sjekk koden');
                 }
-            }, 12000);
+            }, 10000);
         };
 
-        if (window.Gun) {
+        if (window.firebase && window.firebase.database) {
             tryConnect();
         } else {
             const wait = setInterval(() => {
-                if (window.Gun) { clearInterval(wait); tryConnect(); }
+                if (window.firebase && window.firebase.database) { clearInterval(wait); tryConnect(); }
             }, 100);
             setTimeout(() => clearInterval(wait), 8000);
         }
@@ -4405,8 +4402,8 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
     }
 
     bvSend(number) {
-        if (this._bvChannel) {
-            this._bvChannel.get('call').put({ number, ts: Date.now() });
+        if (this._bvChannelRef) {
+            this._bvChannelRef.child('call').set({ number, ts: Date.now() });
         }
     }
 }
