@@ -123,9 +123,10 @@ class BingoApp {
         // Average filter (null = all sessions)
         this.avgFilter = null;
 
-        // BingoView peer connection
-        this._bvPeer = null;
-        this._bvConn = null;
+        // BingoView Gun.js connection
+        this._bvGun     = null;
+        this._bvChannel = null;
+        this._bvConnTimeout = null;
 
         // Settings
         this.settings = {
@@ -4296,14 +4297,16 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         connectBtn.addEventListener('click', () => this.bvConnect());
         codeInput.addEventListener('keydown', e => { if (e.key === 'Enter') this.bvConnect(); });
 
-        // Close on backdrop click
         modal.addEventListener('click', e => {
             if (e.target === modal) this.closeBingoViewModal();
         });
 
-        // Init PeerJS immediately so we're ready
-        this._bvPeer = new Peer({ debug: 0 });
-        this._bvPeer.on('error', () => this.bvSetStatus('error', 'Tilkoblingsfeil'));
+        // Load Gun.js dynamically
+        if (!window.Gun) {
+            const s = document.createElement('script');
+            s.src = 'https://cdn.jsdelivr.net/npm/gun/gun.js';
+            document.head.appendChild(s);
+        }
     }
 
     openBingoViewModal() {
@@ -4322,69 +4325,32 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         const code = document.getElementById('bingoview-code-input').value.trim().toUpperCase();
         if (code.length < 4) return;
 
-        this.bvSetStatus('connecting', 'Kobler til…');
+        this.bvSetStatus('connecting', 'Kobler til\u2026');
 
-        // Close any existing connection
-        if (this._bvConn) { this._bvConn.close(); this._bvConn = null; }
+        const tryConnect = () => {
+            this._bvGun = Gun(['https://gun-manhattan.herokuapp.com/gun',
+                               'https://gun-us.herokuapp.com/gun']);
+            this._bvChannel = this._bvGun.get('bingoview-' + code);
 
-        const doConnect = () => {
-            const c = this._bvPeer.connect(code, { reliable: true });
-            this._bvConn = c;
+            // Write a heartbeat so the phone can confirm iPad is live
+            this._bvChannel.get('ipad').put({ ts: Date.now(), connected: true });
 
-            const onOpen = () => {
-                clearInterval(pollTimer);
-                clearTimeout(timeoutTimer);
-                this.bvSetStatus('connected', 'Telefon tilkoblet ✓');
+            // Gun has no formal "connected" event — assume live after 1.5s
+            clearTimeout(this._bvConnTimeout);
+            this._bvConnTimeout = setTimeout(() => {
+                this.bvSetStatus('connected', 'Telefon tilkoblet \u2713');
                 document.getElementById('bingoview-btn').style.opacity = '1';
-                document.getElementById('bingoview-btn').title = 'BingoView — tilkoblet';
-            };
-
-            const onClose = () => {
-                clearInterval(pollTimer);
-                clearTimeout(timeoutTimer);
-                this._bvConn = null;
-                this.bvSetStatus('disconnected', 'Telefon koblet fra');
-                document.getElementById('bingoview-btn').style.opacity = '0.5';
-                document.getElementById('bingoview-btn').title = 'BingoView — ikke tilkoblet';
-            };
-
-            const onError = () => {
-                clearInterval(pollTimer);
-                clearTimeout(timeoutTimer);
-                this._bvConn = null;
-                this.bvSetStatus('error', 'Kunne ikke koble til — sjekk koden');
-            };
-
-            c.on('open', onOpen);
-            c.on('close', onClose);
-            c.on('error', onError);
-
-            // PeerJS sometimes misses the 'open' event on the initiating side — poll as fallback
-            const pollTimer = setInterval(() => {
-                if (c.open) { onOpen(); }
-            }, 200);
-
-            // Give up after 20 seconds
-            const timeoutTimer = setTimeout(() => {
-                clearInterval(pollTimer);
-                if (!c.open) onError();
-            }, 20000);
+                document.getElementById('bingoview-btn').title = 'BingoView \u2014 tilkoblet';
+            }, 1500);
         };
 
-        // If peer is already open, connect immediately
-        // Otherwise wait for it to be ready first
-        if (this._bvPeer && !this._bvPeer.destroyed && this._bvPeer.id) {
-            doConnect();
+        if (window.Gun) {
+            tryConnect();
         } else {
-            // Re-create peer and wait for open before connecting
-            if (this._bvPeer && !this._bvPeer.destroyed) {
-                this._bvPeer.destroy();
-            }
-            this._bvPeer = new Peer({ debug: 0 });
-            this._bvPeer.on('open', () => doConnect());
-            this._bvPeer.on('error', () => {
-                this.bvSetStatus('error', 'Nettverk feil — prøv igjen');
-            });
+            const wait = setInterval(() => {
+                if (window.Gun) { clearInterval(wait); tryConnect(); }
+            }, 100);
+            setTimeout(() => clearInterval(wait), 8000);
         }
     }
 
@@ -4392,13 +4358,13 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         const dot   = document.getElementById('bingoview-dot');
         const label = document.getElementById('bingoview-status-text');
         if (!dot || !label) return;
-        dot.className  = 'bv-dot ' + state;
+        dot.className     = 'bv-dot ' + state;
         label.textContent = text;
     }
 
     bvSend(number) {
-        if (this._bvConn && this._bvConn.open) {
-            this._bvConn.send({ type: 'call', number });
+        if (this._bvChannel) {
+            this._bvChannel.get('call').put({ number, ts: Date.now() });
         }
     }
 }
