@@ -4408,12 +4408,14 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
 
     bvSend(number) {
         if (this._bvChannelRef) {
-            this._bvChannelRef.child('call').set({
+            const entry = {
                 number,
-                ts: Date.now(),
+                ts:    Date.now(),
                 game:  this.currentTheme,
                 rekke: this.slot.currentRekke
-            });
+            };
+            this._bvChannelRef.child('call').set(entry);       // legacy single-value (backward compat)
+            this._bvChannelRef.child('callLog').push(entry);   // append to log so phone catches up on reconnect
         }
     }
 
@@ -4428,11 +4430,9 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
 
     bvSendReset(scope) {
         if (!this._bvChannelRef) return;
-        this._bvChannelRef.child('reset').set({
-            scope,
-            game: this.currentTheme,
-            ts:   Date.now()
-        });
+        const ts = Date.now();
+        this._bvChannelRef.child('reset').set({ scope, game: this.currentTheme, ts });
+        this._bvChannelRef.child('resetTs').set(ts);   // phone ignores callLog entries older than this
     }
 }
 
