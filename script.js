@@ -1923,6 +1923,7 @@ class BingoApp {
         this.updateAverageHighlight();
         this.checkSaveSessionButton();
         this.saveSlotToStorage();
+        this.bvSendState();
     }
 
     // ── Theme Switching ──────────────────────────────
@@ -1940,6 +1941,7 @@ class BingoApp {
         this.applySlotToDOM();
         this.updateAverages();
         this.syncSettingsThemeSwitcher();
+        this.bvSendState();
     }
 
     syncSettingsThemeSwitcher() {
@@ -3120,6 +3122,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         this.updateAverages();
         this.saveSlotToStorage();
         this.applySlotToDOM();
+        this.bvSendReset('all');
     }
 
     // ── Unsaved Confirm ──────────────────────────────
@@ -3695,6 +3698,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
 
         this.saveSlotToStorage();
         this.applySlotToDOM();
+        this.bvSendReset('game');
     }
 
     cancelResetConfirm() {
@@ -4368,6 +4372,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                 this.bvSetStatus('connected', 'Telefon tilkoblet \u2713');
                 document.getElementById('bingoview-btn').style.opacity = '1';
                 document.getElementById('bingoview-btn').title = 'BingoView \u2014 tilkoblet';
+                this.bvSendState();
             });
 
             // Send ping — phone will ack back
@@ -4403,8 +4408,31 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
 
     bvSend(number) {
         if (this._bvChannelRef) {
-            this._bvChannelRef.child('call').set({ number, ts: Date.now() });
+            this._bvChannelRef.child('call').set({
+                number,
+                ts: Date.now(),
+                game:  this.currentTheme,
+                rekke: this.slot.currentRekke
+            });
         }
+    }
+
+    bvSendState() {
+        if (!this._bvChannelRef) return;
+        this._bvChannelRef.child('state').set({
+            game:  this.currentTheme,
+            rekke: this.slot.currentRekke,
+            ts:    Date.now()
+        });
+    }
+
+    bvSendReset(scope) {
+        if (!this._bvChannelRef) return;
+        this._bvChannelRef.child('reset').set({
+            scope,
+            game: this.currentTheme,
+            ts:   Date.now()
+        });
     }
 }
 

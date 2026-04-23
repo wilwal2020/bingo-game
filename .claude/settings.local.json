@@ -4,7 +4,10 @@
       "mcp__Claude_Preview__preview_start",
       "Bash(gh api:*)",
       "Bash(node -e ':*)",
-      "Bash(ffmpeg -version)"
+      "Bash(ffmpeg -version)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)"
     ]
   }
 }
