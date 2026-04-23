@@ -4290,16 +4290,12 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
     // ── BingoView ─────────────────────────────────────────────────────────────
 
     initBingoView() {
-        const btn       = document.getElementById('bingoview-btn');
-        const modal     = document.getElementById('bingoview-modal');
-        const closeBtn  = document.getElementById('bingoview-close-btn');
-        const connectBtn= document.getElementById('bingoview-connect-btn');
-        const codeInput = document.getElementById('bingoview-code-input');
+        const btn      = document.getElementById('bingoview-btn');
+        const modal    = document.getElementById('bingoview-modal');
+        const closeBtn = document.getElementById('bingoview-close-btn');
 
         btn.addEventListener('click', () => this.openBingoViewModal());
         closeBtn.addEventListener('click', () => this.closeBingoViewModal());
-        connectBtn.addEventListener('click', () => this.bvConnect());
-        codeInput.addEventListener('keydown', e => { if (e.key === 'Enter') this.bvConnect(); });
 
         modal.addEventListener('click', e => {
             if (e.target === modal) this.closeBingoViewModal();
@@ -4335,7 +4331,18 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         const modal = document.getElementById('bingoview-modal');
         modal.style.display = 'flex';
         document.body.style.overflow = 'hidden';
-        document.getElementById('bingoview-code-input').focus();
+        // Show code and auto-connect on first open
+        const el = document.getElementById('bv-code-display');
+        if (el) el.textContent = this.bvGenerateCode();
+        if (!this._bvChannelRef) this.bvConnect();
+    }
+
+    bvGenerateCode() {
+        if (this._bvCode) return this._bvCode;
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        this._bvCode = Array.from({length: 6}, () =>
+            chars[Math.floor(Math.random() * chars.length)]).join('');
+        return this._bvCode;
     }
 
     closeBingoViewModal() {
@@ -4344,48 +4351,41 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
     }
 
     bvConnect() {
-        const code = document.getElementById('bingoview-code-input').value.trim().toUpperCase();
-        if (code.length < 4) return;
+        const code = this.bvGenerateCode();
+        this.bvSetStatus('connecting', 'Venter p\u00e5 telefon\u2026');
 
-        this.bvSetStatus('connecting', 'Kobler til\u2026');
-
-        // Clear any previous connection
         if (this._bvChannelRef) {
-            try { this._bvChannelRef.child('phone').off(); } catch(e) {}
+            try { this._bvChannelRef.off(); } catch(e) {}
         }
-        clearTimeout(this._bvConnTimeout);
 
         const tryConnect = () => {
             this._bvChannelRef = firebase.database().ref('bingoview/' + code);
-            console.log('[BV] joining channel bingoview/' + code);
+            console.log('[BV] hosting channel bingoview/' + code);
 
-            // Listen for phone acknowledgement — this is the only way
-            // we confirm the phone is actually on the other end
-            let confirmed = false;
-            this._bvChannelRef.child('phone').on('value', (snap) => {
-                const data = snap.val();
-                if (!data || !data.ack) return;
-                if (confirmed) return;
-                confirmed = true;
-                clearTimeout(this._bvConnTimeout);
-                console.log('[BV] ack received from phone');
-                this.bvSetStatus('connected', 'Telefon tilkoblet \u2713');
-                document.getElementById('bingoview-btn').style.opacity = '1';
-                document.getElementById('bingoview-btn').title = 'BingoView \u2014 tilkoblet';
-                this.bvSendState();
-            });
+            const codeEl = document.getElementById('bv-code-display');
+            if (codeEl) codeEl.textContent = code;
 
-            // Send ping — phone will ack back
-            console.log('[BV] sending ping');
-            this._bvChannelRef.child('ipad').set({ ts: Date.now(), ping: true });
-
-            // Timeout if phone never acks
-            this._bvConnTimeout = setTimeout(() => {
-                if (!confirmed) {
-                    console.warn('[BV] timeout \u2014 no ack after 10s');
-                    this.bvSetStatus('error', 'Ingen telefon fant \u2014 sjekk koden');
+            // Watch presence of all connected phones
+            this._bvChannelRef.child('phones').on('value', (snap) => {
+                const count = snap.numChildren();
+                const countEl = document.getElementById('bv-phone-count');
+                if (countEl) countEl.textContent =
+                    count === 0 ? 'Ingen telefon tilkoblet' :
+                    count === 1 ? '1 telefon tilkoblet \u2713' :
+                                  `${count} telefoner tilkoblet \u2713`;
+                const label = count === 0 ? 'Venter p\u00e5 telefon\u2026' :
+                              count === 1 ? 'Telefon tilkoblet \u2713' :
+                                           `${count} telefoner tilkoblet \u2713`;
+                this.bvSetStatus(count > 0 ? 'connected' : 'connecting', label);
+                const btn = document.getElementById('bingoview-btn');
+                if (btn) {
+                    btn.style.opacity = count > 0 ? '1' : '0.6';
+                    btn.title = count > 0
+                        ? `BingoView \u2014 ${count} tilkoblet`
+                        : 'BingoView \u2014 venter p\u00e5 telefon';
                 }
-            }, 10000);
+                if (count > 0) this.bvSendState();
+            });
         };
 
         if (window.firebase && window.firebase.database) {
