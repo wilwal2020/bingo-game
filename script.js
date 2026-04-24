@@ -1577,6 +1577,7 @@ class BingoApp {
             if (this._lastClickedBall === ball) this._lastClickedBall = null;
             this.slot.bigNumber = '';
             this.el.bigNumberText.textContent = '';
+            this.bvSendUncall(number);
         } else {
             // If this is the jackpot number being called, break the circle
             if (number === this.slot.jackpotNumber) {
