@@ -204,7 +204,9 @@
                     <button id="jackpot-button">Jackpot</button>
                 </div>
                 <div class="balls spacer"></div>
-                <div class="balls spacer"></div>
+                <div class="balls grid-btn-cell" id="random-btn-cell" data-skip-ball="true">
+                    <button id="random-button">?</button>
+                </div>
                 <div class="balls spacer"></div>
             </div>
             <div class="stats-row">
@@ -689,6 +691,16 @@
                             </div>
                             <label class="settings-toggle">
                                 <input type="checkbox" id="setting-next-game-countdown">
+                                <span class="settings-toggle-track"></span>
+                            </label>
+                        </div>
+                        <div class="settings-row">
+                            <div class="settings-label">
+                                <span>Tilfeldig tall-knapp</span>
+                                <span class="settings-desc">Vis «?»-knapp i tallnettet for å trekke et tilfeldig tall</span>
+                            </div>
+                            <label class="settings-toggle">
+                                <input type="checkbox" id="setting-random-btn" checked>
                                 <span class="settings-toggle-track"></span>
                             </label>
                         </div>

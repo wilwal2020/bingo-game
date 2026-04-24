@@ -172,6 +172,7 @@ class BingoApp {
             nextGameCountdownMinutes: 4,
             nextGameCountdownSeconds: 0,
             blurEnabled: true,
+            randomBtnEnabled: true,
         };
 
         // Init all slots
@@ -238,6 +239,8 @@ class BingoApp {
             recentNumbers:   document.getElementById('recent-numbers'),
             resetButton:     document.getElementById('reset-button'),
             jackpotButton:   document.getElementById('jackpot-button'),
+            randomButton:    document.getElementById('random-button'),
+            randomBtnCell:   document.getElementById('random-btn-cell'),
             circle:          document.querySelector('.circle'),
             difference:      document.getElementById('difference'),
             rekkeBtns:       document.querySelectorAll('.rekke-btn'),
@@ -442,6 +445,7 @@ class BingoApp {
             settingOverAverageBlink:    document.getElementById('setting-over-average-blink'),
             settingBlur:                document.getElementById('setting-blur'),
             settingNextGameCountdown:   document.getElementById('setting-next-game-countdown'),
+            settingRandomBtn:           document.getElementById('setting-random-btn'),
             nextGameCdDurRow:           document.getElementById('next-game-countdown-dur-row'),
             nextGameCdMin:              document.getElementById('next-game-cd-min'),
             nextGameCdSec:              document.getElementById('next-game-cd-sec'),
@@ -908,6 +912,18 @@ class BingoApp {
         }
 
         // Next-game countdown settings
+        if (this.el.randomButton) {
+            this.el.randomButton.addEventListener('click', () => this.drawRandomNumber());
+        }
+
+        if (this.el.settingRandomBtn) {
+            this.el.settingRandomBtn.addEventListener('change', () => {
+                this.settings.randomBtnEnabled = this.el.settingRandomBtn.checked;
+                this.el.randomBtnCell.style.display = this.settings.randomBtnEnabled ? '' : 'none';
+                this.saveSettings();
+            });
+        }
+
         if (this.el.settingNextGameCountdown) {
             this.el.settingNextGameCountdown.addEventListener('change', () => {
                 this.settings.nextGameCountdownEnabled = this.el.settingNextGameCountdown.checked;
@@ -1242,6 +1258,13 @@ class BingoApp {
         if (this.el.settingBlur) {
             this.el.settingBlur.checked = s.blurEnabled ?? true;
             document.body.classList.toggle('no-blur', !(s.blurEnabled ?? true));
+        }
+
+        // Random button
+        if (this.el.settingRandomBtn) {
+            const enabled = s.randomBtnEnabled ?? true;
+            this.el.settingRandomBtn.checked = enabled;
+            this.el.randomBtnCell.style.display = enabled ? '' : 'none';
         }
 
         // Next-game countdown
@@ -3011,6 +3034,18 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         this.typingBuffer = '';
         this._typingHighlighted.forEach(b => b.classList.remove('typing-preview', 'digit-match'));
         this._typingHighlighted.clear();
+    }
+
+    drawRandomNumber() {
+        const called = new Set(this.slot.selectedNumbers);
+        const remaining = [];
+        for (let n = 1; n <= 90; n++) {
+            if (!called.has(String(n))) remaining.push(String(n));
+        }
+        if (remaining.length === 0) return;
+        const pick = remaining[Math.floor(Math.random() * remaining.length)];
+        const ball = this.el.ballMap.get(pick);
+        if (ball) this.handleNormalClick(ball, pick);
     }
 
     undoLastNumber() {

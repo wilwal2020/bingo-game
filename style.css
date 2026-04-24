@@ -2039,6 +2039,35 @@ body.fullscreen .page-layout {
     filter:    none !important;
 }
 
+#random-button {
+    width:            100%;
+    font-size:        1.6rem;
+    font-weight:      bold;
+    padding:          12px 4px;
+    color:            var(--primary-color);
+    background-color: var(--accent-color);
+    border:           2.5px solid var(--accent-color);
+    border-radius:    var(--btn-radius);
+    cursor:           pointer;
+    transition:       transform .12s ease, box-shadow .12s ease, background-color .12s, color .12s, border-color .12s;
+    box-shadow:       4px 4px 0 rgba(0,0,0,.5);
+    opacity:          0.75;
+}
+
+#random-button:hover {
+    background-color: transparent;
+    color:            var(--accent-color);
+    border-color:     var(--accent-color);
+    transform:        translate(-2px, -2px);
+    box-shadow:       6px 6px 0 rgba(var(--accent-rgb), .35);
+    opacity:          1;
+}
+
+body.layout-vertical #random-button {
+    font-size: 1rem;
+    padding:   8px 4px;
+}
+
 #reset-button,
 #jackpot-button {
     width:            100%;
