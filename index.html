@@ -1271,9 +1271,14 @@
             <div class="modal-subtitle">Koble iPad til telefon</div>
 
             <div class="bv-field-group">
-                <label class="bv-label">Skriv inn denne koden på telefonen</label>
-                <div class="bv-code-display" id="bv-code-display">——————</div>
-                <div class="bv-phone-count" id="bv-phone-count">Ingen telefon tilkoblet</div>
+                <label class="bv-label">Skann QR-koden eller skriv inn koden på telefonen</label>
+                <div class="bv-code-qr-row">
+                    <div id="bv-qr-code" class="bv-qr-box"></div>
+                    <div class="bv-code-right">
+                        <div class="bv-code-display" id="bv-code-display">——————</div>
+                        <div class="bv-phone-count" id="bv-phone-count">Ingen telefon tilkoblet</div>
+                    </div>
+                </div>
             </div>
 
             <div class="bv-status-row">
@@ -1287,6 +1292,7 @@
         </div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

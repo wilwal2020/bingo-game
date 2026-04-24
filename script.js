@@ -4368,9 +4368,26 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         const modal = document.getElementById('bingoview-modal');
         modal.style.display = 'flex';
         document.body.style.overflow = 'hidden';
-        // Show code and auto-connect on first open
+
+        const code = this.bvGenerateCode();
         const el = document.getElementById('bv-code-display');
-        if (el) el.textContent = this.bvGenerateCode();
+        if (el) el.textContent = code;
+
+        // Generate QR code pointing to BingoView with the code pre-filled
+        const qrEl = document.getElementById('bv-qr-code');
+        if (qrEl && !qrEl._qrDone) {
+            qrEl._qrDone = true;
+            const bvUrl = 'https://wilwal2020.github.io/BingoView/?code=' + code;
+            new QRCode(qrEl, {
+                text:         bvUrl,
+                width:        160,
+                height:       160,
+                colorDark:    '#000000',
+                colorLight:   '#ffffff',
+                correctLevel: QRCode.CorrectLevel.M
+            });
+        }
+
         if (!this._bvChannelRef) this.bvConnect();
     }
 
