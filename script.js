@@ -4445,27 +4445,28 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
 
     bvSend(number) {
         if (this._bvChannelRef) {
-            const entry = {
-                number,
-                ts:    Date.now(),
-                game:  this.currentTheme,
-                rekke: this.slot.currentRekke
-            };
-            this._bvChannelRef.child('call').set(entry);       // legacy single-value (backward compat)
-            this._bvChannelRef.child('callLog').push(entry);   // append to log so phone catches up on reconnect
+            const entry = { number, ts: Date.now(), game: this.currentTheme, rekke: this.slot.currentRekke };
+            this._bvChannelRef.child('call').set(entry);      // legacy single-value
+            this._bvChannelRef.child('callLog').push(entry);  // legacy replay log
+            this._bvSendCallState();                          // full state broadcast
         }
     }
 
     bvSendUncall(number) {
         if (this._bvChannelRef) {
-            this._bvChannelRef.child('callLog').push({
-                undo:  true,
-                number,
-                ts:    Date.now(),
-                game:  this.currentTheme,
-                rekke: this.slot.currentRekke
-            });
+            this._bvSendCallState();  // broadcast updated full list — no undo event needed
         }
+    }
+
+    // Broadcast the full current called-number list for the active game.
+    // BingoView reconciles from this on every call/undo, so it is always in sync.
+    _bvSendCallState() {
+        if (!this._bvChannelRef) return;
+        this._bvChannelRef.child('callState/' + this.currentTheme).set({
+            numbers: this.slot.selectedNumbers.slice(),
+            rekke:   this.slot.currentRekke,
+            ts:      Date.now()
+        });
     }
 
     bvSendState() {
@@ -4481,7 +4482,10 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         if (!this._bvChannelRef) return;
         const ts = Date.now();
         this._bvChannelRef.child('reset').set({ scope, game: this.currentTheme, ts });
-        this._bvChannelRef.child('resetTs').set(ts);   // phone ignores callLog entries older than this
+        this._bvChannelRef.child('resetTs').set(ts);
+        // Clear callState for affected games
+        const games = scope === 'all' ? ['blue','yellow','pink','grey'] : [this.currentTheme];
+        games.forEach(g => this._bvChannelRef.child('callState/' + g).remove());
     }
 }
 
