@@ -3070,6 +3070,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             }
             this.updateDisplay();
             this.saveSlotToStorage();
+            this.bvSendUncall(lastNum);
         }
     }
 
@@ -4451,6 +4452,18 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             };
             this._bvChannelRef.child('call').set(entry);       // legacy single-value (backward compat)
             this._bvChannelRef.child('callLog').push(entry);   // append to log so phone catches up on reconnect
+        }
+    }
+
+    bvSendUncall(number) {
+        if (this._bvChannelRef) {
+            this._bvChannelRef.child('callLog').push({
+                undo:  true,
+                number,
+                ts:    Date.now(),
+                game:  this.currentTheme,
+                rekke: this.slot.currentRekke
+            });
         }
     }
 
