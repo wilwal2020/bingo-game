@@ -4424,9 +4424,20 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             const codeEl = document.getElementById('bv-code-display');
             if (codeEl) codeEl.textContent = code;
 
-            // Watch presence of all connected phones
+            // Watch presence of all connected phones, including their published papers
             this._bvChannelRef.child('phones').on('value', (snap) => {
-                const count = snap.numChildren();
+                const phones = snap.val() || {};
+                const phoneList = Object.entries(phones)
+                    .map(([id, data]) => ({
+                        id,
+                        ts: (data && data.ts) || 0,
+                        papers: (data && data.papers) || {},
+                    }))
+                    .sort((a, b) => a.ts - b.ts);
+
+                this._bvPhones = phoneList;
+                const count = phoneList.length;
+
                 const countEl = document.getElementById('bv-phone-count');
                 if (countEl) countEl.textContent =
                     count === 0 ? 'Ingen telefon tilkoblet' :
@@ -4444,6 +4455,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                         : 'BingoView \u2014 venter p\u00e5 telefon';
                 }
                 if (count > 0) this.bvSendState();
+                this._bvUpdatePaperHighlights();
             });
         };
 
@@ -4472,12 +4484,14 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             this._bvChannelRef.child('callLog').push(entry);  // legacy replay log
             this._bvSendCallState();                          // full state broadcast
         }
+        this._bvUpdatePaperHighlights();
     }
 
     bvSendUncall(number) {
         if (this._bvChannelRef) {
             this._bvSendCallState();  // broadcast updated full list — no undo event needed
         }
+        this._bvUpdatePaperHighlights();
     }
 
     // Broadcast the full current called-number list for the active game.
@@ -4498,6 +4512,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             rekke: this.slot.currentRekke,
             ts:    Date.now()
         });
+        this._bvUpdatePaperHighlights();
     }
 
     bvSendReset(scope) {
@@ -4508,10 +4523,196 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         // Clear callState for affected games
         const games = scope === 'all' ? ['blue','yellow','pink','grey'] : [this.currentTheme];
         games.forEach(g => this._bvChannelRef.child('callState/' + g).remove());
+        this._bvUpdatePaperHighlights();
+    }
+
+    // ── Phone-paper aware highlights ────────────────────────────
+    // Distinct per-phone colors used for ring highlights and the modal list.
+    static get BV_PHONE_COLORS() {
+        return ['#00d4ff', '#ff66e0', '#d4ff00', '#ff8c00', '#7cffb0', '#aa66ff', '#ffe066', '#ff6b6b'];
+    }
+
+    // Build a number→ball element map on first use.
+    _bvBallMap() {
+        if (this._bvBallMapCache) return this._bvBallMapCache;
+        const map = {};
+        document.querySelectorAll('.ball-grid .balls').forEach(el => {
+            const txt = (el.textContent || '').trim();
+            const n = parseInt(txt, 10);
+            if (!isNaN(n) && n >= 1 && n <= 90) map[n] = el;
+        });
+        this._bvBallMapCache = map;
+        return map;
+    }
+
+    // For one strip and the iPad's current rekke, return zero or more "close
+    // info" entries: each is a candidate win path with its missing numbers and
+    // intensity level. Rekke 1 lets every row complete independently — so
+    // multiple rows of the same strip can each contribute. Rekke 2/3 use the
+    // strip's combined best-N rows as a single path.
+    _bvStripCloseInfos(strip, calledSet, rekke) {
+        if (!strip || !Array.isArray(strip.rows)) return [];
+        const rowsMissing = strip.rows.map(nums =>
+            (nums || []).filter(n => Number.isFinite(n) && !calledSet.has(n))
+        );
+
+        if (rekke === 'Rekke1') {
+            // Each row independently — only highlight rows that need exactly 1
+            const out = [];
+            rowsMissing.forEach((missing, idx) => {
+                if (missing.length === 1) {
+                    out.push({ total: 1, numbers: missing.slice(), level: 'strong', rowIdx: idx });
+                }
+            });
+            return out;
+        }
+
+        // Rekke 2/3: combined best-N rows
+        const N = rekke === 'Rekke2' ? 2 : 3;
+        const sorted = rowsMissing.map((missing, idx) => ({ idx, missing }))
+            .sort((a, b) => a.missing.length - b.missing.length);
+        const selected = sorted.slice(0, N);
+        const total = selected.reduce((s, r) => s + r.missing.length, 0);
+        const numbers = selected.flatMap(r => r.missing);
+
+        let level = null;
+        if (total === 1)      level = 'strong';
+        else if (total === 2) level = 'regular';
+        if (level === null) return [];
+        return [{ total, numbers, level }];
+    }
+
+    // Recompute ball highlights and modal phones list. Called from phones-listener,
+    // bvSend, bvSendUncall, bvSendState, bvSendReset.
+    _bvUpdatePaperHighlights() {
+        // Clear previous styling on every ball
+        const ballMap = this._bvBallMap();
+        Object.values(ballMap).forEach(el => {
+            el.classList.remove('bv-watch', 'bv-pulse');
+            el.style.removeProperty('--bv-rings');
+        });
+
+        const phones = this._bvPhones || [];
+        const calledSet = new Set(this.slot ? this.slot.selectedNumbers : []);
+        const rekke = this.slot ? this.slot.currentRekke : 'Rekke1';
+        const game  = this.currentTheme;
+
+        // Aggregate: { number: [{phoneIdx, level}, ...] }
+        const byBall = {};
+        // For modal rendering, also collect close strips per phone
+        const phoneRows = [];
+
+        phones.forEach((phone, idx) => {
+            const color = BingoApp.BV_PHONE_COLORS[idx % BingoApp.BV_PHONE_COLORS.length];
+            const papers = phone.papers || {};
+            const strips = papers[game];
+            const closeStrips = [];
+
+            if (Array.isArray(strips)) {
+                strips.forEach(strip => {
+                    const infos = this._bvStripCloseInfos(strip, calledSet, rekke);
+                    infos.forEach(info => {
+                        closeStrips.push({ id: strip.id, ...info });
+                        info.numbers.forEach(num => {
+                            if (!byBall[num]) byBall[num] = [];
+                            byBall[num].push({ phoneIdx: idx, color, level: info.level });
+                        });
+                    });
+                });
+            }
+
+            phoneRows.push({ idx, color, ts: phone.ts, hasPaper: Array.isArray(strips), closeStrips });
+        });
+
+        // Apply ball highlights
+        Object.entries(byBall).forEach(([numStr, entries]) => {
+            const num = Number(numStr);
+            const ball = ballMap[num];
+            if (!ball) return;
+            // Stack rings outward — innermost at 2px, each phone adds 2px
+            const rings = entries.map((e, i) =>
+                `0 0 0 ${2 + i * 2}px ${e.color}`
+            ).join(', ');
+            ball.style.setProperty('--bv-rings', rings);
+            ball.classList.add('bv-watch');
+            if (entries.some(e => e.level === 'strong')) {
+                ball.classList.add('bv-pulse');
+            }
+        });
+
+        this._bvRenderPhonesSection(phoneRows);
+    }
+
+    _bvRenderPhonesSection(rows) {
+        const section = document.getElementById('bv-phones-section');
+        const list    = document.getElementById('bv-phones-list');
+        if (!section || !list) return;
+
+        if (!rows.length) {
+            section.style.display = 'none';
+            list.innerHTML = '';
+            return;
+        }
+        section.style.display = '';
+        list.innerHTML = '';
+
+        rows.forEach((row, i) => {
+            const div = document.createElement('div');
+            div.className = 'bv-phone-row';
+            div.style.setProperty('--bv-phone-color', row.color);
+
+            const info = document.createElement('div');
+            info.className = 'bv-phone-info';
+
+            const name = document.createElement('div');
+            name.className = 'bv-phone-name';
+            name.textContent = `Telefon ${row.idx + 1}`;
+            info.appendChild(name);
+
+            const summary = document.createElement('div');
+            summary.className = 'bv-phone-summary';
+            if (!row.hasPaper) {
+                summary.textContent = 'Ingen ark for dette spillet ennå';
+            } else if (row.closeStrips.length === 0) {
+                summary.textContent = 'Ingen rekker nær gevinst';
+            } else {
+                const strong = row.closeStrips.filter(s => s.level === 'strong').length;
+                summary.textContent = strong > 0
+                    ? `${row.closeStrips.length} rekke${row.closeStrips.length === 1 ? '' : 'r'} nær — ${strong} bingo!`
+                    : `${row.closeStrips.length} rekke${row.closeStrips.length === 1 ? '' : 'r'} nær`;
+            }
+            info.appendChild(summary);
+
+            if (row.closeStrips.length) {
+                const stripsWrap = document.createElement('div');
+                stripsWrap.className = 'bv-phone-strips';
+                row.closeStrips
+                    .slice()
+                    .sort((a, b) => a.total - b.total)
+                    .forEach(s => {
+                        const r = document.createElement('div');
+                        r.className = 'bv-strip-row ' + s.level;
+                        const idEl = document.createElement('span');
+                        idEl.className = 'bv-strip-id';
+                        idEl.textContent = '#' + (s.id || '');
+                        const nums = document.createElement('span');
+                        nums.className = 'bv-strip-nums';
+                        nums.textContent = s.total === 1 ? `mangler ${s.numbers[0]}` :
+                                           `mangler ${s.numbers.slice().sort((a,b) => a-b).join(', ')}`;
+                        r.appendChild(idEl);
+                        r.appendChild(nums);
+                        stripsWrap.appendChild(r);
+                    });
+                info.appendChild(stripsWrap);
+            }
+
+            div.appendChild(info);
+            list.appendChild(div);
+        });
     }
 }
 
-document.addEventListener('DOMContentLoaded', () => new BingoApp());
+document.addEventListener('DOMContentLoaded', () => { window.bingoApp = new BingoApp(); });
 
 /* ═══════════════════════════════════════════════
    VISUAL FLARE — effects + settings panel

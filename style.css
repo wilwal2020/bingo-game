@@ -3504,3 +3504,88 @@ body.flare-no-pulse-ring .balls.clicked::after { display: none; }
     letter-spacing: 0.06em;
     color:          rgba(255,255,255,.45);
 }
+
+/* ── Connected phones list inside the BingoView modal ─────────── */
+.bv-phones-section {
+    margin-top:    14px;
+    padding-top:   14px;
+    border-top:    1px solid rgba(255,255,255,.08);
+    text-align:    left;
+    max-height:    260px;
+    overflow-y:    auto;
+}
+.bv-phones-title {
+    font-family:    'Barlow Condensed', sans-serif;
+    font-size:      0.78rem;
+    font-weight:    700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color:          rgba(255,255,255,.55);
+    margin-bottom:  8px;
+}
+.bv-phones-list {
+    display:        flex;
+    flex-direction: column;
+    gap:            10px;
+}
+.bv-phone-row {
+    display:        flex;
+    align-items:    flex-start;
+    gap:            10px;
+    padding:        8px 10px;
+    background:     rgba(255,255,255,.03);
+    border-radius:  6px;
+    border-left:    3px solid var(--bv-phone-color, #888);
+}
+.bv-phone-info { flex: 1; min-width: 0; }
+.bv-phone-name {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size:   0.95rem;
+    color:       var(--bv-phone-color, #fff);
+    letter-spacing: 0.04em;
+}
+.bv-phone-summary {
+    font-size:   0.78rem;
+    color:       rgba(255,255,255,.55);
+    margin-top:  2px;
+}
+.bv-phone-strips {
+    margin-top:  6px;
+    display:     flex;
+    flex-direction: column;
+    gap:         3px;
+    font-size:   0.8rem;
+    color:       rgba(255,255,255,.7);
+    font-family: 'IBM Plex Mono', monospace;
+}
+.bv-strip-row {
+    display:     flex;
+    gap:         6px;
+    align-items: baseline;
+}
+.bv-strip-id   { color: rgba(255,255,255,.4); min-width: 42px; }
+.bv-strip-nums { font-weight: 600; }
+.bv-strip-row.strong .bv-strip-nums { color: #ff6b6b; }
+.bv-strip-row.regular .bv-strip-nums { color: #ffc83d; }
+
+/* ── Ball grid: highlights for balls phones still need to win ── */
+.balls.bv-watch {
+    position: relative;
+}
+.balls.bv-watch::before {
+    content:     '';
+    position:    absolute;
+    inset:       -2px;
+    border-radius: 50%;
+    pointer-events: none;
+    box-shadow:  var(--bv-rings, none);
+    z-index:     5;
+}
+.balls.bv-watch.bv-pulse::before {
+    animation: bvWatchPulse 1.2s ease-in-out infinite;
+}
+@keyframes bvWatchPulse {
+    0%, 100% { opacity: 0.55; transform: scale(1); }
+    50%      { opacity: 1;    transform: scale(1.12); }
+}
