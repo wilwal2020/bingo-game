@@ -4593,7 +4593,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         });
 
         const phones = this._bvPhones || [];
-        const calledSet = new Set(this.slot ? this.slot.selectedNumbers : []);
+        const calledSet = new Set((this.slot ? this.slot.selectedNumbers : []).map(Number));
         const rekke = this.slot ? this.slot.currentRekke : 'Rekke1';
         const game  = this.currentTheme;
 
