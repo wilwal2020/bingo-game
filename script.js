@@ -4416,6 +4416,11 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             this._bvChannelRef = firebase.database().ref('bingoview/' + code);
             console.log('[BV] hosting channel bingoview/' + code);
 
+            // Host presence marker — phones check this to verify the code is valid
+            const hostRef = this._bvChannelRef.child('host');
+            hostRef.set({ ts: Date.now() });
+            hostRef.onDisconnect().remove();
+
             const codeEl = document.getElementById('bv-code-display');
             if (codeEl) codeEl.textContent = code;
 
