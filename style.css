@@ -3569,6 +3569,28 @@ body.flare-no-pulse-ring .balls.clicked::after { display: none; }
 .bv-strip-row.strong .bv-strip-nums { color: #ff6b6b; }
 .bv-strip-row.regular .bv-strip-nums { color: #ffc83d; }
 
+/* ── BingoView modal: highlight settings rows ────────────────── */
+.bv-settings-section {
+    margin-bottom: 16px;
+    padding: 6px 0;
+    border-top:    1px solid rgba(255,255,255,.08);
+    border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.bv-settings-row {
+    display:         flex;
+    align-items:     center;
+    justify-content: space-between;
+    gap:             12px;
+    padding:         7px 0;
+}
+.bv-settings-label {
+    font-family:    'Barlow Condensed', sans-serif;
+    font-size:      0.85rem;
+    font-weight:    600;
+    letter-spacing: 0.06em;
+    color:          rgba(255,255,255,.7);
+}
+
 /* ── Ball grid: highlights for balls phones still need to win ── */
 .balls.bv-watch {
     position: relative;

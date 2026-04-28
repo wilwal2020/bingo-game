@@ -173,6 +173,8 @@ class BingoApp {
             nextGameCountdownSeconds: 0,
             blurEnabled: true,
             randomBtnEnabled: true,
+            bvHighlightEnabled: true,
+            bvHighlightRekke:   'current',
         };
 
         // Init all slots
@@ -442,6 +444,9 @@ class BingoApp {
             unsavedDiscard:      document.getElementById('unsaved-discard'),
             unsavedCancel:       document.getElementById('unsaved-cancel'),
             // Over-average blink + next-game countdown
+            bvHighlightEnabled:   document.getElementById('bv-highlight-enabled'),
+            bvHighlightRekke:     document.getElementById('bv-highlight-rekke'),
+            bvHighlightRekkeRow:  document.getElementById('bv-highlight-rekke-row'),
             settingOverAverageBlink:    document.getElementById('setting-over-average-blink'),
             settingBlur:                document.getElementById('setting-blur'),
             settingNextGameCountdown:   document.getElementById('setting-next-game-countdown'),
@@ -989,6 +994,24 @@ class BingoApp {
             });
         }
 
+        // BingoView highlight settings
+        if (this.el.bvHighlightEnabled) {
+            this.el.bvHighlightEnabled.addEventListener('change', () => {
+                this.settings.bvHighlightEnabled = this.el.bvHighlightEnabled.checked;
+                if (this.el.bvHighlightRekkeRow)
+                    this.el.bvHighlightRekkeRow.style.display = this.settings.bvHighlightEnabled ? '' : 'none';
+                this._bvUpdatePaperHighlights();
+                this.saveSettings();
+            });
+        }
+        if (this.el.bvHighlightRekke) {
+            this.el.bvHighlightRekke.addEventListener('change', () => {
+                this.settings.bvHighlightRekke = this.el.bvHighlightRekke.value;
+                this._bvUpdatePaperHighlights();
+                this.saveSettings();
+            });
+        }
+
         // Per-theme color preset save buttons
         document.querySelectorAll('.color-preset-save-btn').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -1266,6 +1289,15 @@ class BingoApp {
             this.el.settingRandomBtn.checked = enabled;
             this.el.randomBtnCell.style.display = enabled ? '' : 'none';
         }
+
+        // BingoView highlight
+        if (this.el.bvHighlightEnabled) {
+            this.el.bvHighlightEnabled.checked = s.bvHighlightEnabled ?? true;
+            if (this.el.bvHighlightRekkeRow)
+                this.el.bvHighlightRekkeRow.style.display = (s.bvHighlightEnabled ?? true) ? '' : 'none';
+        }
+        if (this.el.bvHighlightRekke)
+            this.el.bvHighlightRekke.value = s.bvHighlightRekke || 'current';
 
         // Next-game countdown
         if (this.el.settingNextGameCountdown) {
@@ -4593,8 +4625,11 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         });
 
         const phones = this._bvPhones || [];
+        const highlightOn = this.settings.bvHighlightEnabled ?? true;
         const calledSet = new Set((this.slot ? this.slot.selectedNumbers : []).map(Number));
-        const rekke = this.slot ? this.slot.currentRekke : 'Rekke1';
+        const rekke = (this.settings.bvHighlightRekke === 'current' || !this.settings.bvHighlightRekke)
+            ? (this.slot ? this.slot.currentRekke : 'Rekke1')
+            : this.settings.bvHighlightRekke;
         const game  = this.currentTheme;
 
         // Aggregate: { number: [{phoneIdx, level}, ...] }
@@ -4608,7 +4643,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             const strips = papers[game];
             const closeStrips = [];
 
-            if (Array.isArray(strips)) {
+            if (highlightOn && Array.isArray(strips)) {
                 strips.forEach(strip => {
                     const infos = this._bvStripCloseInfos(strip, calledSet, rekke);
                     infos.forEach(info => {

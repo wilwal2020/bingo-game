@@ -1286,6 +1286,26 @@
                 <span class="bv-status-text" id="bingoview-status-text">Ikke tilkoblet</span>
             </div>
 
+            <!-- Highlight settings -->
+            <div class="bv-settings-section">
+                <div class="bv-settings-row">
+                    <div class="bv-settings-label">Vis markering i tallfeltet</div>
+                    <label class="settings-toggle">
+                        <input type="checkbox" id="bv-highlight-enabled" checked>
+                        <span class="settings-toggle-track"></span>
+                    </label>
+                </div>
+                <div class="bv-settings-row" id="bv-highlight-rekke-row">
+                    <div class="bv-settings-label">Markering for rekke</div>
+                    <select id="bv-highlight-rekke" class="session-input" style="width:120px;">
+                        <option value="current">Gjeldende</option>
+                        <option value="Rekke1">Rekke 1</option>
+                        <option value="Rekke2">Rekke 2</option>
+                        <option value="Rekke3">Rekke 3</option>
+                    </select>
+                </div>
+            </div>
+
             <!-- Connected phones with their close-to-winning strips -->
             <div class="bv-phones-section" id="bv-phones-section" style="display:none">
                 <div class="bv-phones-title">Tilkoblede ark</div>
