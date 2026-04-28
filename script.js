@@ -173,8 +173,9 @@ class BingoApp {
             nextGameCountdownSeconds: 0,
             blurEnabled: true,
             randomBtnEnabled: true,
-            bvHighlightEnabled: true,
-            bvHighlightRekke:   'current',
+            bvHighlightEnabled:   true,
+            bvHighlightRekke:     'current',
+            bvHighlightThreshold: 2,
         };
 
         // Init all slots
@@ -444,9 +445,13 @@ class BingoApp {
             unsavedDiscard:      document.getElementById('unsaved-discard'),
             unsavedCancel:       document.getElementById('unsaved-cancel'),
             // Over-average blink + next-game countdown
-            bvHighlightEnabled:   document.getElementById('bv-highlight-enabled'),
-            bvHighlightRekke:     document.getElementById('bv-highlight-rekke'),
-            bvHighlightRekkeRow:  document.getElementById('bv-highlight-rekke-row'),
+            bvHighlightEnabled:       document.getElementById('bv-highlight-enabled'),
+            bvHighlightRekke:         document.getElementById('bv-highlight-rekke'),
+            bvHighlightRekkeRow:      document.getElementById('bv-highlight-rekke-row'),
+            bvHighlightThresholdRow:  document.getElementById('bv-highlight-threshold-row'),
+            bvThresholdValue:         document.getElementById('bv-threshold-value'),
+            bvThresholdPlus:          document.getElementById('bv-threshold-plus'),
+            bvThresholdMinus:         document.getElementById('bv-threshold-minus'),
             settingOverAverageBlink:    document.getElementById('setting-over-average-blink'),
             settingBlur:                document.getElementById('setting-blur'),
             settingNextGameCountdown:   document.getElementById('setting-next-game-countdown'),
@@ -998,8 +1003,9 @@ class BingoApp {
         if (this.el.bvHighlightEnabled) {
             this.el.bvHighlightEnabled.addEventListener('change', () => {
                 this.settings.bvHighlightEnabled = this.el.bvHighlightEnabled.checked;
-                if (this.el.bvHighlightRekkeRow)
-                    this.el.bvHighlightRekkeRow.style.display = this.settings.bvHighlightEnabled ? '' : 'none';
+                const on = this.settings.bvHighlightEnabled;
+                if (this.el.bvHighlightRekkeRow)      this.el.bvHighlightRekkeRow.style.display      = on ? '' : 'none';
+                if (this.el.bvHighlightThresholdRow)  this.el.bvHighlightThresholdRow.style.display  = on ? '' : 'none';
                 this._bvUpdatePaperHighlights();
                 this.saveSettings();
             });
@@ -1007,6 +1013,22 @@ class BingoApp {
         if (this.el.bvHighlightRekke) {
             this.el.bvHighlightRekke.addEventListener('change', () => {
                 this.settings.bvHighlightRekke = this.el.bvHighlightRekke.value;
+                this._bvUpdatePaperHighlights();
+                this.saveSettings();
+            });
+        }
+        if (this.el.bvThresholdPlus) {
+            this.el.bvThresholdPlus.addEventListener('click', () => {
+                this.settings.bvHighlightThreshold = Math.min(9, (this.settings.bvHighlightThreshold ?? 2) + 1);
+                this.el.bvThresholdValue.textContent = this.settings.bvHighlightThreshold;
+                this._bvUpdatePaperHighlights();
+                this.saveSettings();
+            });
+        }
+        if (this.el.bvThresholdMinus) {
+            this.el.bvThresholdMinus.addEventListener('click', () => {
+                this.settings.bvHighlightThreshold = Math.max(1, (this.settings.bvHighlightThreshold ?? 2) - 1);
+                this.el.bvThresholdValue.textContent = this.settings.bvHighlightThreshold;
                 this._bvUpdatePaperHighlights();
                 this.saveSettings();
             });
@@ -1292,12 +1314,17 @@ class BingoApp {
 
         // BingoView highlight
         if (this.el.bvHighlightEnabled) {
-            this.el.bvHighlightEnabled.checked = s.bvHighlightEnabled ?? true;
+            const hlOn = s.bvHighlightEnabled ?? true;
+            this.el.bvHighlightEnabled.checked = hlOn;
             if (this.el.bvHighlightRekkeRow)
-                this.el.bvHighlightRekkeRow.style.display = (s.bvHighlightEnabled ?? true) ? '' : 'none';
+                this.el.bvHighlightRekkeRow.style.display = hlOn ? '' : 'none';
+            if (this.el.bvHighlightThresholdRow)
+                this.el.bvHighlightThresholdRow.style.display = hlOn ? '' : 'none';
         }
         if (this.el.bvHighlightRekke)
             this.el.bvHighlightRekke.value = s.bvHighlightRekke || 'current';
+        if (this.el.bvThresholdValue)
+            this.el.bvThresholdValue.textContent = s.bvHighlightThreshold ?? 2;
 
         // Next-game countdown
         if (this.el.settingNextGameCountdown) {
@@ -4582,18 +4609,21 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
     // intensity level. Rekke 1 lets every row complete independently — so
     // multiple rows of the same strip can each contribute. Rekke 2/3 use the
     // strip's combined best-N rows as a single path.
-    _bvStripCloseInfos(strip, calledSet, rekke) {
+    _bvStripCloseInfos(strip, calledSet, rekke, threshold) {
         if (!strip || !Array.isArray(strip.rows)) return [];
+        const thresh = Math.max(1, threshold || 2);
         const rowsMissing = strip.rows.map(nums =>
             (nums || []).filter(n => Number.isFinite(n) && !calledSet.has(n))
         );
 
         if (rekke === 'Rekke1') {
-            // Each row independently — only highlight rows that need exactly 1
+            // Each row independently
             const out = [];
             rowsMissing.forEach((missing, idx) => {
-                if (missing.length === 1) {
-                    out.push({ total: 1, numbers: missing.slice(), level: 'strong', rowIdx: idx });
+                const count = missing.length;
+                if (count > 0 && count <= thresh) {
+                    const level = count === 1 ? 'strong' : 'regular';
+                    out.push({ total: count, numbers: missing.slice(), level, rowIdx: idx });
                 }
             });
             return out;
@@ -4607,10 +4637,8 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         const total = selected.reduce((s, r) => s + r.missing.length, 0);
         const numbers = selected.flatMap(r => r.missing);
 
-        let level = null;
-        if (total === 1)      level = 'strong';
-        else if (total === 2) level = 'regular';
-        if (level === null) return [];
+        if (total === 0 || total > thresh) return [];
+        const level = total === 1 ? 'strong' : 'regular';
         return [{ total, numbers, level }];
     }
 
@@ -4630,6 +4658,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         const rekke = (this.settings.bvHighlightRekke === 'current' || !this.settings.bvHighlightRekke)
             ? (this.slot ? this.slot.currentRekke : 'Rekke1')
             : this.settings.bvHighlightRekke;
+        const threshold = this.settings.bvHighlightThreshold ?? 2;
         const game  = this.currentTheme;
 
         // Aggregate: { number: [{phoneIdx, level}, ...] }
@@ -4645,7 +4674,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
 
             if (highlightOn && Array.isArray(strips)) {
                 strips.forEach(strip => {
-                    const infos = this._bvStripCloseInfos(strip, calledSet, rekke);
+                    const infos = this._bvStripCloseInfos(strip, calledSet, rekke, threshold);
                     infos.forEach(info => {
                         closeStrips.push({ id: strip.id, ...info });
                         info.numbers.forEach(num => {
