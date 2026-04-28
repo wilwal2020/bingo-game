@@ -1006,31 +1006,31 @@ class BingoApp {
                 const on = this.settings.bvHighlightEnabled;
                 if (this.el.bvHighlightRekkeRow)      this.el.bvHighlightRekkeRow.style.display      = on ? '' : 'none';
                 if (this.el.bvHighlightThresholdRow)  this.el.bvHighlightThresholdRow.style.display  = on ? '' : 'none';
-                this._bvUpdatePaperHighlights();
                 this.saveSettings();
+                try { this._bvUpdatePaperHighlights(); } catch(e) {}
             });
         }
         if (this.el.bvHighlightRekke) {
             this.el.bvHighlightRekke.addEventListener('change', () => {
                 this.settings.bvHighlightRekke = this.el.bvHighlightRekke.value;
-                this._bvUpdatePaperHighlights();
                 this.saveSettings();
+                try { this._bvUpdatePaperHighlights(); } catch(e) {}
             });
         }
         if (this.el.bvThresholdPlus) {
             this.el.bvThresholdPlus.addEventListener('click', () => {
                 this.settings.bvHighlightThreshold = Math.min(9, (this.settings.bvHighlightThreshold ?? 2) + 1);
-                this.el.bvThresholdValue.textContent = this.settings.bvHighlightThreshold;
-                this._bvUpdatePaperHighlights();
+                if (this.el.bvThresholdValue) this.el.bvThresholdValue.textContent = this.settings.bvHighlightThreshold;
                 this.saveSettings();
+                try { this._bvUpdatePaperHighlights(); } catch(e) {}
             });
         }
         if (this.el.bvThresholdMinus) {
             this.el.bvThresholdMinus.addEventListener('click', () => {
                 this.settings.bvHighlightThreshold = Math.max(1, (this.settings.bvHighlightThreshold ?? 2) - 1);
-                this.el.bvThresholdValue.textContent = this.settings.bvHighlightThreshold;
-                this._bvUpdatePaperHighlights();
+                if (this.el.bvThresholdValue) this.el.bvThresholdValue.textContent = this.settings.bvHighlightThreshold;
                 this.saveSettings();
+                try { this._bvUpdatePaperHighlights(); } catch(e) {}
             });
         }
 
