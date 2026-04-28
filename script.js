@@ -4470,15 +4470,27 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         if (this._bvChannelRef) {
             try { this._bvChannelRef.off(); } catch(e) {}
         }
+        // Remove any previous .info/connected listener so we don't stack them on reconnect
+        if (this._bvInfoConnectedOff) {
+            try { this._bvInfoConnectedOff(); } catch(e) {}
+            this._bvInfoConnectedOff = null;
+        }
 
         const tryConnect = () => {
             this._bvChannelRef = firebase.database().ref('bingoview/' + code);
             console.log('[BV] hosting channel bingoview/' + code);
 
-            // Host presence marker — phones check this to verify the code is valid
+            // Host presence marker — re-register on every Firebase reconnect so phones
+            // can always find the host even after a brief network interruption
             const hostRef = this._bvChannelRef.child('host');
-            hostRef.set({ ts: Date.now() });
-            hostRef.onDisconnect().remove();
+            const infoRef = firebase.database().ref('.info/connected');
+            const infoHandler = (snap) => {
+                if (!snap.val()) return;
+                hostRef.onDisconnect().remove();
+                hostRef.set({ ts: Date.now() });
+            };
+            infoRef.on('value', infoHandler);
+            this._bvInfoConnectedOff = () => infoRef.off('value', infoHandler);
 
             const codeEl = document.getElementById('bv-code-display');
             if (codeEl) codeEl.textContent = code;
