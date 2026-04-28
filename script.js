@@ -36,6 +36,7 @@ const BUNDLED_SOUNDS = [
     { src: SAVE_CONFIRM_2_WAV,    name: 'Save / Confirm 2' },
     { src: OVERTIME_WAV,          name: 'Overtid' },
     { src: 'Sounds/62274159.wav', name: '62274159' },
+    { src: 'Sounds/fxprosound-metal-plate-gong-4-248610.wav', name: 'Metal Plate Gong' },
 ];
 
 /* =====================================================
