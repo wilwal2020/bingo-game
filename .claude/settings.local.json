@@ -7,7 +7,11 @@
       "Bash(ffmpeg -version)",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(gh run *)",
+      "WebFetch(domain:wilwal2020.github.io)",
+      "Bash(start \"\" \"index.html\")",
+      "Bash(awk -F: '$1 < 1050 && $1 > 700')"
     ]
   }
 }
