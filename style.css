@@ -3756,6 +3756,49 @@ body.flare-no-pulse-ring .balls.clicked::after { display: none; }
     border-color: #ff4444;
     color: white;
 }
+
+/* Offline-row pulse: plays once when the row is rendered after a fresh
+   call from the host, so the user sees that disconnected papers are
+   still being processed live. */
+.bv-phone-row.bv-phone-just-updated {
+    animation: bv-phone-update-pulse 0.5s ease-out;
+}
+@keyframes bv-phone-update-pulse {
+    0%   { background: rgba(46, 204, 113, .25); border-left-color: #2ecc71; }
+    100% { background: rgba(255,255,255,.03);   border-left-color: var(--bv-phone-color, #888); }
+}
+
+/* "📱N" badge that briefly appears on the ball clicked by the host so the
+   host has direct visual confirmation that disconnected phones' papers
+   were also evaluated for that call. */
+.bv-ball-ping {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    background: rgba(46, 204, 113, .9);
+    color: #0a0a0a;
+    font-size: 0.55rem;
+    font-weight: 700;
+    line-height: 1;
+    padding: 3px 6px;
+    border-radius: 9px;
+    box-shadow: 0 0 10px rgba(46, 204, 113, .6);
+    pointer-events: none;
+    z-index: 5;
+    white-space: nowrap;
+    animation: bv-ball-ping 1.4s ease-out forwards;
+}
+.bv-ball-ping.bv-ball-ping-offline {
+    background: rgba(255, 200, 60, .95);
+    box-shadow: 0 0 10px rgba(255, 200, 60, .6);
+}
+@keyframes bv-ball-ping {
+    0%   { opacity: 0; transform: translateY(4px) scale(0.6); }
+    20%  { opacity: 1; transform: translateY(0)    scale(1.05); }
+    35%  { transform: translateY(0)    scale(1); }
+    80%  { opacity: 1; }
+    100% { opacity: 0; transform: translateY(-12px) scale(1); }
+}
 .bv-phone-info { flex: 1; min-width: 0; }
 .bv-phone-name {
     font-family: 'Barlow Condensed', sans-serif;

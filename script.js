@@ -5064,7 +5064,34 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             this._bvChannelRef.child('callLog').push(entry);  // legacy replay log
             this._bvSendCallState();                          // full state broadcast
         }
+        // Mark this as the last call ts so the offline-phone rows get a
+        // pulse on this render (and only this render) to make it visible
+        // that even disconnected papers were processed.
+        this._bvLastCallTs = Date.now();
         this._bvUpdatePaperHighlights();
+        this._bvShowBallPing(number);
+    }
+
+    // Briefly flash a "papers updated" badge on the clicked ball so the
+    // host can see, at a glance, that disconnected phones' papers were
+    // also processed for this call.
+    _bvShowBallPing(number) {
+        const phones = this._bvPhones || [];
+        const game = this.currentTheme;
+        // Count phones that actually have a paper for this game (online + offline)
+        const totalPapers  = phones.filter(p => Array.isArray((p.papers || {})[game])).length;
+        const offlinePapers = phones.filter(p => !p.online && Array.isArray((p.papers || {})[game])).length;
+        if (totalPapers === 0) return;
+        const ball = this._bvBallMap()[number];
+        if (!ball) return;
+        // Remove any prior badge so the animation can restart
+        const old = ball.querySelector('.bv-ball-ping');
+        if (old) old.remove();
+        const badge = document.createElement('div');
+        badge.className = 'bv-ball-ping' + (offlinePapers > 0 ? ' bv-ball-ping-offline' : '');
+        badge.textContent = '📱' + totalPapers;
+        ball.appendChild(badge);
+        setTimeout(() => { if (badge.parentNode) badge.remove(); }, 1400);
     }
 
     bvSendUncall(number) {
@@ -5150,17 +5177,34 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             return out;
         }
 
-        // Rekke 2/3: combined best-N rows
+        // Rekke 2/3: enumerate ALL N-row combinations within threshold and
+        // aggregate the unique winning numbers. Picking just the single best
+        // combo (as the previous version did) hid valid alternative win-paths
+        // — e.g. with row 0 complete and rows 1 + 2 each missing 1 number,
+        // both 1-row-misses are independent rekke-2 wins, but the old code
+        // would only flag whichever pair sorted first.
         const N = rekke === 'Rekke2' ? 2 : 3;
-        const sorted = rowsMissing.map((missing, idx) => ({ idx, missing }))
-            .sort((a, b) => a.missing.length - b.missing.length);
-        const selected = sorted.slice(0, N);
-        const total = selected.reduce((s, r) => s + r.missing.length, 0);
-        const numbers = selected.flatMap(r => r.missing);
-
-        if (total === 0 || total > thresh) return [];
-        const level = total === 1 ? 'strong' : 'regular';
-        return [{ total, numbers, level }];
+        const idxs = rowsMissing.map((missing, idx) => ({ idx, missing }));
+        const winning = new Set();
+        let bestTotal = Infinity;
+        const visit = (start, picked, total) => {
+            if (total > thresh) return; // prune
+            if (picked.length === N) {
+                if (total === 0) return;
+                picked.forEach(p => p.missing.forEach(n => winning.add(n)));
+                if (total < bestTotal) bestTotal = total;
+                return;
+            }
+            for (let i = start; i < idxs.length; i++) {
+                const next = total + idxs[i].missing.length;
+                if (next > thresh) continue;
+                visit(i + 1, [...picked, idxs[i]], next);
+            }
+        };
+        visit(0, [], 0);
+        if (winning.size === 0) return [];
+        const level = bestTotal === 1 ? 'strong' : 'regular';
+        return [{ total: bestTotal, numbers: [...winning], level }];
     }
 
     // Recompute ball highlights and modal phones list. Called from phones-listener,
@@ -5244,9 +5288,15 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         section.style.display = '';
         list.innerHTML = '';
 
+        // Did a call just happen? If so, the offline rows below get a brief
+        // pulse animation as feedback that the system is still processing
+        // their paper.
+        const justCalled = this._bvLastCallTs && (Date.now() - this._bvLastCallTs) < 250;
         rows.forEach((row, i) => {
             const div = document.createElement('div');
-            div.className = 'bv-phone-row' + (row.online === false ? ' bv-phone-offline' : '');
+            const offlineCls = row.online === false ? ' bv-phone-offline' : '';
+            const pulseCls   = (row.online === false && justCalled) ? ' bv-phone-just-updated' : '';
+            div.className = 'bv-phone-row' + offlineCls + pulseCls;
             div.style.setProperty('--bv-phone-color', row.color);
 
             const info = document.createElement('div');
