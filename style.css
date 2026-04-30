@@ -3724,6 +3724,38 @@ body.flare-no-pulse-ring .balls.clicked::after { display: none; }
     border-radius:  6px;
     border-left:    3px solid var(--bv-phone-color, #888);
 }
+.bv-phone-row.bv-phone-offline {
+    opacity: 0.55;
+    border-left-style: dashed;
+}
+.bv-phone-row.bv-phone-offline .bv-phone-name::before {
+    content: '○ ';
+    color: rgba(255,255,255,.4);
+}
+.bv-phone-row:not(.bv-phone-offline) .bv-phone-name::before {
+    content: '● ';
+    color: #2ecc71;
+}
+.bv-phone-delete-btn {
+    align-self: center;
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 6px;
+    color: rgba(255,255,255,0.7);
+    font-size: 0.75rem;
+    padding: 4px 10px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+.bv-phone-delete-btn:hover {
+    border-color: #ff4444;
+    color: #ff4444;
+}
+.bv-phone-delete-btn.bv-phone-delete-confirm {
+    background: #ff4444;
+    border-color: #ff4444;
+    color: white;
+}
 .bv-phone-info { flex: 1; min-width: 0; }
 .bv-phone-name {
     font-family: 'Barlow Condensed', sans-serif;

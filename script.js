@@ -4926,48 +4926,70 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             const codeEl = document.getElementById('bv-code-display');
             if (codeEl) codeEl.textContent = code;
 
-            // Watch presence of all connected phones, including their published papers
-            this._bvChannelRef.child('phones').on('value', (snap) => {
-                const phones = snap.val() || {};
-                const phoneList = Object.entries(phones)
-                    .map(([id, data]) => ({
+            // Watch live presence (gets removed on disconnect)
+            this._bvLivePhones = {};
+            this._bvPersistedPapers = {};
+            this._bvPapersMeta = {};
+
+            const recompute = () => {
+                // Merge connected phones with persisted offline papers.
+                // Connected phones use live data (ts > 0); offline phones come
+                // from papers/ + papers_meta/ paths and have ts = 0.
+                const ids = new Set([
+                    ...Object.keys(this._bvLivePhones),
+                    ...Object.keys(this._bvPersistedPapers),
+                ]);
+                const phoneList = [...ids].map(id => {
+                    const live = this._bvLivePhones[id];
+                    const livePapers = (live && live.papers) || {};
+                    const persistedPapers = this._bvPersistedPapers[id] || {};
+                    // Live papers take priority — they're the most recent. Fall back
+                    // to persisted for game keys the live phone hasn't published yet.
+                    const papers = { ...persistedPapers, ...livePapers };
+                    const meta = this._bvPapersMeta[id] || {};
+                    return {
                         id,
-                        ts: (data && data.ts) || 0,
-                        papers: (data && data.papers) || {},
-                    }))
-                    .sort((a, b) => a.ts - b.ts);
+                        online: !!live,
+                        ts: (live && live.ts) || 0,
+                        lastSeen: meta.lastSeen || 0,
+                        papers,
+                    };
+                }).sort((a, b) => {
+                    // Online first (sorted by connection ts), then offline (by lastSeen desc)
+                    if (a.online !== b.online) return a.online ? -1 : 1;
+                    return a.online ? a.ts - b.ts : b.lastSeen - a.lastSeen;
+                });
 
                 this._bvPhones = phoneList;
-                const count = phoneList.length;
-
-                const countEl = document.getElementById('bv-phone-count');
-                if (countEl) countEl.textContent =
-                    count === 0 ? 'Ingen telefon tilkoblet' :
-                    count === 1 ? '1 telefon tilkoblet \u2713' :
-                                  `${count} telefoner tilkoblet \u2713`;
-                const label = count === 0 ? 'Venter p\u00e5 telefon\u2026' :
-                              count === 1 ? 'Telefon tilkoblet \u2713' :
-                                           `${count} telefoner tilkoblet \u2713`;
-                this.bvSetStatus(count > 0 ? 'connected' : 'connecting', label);
-                const btn = document.getElementById('bingoview-btn');
-                if (btn) {
-                    btn.style.opacity = count > 0 ? '1' : '0.6';
-                    btn.title = count > 0
-                        ? `BingoView \u2014 ${count} tilkoblet`
-                        : 'BingoView \u2014 venter p\u00e5 telefon';
-                }
-                const badge = document.getElementById('bv-nav-badge');
-                if (badge) {
-                    if (count > 0) {
-                        badge.textContent = String(count);
-                        badge.style.display = '';
-                    } else {
-                        badge.style.display = 'none';
-                    }
-                }
-                if (count > 0) this.bvSendState();
+                const onlineCount = phoneList.filter(p => p.online).length;
+                this._bvOnlineCount = onlineCount;
+                this._bvUpdatePresenceUI(onlineCount);
+                if (onlineCount > 0) this.bvSendState();
                 this._bvUpdatePaperHighlights();
+            };
+
+            this._bvChannelRef.child('phones').on('value', (snap) => {
+                const phones = snap.val() || {};
+                this._bvLivePhones = {};
+                Object.entries(phones).forEach(([id, data]) => {
+                    this._bvLivePhones[id] = {
+                        ts: (data && data.ts) || 0,
+                        papers: (data && data.papers) || {},
+                    };
+                });
+                recompute();
             });
+
+            this._bvChannelRef.child('papers').on('value', (snap) => {
+                this._bvPersistedPapers = snap.val() || {};
+                recompute();
+            });
+
+            this._bvChannelRef.child('papers_meta').on('value', (snap) => {
+                this._bvPapersMeta = snap.val() || {};
+                recompute();
+            });
+
         };
 
         if (window.firebase && window.firebase.database) {
@@ -4986,6 +5008,42 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         if (!dot || !label) return;
         dot.className     = 'bv-dot ' + state;
         label.textContent = text;
+    }
+
+    _bvUpdatePresenceUI(count) {
+        const countEl = document.getElementById('bv-phone-count');
+        if (countEl) countEl.textContent =
+            count === 0 ? 'Ingen telefon tilkoblet' :
+            count === 1 ? '1 telefon tilkoblet ✓' :
+                          `${count} telefoner tilkoblet ✓`;
+        const label = count === 0 ? 'Venter på telefon…' :
+                      count === 1 ? 'Telefon tilkoblet ✓' :
+                                   `${count} telefoner tilkoblet ✓`;
+        this.bvSetStatus(count > 0 ? 'connected' : 'connecting', label);
+        const btn = document.getElementById('bingoview-btn');
+        if (btn) {
+            btn.style.opacity = count > 0 ? '1' : '0.6';
+            btn.title = count > 0
+                ? `BingoView — ${count} tilkoblet`
+                : 'BingoView — venter på telefon';
+        }
+        const badge = document.getElementById('bv-nav-badge');
+        if (badge) {
+            if (count > 0) {
+                badge.textContent = String(count);
+                badge.style.display = '';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+    }
+
+    // Remove a persisted phone's papers + meta. Used for the "Slett" button
+    // on offline phones in the BV modal — useful when a phone won't reconnect.
+    bvDeletePersistedPhone(phoneId) {
+        if (!this._bvChannelRef || !phoneId) return;
+        this._bvChannelRef.child('papers/' + phoneId).remove();
+        this._bvChannelRef.child('papers_meta/' + phoneId).remove();
     }
 
     bvSend(number) {
@@ -5137,7 +5195,10 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                 });
             }
 
-            phoneRows.push({ idx, color, ts: phone.ts, hasPaper: Array.isArray(strips), closeStrips });
+            phoneRows.push({
+                idx, color, ts: phone.ts, online: !!phone.online, lastSeen: phone.lastSeen,
+                phoneId: phone.id, hasPaper: Array.isArray(strips), closeStrips,
+            });
         });
 
         // Apply ball highlights
@@ -5174,7 +5235,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
 
         rows.forEach((row, i) => {
             const div = document.createElement('div');
-            div.className = 'bv-phone-row';
+            div.className = 'bv-phone-row' + (row.online === false ? ' bv-phone-offline' : '');
             div.style.setProperty('--bv-phone-color', row.color);
 
             const info = document.createElement('div');
@@ -5182,7 +5243,10 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
 
             const name = document.createElement('div');
             name.className = 'bv-phone-name';
-            name.textContent = `Telefon ${row.idx + 1}`;
+            const offlineSuffix = row.online === false
+                ? ` · Frakoblet${row.lastSeen ? ' (' + this._bvFormatLastSeen(row.lastSeen) + ')' : ''}`
+                : '';
+            name.textContent = `Telefon ${row.idx + 1}${offlineSuffix}`;
             info.appendChild(name);
 
             const summary = document.createElement('div');
@@ -5223,8 +5287,41 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             }
 
             div.appendChild(info);
+
+            // Slett button for offline persisted phones
+            if (row.online === false && row.phoneId) {
+                const del = document.createElement('button');
+                del.className = 'bv-phone-delete-btn';
+                del.title = 'Slett ark for denne frakoblede telefonen';
+                del.textContent = 'Slett';
+                del.addEventListener('click', e => {
+                    e.stopPropagation();
+                    if (del.dataset.confirming === '1') {
+                        this.bvDeletePersistedPhone(row.phoneId);
+                    } else {
+                        del.dataset.confirming = '1';
+                        del.textContent = 'Bekreft?';
+                        del.classList.add('bv-phone-delete-confirm');
+                        setTimeout(() => {
+                            del.dataset.confirming = '';
+                            del.textContent = 'Slett';
+                            del.classList.remove('bv-phone-delete-confirm');
+                        }, 2500);
+                    }
+                });
+                div.appendChild(del);
+            }
+
             list.appendChild(div);
         });
+    }
+
+    _bvFormatLastSeen(ts) {
+        const diff = Date.now() - ts;
+        if (diff < 60_000)        return 'akkurat nå';
+        if (diff < 3_600_000)     return Math.floor(diff / 60_000) + ' min siden';
+        if (diff < 86_400_000)    return Math.floor(diff / 3_600_000) + ' t siden';
+        return Math.floor(diff / 86_400_000) + ' d siden';
     }
 }
 
