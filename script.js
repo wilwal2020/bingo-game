@@ -1,3 +1,49 @@
+/* =====================================================
+   ERROR LOG — captures runtime errors to localStorage
+   ring buffer of last 50, viewable from nav menu.
+   ===================================================== */
+(function () {
+    const KEY = 'bingoErrorLog';
+    const MAX = 50;
+    function read() {
+        try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) { return []; }
+    }
+    function write(list) {
+        try { localStorage.setItem(KEY, JSON.stringify(list.slice(-MAX))); } catch (e) {}
+    }
+    function record(kind, msg, stack, extra) {
+        const list = read();
+        list.push({
+            ts: Date.now(),
+            kind,
+            msg: String(msg || '').slice(0, 500),
+            stack: String(stack || '').slice(0, 2000),
+            url: location.href,
+            ua: navigator.userAgent,
+            extra: extra || null,
+        });
+        write(list);
+        // Notify if a viewer is open
+        if (typeof window.__bingoErrLogChanged === 'function') {
+            try { window.__bingoErrLogChanged(); } catch (e) {}
+        }
+    }
+    window.addEventListener('error', e => {
+        record('error', e.message, e.error && e.error.stack, {
+            file: e.filename, line: e.lineno, col: e.colno,
+        });
+    });
+    window.addEventListener('unhandledrejection', e => {
+        const r = e.reason;
+        record('promise', r && r.message ? r.message : String(r), r && r.stack);
+    });
+    window.bingoErrorLog = {
+        get: read,
+        clear: () => { write([]); if (typeof window.__bingoErrLogChanged === 'function') window.__bingoErrLogChanged(); },
+        record,
+    };
+})();
+
 const RE4_HOVER_WAV = 'Sounds/re4-hover.wav';
 const RE4_CANCEL_WAV = 'Sounds/re4-cancel.wav';
 const RE4_CANCEL_BIG_WAV = 'Sounds/re4-cancel-big.wav';
@@ -467,6 +513,24 @@ class BingoApp {
             nextGameCdWrap:             document.getElementById('next-game-cd-wrap'),
             nextGameCdDisplay:          document.getElementById('next-game-cd-display'),
             nextGameCdBar:              document.getElementById('next-game-cd-bar'),
+            // Phone-count badge
+            bvNavBadge:                 document.getElementById('bv-nav-badge'),
+            // Frequency heatmap
+            navFrequency:               document.getElementById('nav-frequency'),
+            frequencyModal:             document.getElementById('frequency-modal'),
+            frequencyClose:             document.getElementById('frequency-close'),
+            frequencyScope:             document.getElementById('frequency-scope'),
+            frequencyDisplay:           document.getElementById('frequency-display'),
+            frequencySummary:           document.getElementById('frequency-summary'),
+            frequencyDisplayWrap:       document.getElementById('frequency-display-wrap'),
+            // Error log
+            navErrorLog:                document.getElementById('nav-errorlog'),
+            errorLogModal:              document.getElementById('error-log-modal'),
+            errorLogList:               document.getElementById('error-log-list'),
+            errorLogSubtitle:           document.getElementById('error-log-subtitle'),
+            errorLogCopy:               document.getElementById('error-log-copy'),
+            errorLogClear:              document.getElementById('error-log-clear'),
+            errorLogClose:              document.getElementById('error-log-close'),
         };
 
         // O(1) number→element lookup — avoids spread+find across all 90 balls
@@ -648,6 +712,52 @@ class BingoApp {
         // Graph
         this.el.graphBtn.addEventListener('click',   () => this.openGraph());
         this.el.graphClose.addEventListener('click', () => this.closeGraph());
+
+        // Frequency heatmap
+        if (this.el.navFrequency) {
+            this.el.navFrequency.addEventListener('click', e => { e.preventDefault(); this.openFrequencyModal(); });
+        }
+        if (this.el.frequencyClose) {
+            this.el.frequencyClose.addEventListener('click', () => this.closeFrequencyModal());
+        }
+        if (this.el.frequencyScope) {
+            this.el.frequencyScope.addEventListener('change', () => this.renderFrequency());
+        }
+        if (this.el.frequencyDisplay) {
+            this.el.frequencyDisplay.addEventListener('change', () => this.renderFrequency());
+        }
+        const freqOverlay = document.getElementById('frequency-modal');
+        if (freqOverlay) {
+            freqOverlay.addEventListener('click', e => {
+                if (e.target === freqOverlay) this.closeFrequencyModal();
+            });
+        }
+
+        // Error log
+        if (this.el.navErrorLog) {
+            this.el.navErrorLog.addEventListener('click', e => { e.preventDefault(); this.openErrorLogModal(); });
+        }
+        if (this.el.errorLogClose) {
+            this.el.errorLogClose.addEventListener('click', () => this.closeErrorLogModal());
+        }
+        if (this.el.errorLogCopy) {
+            this.el.errorLogCopy.addEventListener('click', () => this.copyErrorLog());
+        }
+        if (this.el.errorLogClear) {
+            this.el.errorLogClear.addEventListener('click', () => this.clearErrorLog());
+        }
+        const errOverlay = document.getElementById('error-log-modal');
+        if (errOverlay) {
+            errOverlay.addEventListener('click', e => {
+                if (e.target === errOverlay) this.closeErrorLogModal();
+            });
+        }
+        // Live-refresh the error list when new errors come in while open
+        window.__bingoErrLogChanged = () => {
+            if (this.el.errorLogModal && this.el.errorLogModal.style.display === 'flex') {
+                this.renderErrorLog();
+            }
+        };
 
         // Unsaved confirm
         this.el.unsavedDiscard.addEventListener('click', () => this.confirmUnsavedDiscard());
@@ -2261,6 +2371,24 @@ class BingoApp {
         sessions.push(session);
         localStorage.setItem('bingoSessions', JSON.stringify(sessions));
 
+        // Record called-number history (used by frequency heatmap).
+        // Snapshots numbers from each game slot at session-save time.
+        try {
+            const callHist = this.getCallHistory();
+            const callEntry = { date: session.date, games: {} };
+            COLOR_THEMES.forEach(t => {
+                const slot = this.slots[t];
+                if (slot && Array.isArray(slot.selectedNumbers) && slot.selectedNumbers.length) {
+                    callEntry.games[t] = slot.selectedNumbers.slice();
+                }
+            });
+            // Only record if at least one game had calls
+            if (Object.keys(callEntry.games).length) {
+                callHist.push(callEntry);
+                localStorage.setItem('bingoCallHistory', JSON.stringify(callHist));
+            }
+        } catch (e) {}
+
         // Clear all game slot loggedRekkes after saving
         GAME_THEMES.forEach(t => {
             this.slots[t].loggedRekkes = { Rekke1: null, Rekke2: null, Rekke3: null };
@@ -2842,6 +2970,253 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         try {
             return JSON.parse(localStorage.getItem('bingoSessions') || '[]');
         } catch(e) { return []; }
+    }
+
+    getCallHistory() {
+        try {
+            return JSON.parse(localStorage.getItem('bingoCallHistory') || '[]');
+        } catch(e) { return []; }
+    }
+
+    // ── Frequency heatmap ─────────────────────────────────
+    openFrequencyModal() {
+        this.playSound('select');
+        this.el.frequencyModal.style.display = 'flex';
+        this.renderFrequency();
+    }
+    closeFrequencyModal() {
+        this.playSound('cancel');
+        this.el.frequencyModal.style.display = 'none';
+    }
+    getFrequencyData(scope) {
+        const counts = new Array(91).fill(0); // 1..90
+        let callsTotal = 0;
+        let sessionsTotal = 0;
+        const addNums = (nums) => {
+            nums.forEach(n => {
+                const v = Number(n);
+                if (v >= 1 && v <= 90) { counts[v]++; callsTotal++; }
+            });
+        };
+        if (scope === 'current') {
+            // Live state across all 5 slots (default + 4 games)
+            COLOR_THEMES.forEach(t => {
+                const s = this.slots[t];
+                if (s && Array.isArray(s.selectedNumbers)) addNums(s.selectedNumbers);
+            });
+            sessionsTotal = 1;
+        } else {
+            let hist = this.getCallHistory();
+            if (scope === 'last10') hist = hist.slice(-10);
+            else if (scope === 'lastSession') hist = hist.slice(-1);
+            sessionsTotal = hist.length;
+            hist.forEach(entry => {
+                if (!entry || !entry.games) return;
+                Object.values(entry.games).forEach(nums => {
+                    if (Array.isArray(nums)) addNums(nums);
+                });
+            });
+        }
+        let max = 0;
+        for (let i = 1; i <= 90; i++) if (counts[i] > max) max = counts[i];
+        return { counts, callsTotal, sessionsTotal, max };
+    }
+    _freqColor(value, max) {
+        if (max <= 0 || value <= 0) return '#2a3340';
+        const t = Math.min(1, value / max);
+        // Cold (blue) → warm (gold) → hot (red)
+        const stops = [
+            [0.00, [42, 51, 64]],     // cold base
+            [0.15, [58, 120, 200]],   // blue
+            [0.55, [241, 185, 36]],   // gold
+            [1.00, [255, 85, 68]],    // red
+        ];
+        let a = stops[0], b = stops[stops.length - 1];
+        for (let i = 0; i < stops.length - 1; i++) {
+            if (t >= stops[i][0] && t <= stops[i+1][0]) { a = stops[i]; b = stops[i+1]; break; }
+        }
+        const span = b[0] - a[0] || 1;
+        const k = (t - a[0]) / span;
+        const r = Math.round(a[1][0] + (b[1][0] - a[1][0]) * k);
+        const g = Math.round(a[1][1] + (b[1][1] - a[1][1]) * k);
+        const bl = Math.round(a[1][2] + (b[1][2] - a[1][2]) * k);
+        return `rgb(${r}, ${g}, ${bl})`;
+    }
+    renderFrequency() {
+        if (!this.el.frequencyModal) return;
+        const scope   = this.el.frequencyScope.value;
+        const display = this.el.frequencyDisplay.value;
+        const { counts, callsTotal, sessionsTotal, max } = this.getFrequencyData(scope);
+
+        const scopeLabel =
+            scope === 'current'     ? 'aktiv sesjon'  :
+            scope === 'lastSession' ? 'siste sesjon'  :
+            scope === 'last10'      ? 'siste 10 sesjoner' :
+                                      'alle sesjoner';
+        this.el.frequencySummary.textContent =
+            `${callsTotal} kall fordelt på ${sessionsTotal} ${sessionsTotal === 1 ? 'sesjon' : 'sesjoner'} (${scopeLabel}).`;
+
+        const wrap = this.el.frequencyDisplayWrap;
+        wrap.innerHTML = '';
+
+        if (callsTotal === 0) {
+            wrap.innerHTML = '<div class="error-log-empty">Ingen data ennå — spill og lagre en sesjon for å bygge historikk.</div>';
+            return;
+        }
+
+        if (display === 'grid') {
+            const grid = document.createElement('div');
+            grid.className = 'freq-grid';
+            for (let n = 1; n <= 90; n++) {
+                const cell = document.createElement('div');
+                cell.className = 'freq-cell';
+                cell.style.backgroundColor = this._freqColor(counts[n], max);
+                cell.title = `Tall ${n}: ${counts[n]} kall`;
+                cell.innerHTML = `<div>${n}</div><div class="freq-cell-count">${counts[n]}</div>`;
+                grid.appendChild(cell);
+            }
+            wrap.appendChild(grid);
+            const legend = document.createElement('div');
+            legend.className = 'freq-legend';
+            legend.innerHTML = `<span>Sjelden</span><div class="freq-legend-bar"></div><span>Ofte</span>`;
+            wrap.appendChild(legend);
+        } else if (display === 'bars') {
+            for (let n = 1; n <= 90; n++) {
+                const row = document.createElement('div');
+                row.className = 'freq-bar-row';
+                const pct = max > 0 ? Math.round((counts[n] / max) * 100) : 0;
+                row.innerHTML =
+                    `<span class="freq-bar-num">${n}</span>` +
+                    `<div class="freq-bar-track"><div class="freq-bar-fill" style="width:${pct}%"></div></div>` +
+                    `<span class="freq-bar-count">${counts[n]}</span>`;
+                wrap.appendChild(row);
+            }
+        } else if (display === 'decades') {
+            const buckets = [
+                { label: '1–9',   from: 1,  to: 9  },
+                { label: '10–19', from: 10, to: 19 },
+                { label: '20–29', from: 20, to: 29 },
+                { label: '30–39', from: 30, to: 39 },
+                { label: '40–49', from: 40, to: 49 },
+                { label: '50–59', from: 50, to: 59 },
+                { label: '60–69', from: 60, to: 69 },
+                { label: '70–79', from: 70, to: 79 },
+                { label: '80–90', from: 80, to: 90 },
+            ];
+            const totals = buckets.map(b => {
+                let sum = 0;
+                for (let i = b.from; i <= b.to; i++) sum += counts[i];
+                return { ...b, sum, span: b.to - b.from + 1 };
+            });
+            const bMax = Math.max(...totals.map(t => t.sum / t.span));
+            totals.forEach(b => {
+                const avg = b.sum / b.span;
+                const pct = bMax > 0 ? Math.round((avg / bMax) * 100) : 0;
+                const row = document.createElement('div');
+                row.className = 'freq-decade-row';
+                row.innerHTML =
+                    `<span class="freq-decade-label">${b.label}</span>` +
+                    `<div class="freq-bar-track"><div class="freq-bar-fill" style="width:${pct}%"></div></div>` +
+                    `<span class="freq-bar-count">${b.sum} (${avg.toFixed(1)}/tall)</span>`;
+                wrap.appendChild(row);
+            });
+        } else if (display === 'topbottom') {
+            const list = [];
+            for (let n = 1; n <= 90; n++) list.push({ n, c: counts[n] });
+            const top = list.slice().sort((a, b) => b.c - a.c || a.n - b.n).slice(0, 10);
+            const bot = list.slice().sort((a, b) => a.c - b.c || a.n - b.n).slice(0, 10);
+            const mkSection = (title, items) => {
+                const sec = document.createElement('div');
+                sec.className = 'freq-topbottom-section';
+                const t = document.createElement('div');
+                t.className = 'freq-topbottom-title';
+                t.textContent = title;
+                sec.appendChild(t);
+                items.forEach(({ n, c }) => {
+                    const row = document.createElement('div');
+                    row.className = 'freq-bar-row';
+                    const pct = max > 0 ? Math.round((c / max) * 100) : 0;
+                    row.innerHTML =
+                        `<span class="freq-bar-num">${n}</span>` +
+                        `<div class="freq-bar-track"><div class="freq-bar-fill" style="width:${pct}%"></div></div>` +
+                        `<span class="freq-bar-count">${c}</span>`;
+                    sec.appendChild(row);
+                });
+                return sec;
+            };
+            wrap.appendChild(mkSection('Topp 10 mest trukket', top));
+            wrap.appendChild(mkSection('Bunn 10 minst trukket', bot));
+        }
+    }
+
+    // ── Error log ─────────────────────────────────────────
+    openErrorLogModal() {
+        this.playSound('select');
+        this.el.errorLogModal.style.display = 'flex';
+        this.renderErrorLog();
+    }
+    closeErrorLogModal() {
+        this.playSound('cancel');
+        this.el.errorLogModal.style.display = 'none';
+    }
+    renderErrorLog() {
+        const list = (window.bingoErrorLog && window.bingoErrorLog.get()) || [];
+        this.el.errorLogSubtitle.textContent =
+            list.length === 0 ? 'Ingen feil registrert' :
+            list.length === 1 ? '1 feil registrert' :
+                                `${list.length} feil registrert`;
+        const wrap = this.el.errorLogList;
+        wrap.innerHTML = '';
+        if (!list.length) {
+            wrap.innerHTML = '<div class="error-log-empty">Alt fungerer som det skal.</div>';
+            return;
+        }
+        // Newest first
+        list.slice().reverse().forEach(err => {
+            const entry = document.createElement('div');
+            entry.className = 'error-log-entry';
+            const t = new Date(err.ts);
+            const time = t.toLocaleString('no-NO');
+            entry.innerHTML =
+                `<div class="error-log-entry-head">` +
+                    `<span class="error-log-entry-kind">${err.kind || 'error'}</span>` +
+                    `<span class="error-log-entry-time">${time}</span>` +
+                `</div>` +
+                `<div class="error-log-entry-msg"></div>` +
+                (err.stack ? `<div class="error-log-entry-stack"></div>` : '');
+            entry.querySelector('.error-log-entry-msg').textContent = err.msg || '';
+            if (err.stack) entry.querySelector('.error-log-entry-stack').textContent = err.stack;
+            wrap.appendChild(entry);
+        });
+    }
+    copyErrorLog() {
+        const list = (window.bingoErrorLog && window.bingoErrorLog.get()) || [];
+        const text = JSON.stringify(list, null, 2);
+        const finish = (ok) => {
+            this.playSound(ok ? 'confirm' : 'cancel');
+            const btn = this.el.errorLogCopy;
+            const orig = btn.textContent;
+            btn.textContent = ok ? 'Kopiert ✓' : 'Feil';
+            setTimeout(() => { btn.textContent = orig; }, 1500);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(() => finish(true), () => finish(false));
+        } else {
+            try {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                finish(true);
+            } catch (e) { finish(false); }
+        }
+    }
+    clearErrorLog() {
+        if (window.bingoErrorLog) window.bingoErrorLog.clear();
+        this.playSound('reset');
+        this.renderErrorLog();
     }
 
     // ── Keyboard Input ───────────────────────────────
@@ -4525,6 +4900,15 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                     btn.title = count > 0
                         ? `BingoView \u2014 ${count} tilkoblet`
                         : 'BingoView \u2014 venter p\u00e5 telefon';
+                }
+                const badge = document.getElementById('bv-nav-badge');
+                if (badge) {
+                    if (count > 0) {
+                        badge.textContent = String(count);
+                        badge.style.display = '';
+                    } else {
+                        badge.style.display = 'none';
+                    }
                 }
                 if (count > 0) this.bvSendState();
                 this._bvUpdatePaperHighlights();

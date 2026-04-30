@@ -15,7 +15,7 @@
             <a class="flex-item" href="#" aria-label="90ball bingo">90ball</a>
             <a class="flex-item" href="#" aria-label="Bingoark">Bingoark</a>
             <a class="flex-item" href="#" aria-label="Hjelp">Hjelp</a>
-            <button class="flex-item settings-nav-btn" id="bingoview-btn" aria-label="BingoView telefon" title="Koble til telefon">📱</button>
+            <button class="flex-item settings-nav-btn" id="bingoview-btn" aria-label="BingoView telefon" title="Koble til telefon"><span class="bv-btn-icon">📱</span><span class="bv-nav-badge" id="bv-nav-badge" style="display:none">0</span></button>
             <button class="flex-item settings-nav-btn" id="settings-btn" aria-label="Innstillinger">⚙</button>
             <div class="dropdown">
                 <button class="dropbtn flex-item" aria-label="Apne meny" style="font-size:1.3rem;">
@@ -28,6 +28,8 @@
                     <a href="#">Kontakt oss</a>
                     <a href="#">Spillevett</a>
                     <a href="#" id="nav-statistikk">Statistikk</a>
+                    <a href="#" id="nav-frequency">Frekvens</a>
+                    <a href="#" id="nav-errorlog">Feil-logg</a>
                     <a href="#">Hvordan spille 90 ball bingo</a>
                 </div>
             </div>
@@ -1322,6 +1324,52 @@
 
             <div class="modal-buttons">
                 <button class="modal-btn modal-btn-no" id="bingoview-close-btn">Lukk</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ERROR LOG MODAL -->
+    <div class="modal-overlay" id="error-log-modal" style="display:none">
+        <div class="modal modal-viewer">
+            <h2 class="modal-title">Feil-logg</h2>
+            <p class="modal-subtitle" id="error-log-subtitle">0 feil registrert</p>
+            <div class="error-log-list" id="error-log-list"></div>
+            <div class="modal-buttons" style="margin-top:14px">
+                <button class="modal-btn session-action-btn session-edit-btn" id="error-log-copy">Kopier</button>
+                <button class="modal-btn session-action-btn session-edit-btn" id="error-log-clear" style="background:#ff4444;border-color:#ff4444;color:white">Tøm</button>
+                <button class="modal-btn modal-btn-no" id="error-log-close">Lukk</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- FREQUENCY HEATMAP MODAL -->
+    <div class="modal-overlay" id="frequency-modal" style="display:none">
+        <div class="modal modal-viewer">
+            <h2 class="modal-title">Tall-frekvens</h2>
+            <div class="frequency-controls">
+                <div class="frequency-control">
+                    <label class="frequency-control-label">Omfang</label>
+                    <select id="frequency-scope" class="session-input">
+                        <option value="all">Alle sesjoner</option>
+                        <option value="last10">Siste 10 sesjoner</option>
+                        <option value="lastSession">Siste sesjon</option>
+                        <option value="current">Aktiv sesjon</option>
+                    </select>
+                </div>
+                <div class="frequency-control">
+                    <label class="frequency-control-label">Visning</label>
+                    <select id="frequency-display" class="session-input">
+                        <option value="grid">Heatmap rutenett</option>
+                        <option value="bars">Søyler (alle 90)</option>
+                        <option value="decades">Per tier</option>
+                        <option value="topbottom">Topp/bunn 10</option>
+                    </select>
+                </div>
+            </div>
+            <div class="frequency-summary" id="frequency-summary"></div>
+            <div class="frequency-display-wrap" id="frequency-display-wrap"></div>
+            <div class="modal-buttons" style="margin-top:14px">
+                <button class="modal-btn modal-btn-no" id="frequency-close">Lukk</button>
             </div>
         </div>
     </div>

@@ -3400,8 +3400,192 @@ body.flare-no-pulse-ring .balls.clicked::after { display: none; }
 #bingoview-btn {
     opacity: 0.5;
     transition: opacity 0.3s;
+    position: relative;
 }
 #bingoview-btn:hover { opacity: 1; }
+#bingoview-btn .bv-btn-icon { display: inline-block; }
+.bv-nav-badge {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
+    background: #2ecc71;
+    color: #0a0a0a;
+    font-size: 0.7rem;
+    font-weight: 700;
+    line-height: 18px;
+    text-align: center;
+    box-shadow: 0 0 6px rgba(46, 204, 113, 0.6);
+    pointer-events: none;
+}
+
+/* ── Error log modal ─────────────────────────────────── */
+.error-log-list {
+    max-height: 50vh;
+    overflow-y: auto;
+    background: rgba(0,0,0,0.25);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px;
+    padding: 6px;
+    margin-top: 12px;
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 0.78rem;
+}
+.error-log-empty {
+    padding: 24px;
+    text-align: center;
+    color: rgba(255,255,255,.5);
+}
+.error-log-entry {
+    padding: 8px 10px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    color: rgba(255,255,255,0.85);
+}
+.error-log-entry:last-child { border-bottom: none; }
+.error-log-entry-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 3px;
+}
+.error-log-entry-kind {
+    color: #ff8888;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 0.7rem;
+}
+.error-log-entry-time {
+    color: rgba(255,255,255,0.5);
+    font-size: 0.7rem;
+}
+.error-log-entry-msg { color: #ffd0c0; word-break: break-word; }
+.error-log-entry-stack {
+    margin-top: 4px;
+    color: rgba(255,255,255,0.55);
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: 0.72rem;
+}
+
+/* ── Frequency heatmap modal ─────────────────────── */
+.frequency-controls {
+    display: flex;
+    gap: 16px;
+    margin: 12px 0;
+    flex-wrap: wrap;
+}
+.frequency-control {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    min-width: 160px;
+}
+.frequency-control-label {
+    font-size: 0.75rem;
+    color: rgba(255,255,255,0.6);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+.frequency-summary {
+    padding: 8px 12px;
+    background: rgba(0,0,0,0.25);
+    border-radius: 6px;
+    font-size: 0.85rem;
+    color: rgba(255,255,255,0.85);
+    margin-bottom: 10px;
+}
+.frequency-display-wrap {
+    max-height: 55vh;
+    overflow-y: auto;
+    padding: 8px 4px;
+}
+.freq-grid {
+    display: grid;
+    grid-template-columns: repeat(10, 1fr);
+    gap: 4px;
+}
+.freq-cell {
+    aspect-ratio: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    background: #2a3340;
+    color: #fff;
+    font-weight: 600;
+    font-size: 0.95rem;
+    transition: transform 0.12s;
+    position: relative;
+}
+.freq-cell:hover { transform: scale(1.06); z-index: 2; }
+.freq-cell-count {
+    font-size: 0.65rem;
+    opacity: 0.85;
+    font-weight: 400;
+    margin-top: 2px;
+}
+.freq-bar-row {
+    display: grid;
+    grid-template-columns: 32px 1fr 40px;
+    align-items: center;
+    gap: 8px;
+    padding: 2px 0;
+    font-size: 0.78rem;
+}
+.freq-bar-num { text-align: right; color: rgba(255,255,255,0.7); font-variant-numeric: tabular-nums; }
+.freq-bar-track {
+    height: 14px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+}
+.freq-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #3a78c8, #f1b924, #ff5544);
+    border-radius: 4px;
+    transition: width 0.25s;
+}
+.freq-bar-count { color: rgba(255,255,255,0.85); font-variant-numeric: tabular-nums; }
+.freq-decade-row {
+    display: grid;
+    grid-template-columns: 110px 1fr 90px;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    font-size: 0.85rem;
+}
+.freq-decade-label { color: rgba(255,255,255,0.85); }
+.freq-topbottom-section {
+    margin-bottom: 14px;
+}
+.freq-topbottom-title {
+    font-size: 0.78rem;
+    color: rgba(255,255,255,0.6);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 6px;
+}
+.freq-legend {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+    font-size: 0.7rem;
+    color: rgba(255,255,255,0.6);
+}
+.freq-legend-bar {
+    flex: 1;
+    height: 8px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #2a3340, #3a78c8, #f1b924, #ff5544);
+}
 
 .bv-field-group {
     margin-bottom: 18px;
