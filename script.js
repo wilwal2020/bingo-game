@@ -241,6 +241,7 @@ class BingoApp {
     // ── Initialisation ──────────────────────────────
     init() {
         this.cacheElements();
+        this.setupDropdownPortal();
         this.bindEvents();
         this.loadFromStorage();
         this.applySettings();
@@ -531,6 +532,7 @@ class BingoApp {
             errorLogCopy:               document.getElementById('error-log-copy'),
             errorLogClear:              document.getElementById('error-log-clear'),
             errorLogClose:              document.getElementById('error-log-close'),
+            frequencyBtn:               document.getElementById('frequency-btn'),
         };
 
         // O(1) number→element lookup — avoids spread+find across all 90 balls
@@ -716,6 +718,9 @@ class BingoApp {
         // Frequency heatmap
         if (this.el.navFrequency) {
             this.el.navFrequency.addEventListener('click', e => { e.preventDefault(); this.openFrequencyModal(); });
+        }
+        if (this.el.frequencyBtn) {
+            this.el.frequencyBtn.addEventListener('click', () => this.openFrequencyModal());
         }
         if (this.el.frequencyClose) {
             this.el.frequencyClose.addEventListener('click', () => this.closeFrequencyModal());
@@ -2976,6 +2981,56 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         try {
             return JSON.parse(localStorage.getItem('bingoCallHistory') || '[]');
         } catch(e) { return []; }
+    }
+
+    // Portal the .dropdown-content to <body> so it escapes the nav's
+    // backdrop-filter stacking context (which otherwise traps it behind
+    // the ball grid). JS-positions it under the trigger button.
+    setupDropdownPortal() {
+        const dropdown = document.querySelector('.dropdown');
+        const content  = document.querySelector('.dropdown-content');
+        const button   = dropdown && dropdown.querySelector('.dropbtn');
+        if (!dropdown || !content || !button) return;
+
+        document.body.appendChild(content);
+
+        const place = () => {
+            const r  = button.getBoundingClientRect();
+            const cw = content.offsetWidth || 200;
+            content.style.top  = `${r.bottom + 4}px`;
+            content.style.left = `${Math.max(8, r.right - cw)}px`;
+        };
+        const show = () => { content.classList.add('open'); place(); };
+        const hide = () => { content.classList.remove('open'); };
+
+        let hideTimer = null;
+        const onEnter = () => { clearTimeout(hideTimer); show(); };
+        const onLeave = () => { hideTimer = setTimeout(hide, 200); };
+
+        dropdown.addEventListener('mouseenter', onEnter);
+        dropdown.addEventListener('mouseleave', onLeave);
+        content.addEventListener('mouseenter',  onEnter);
+        content.addEventListener('mouseleave',  onLeave);
+
+        // Tap/click toggle for touch devices
+        button.addEventListener('click', e => {
+            e.stopPropagation();
+            if (content.classList.contains('open')) hide();
+            else show();
+        });
+        document.addEventListener('click', e => {
+            if (content.classList.contains('open') &&
+                !content.contains(e.target) &&
+                !dropdown.contains(e.target)) {
+                hide();
+            }
+        });
+        window.addEventListener('resize', () => {
+            if (content.classList.contains('open')) place();
+        });
+        window.addEventListener('scroll', () => {
+            if (content.classList.contains('open')) place();
+        }, { passive: true });
     }
 
     // ── Frequency heatmap ─────────────────────────────────

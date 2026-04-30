@@ -141,8 +141,9 @@ body {
 
 .dropdown-content {
     display:          none;
-    position:         absolute;
-    right:            0;
+    /* Portaled into <body> by setupDropdownPortal() so it escapes ancestor
+       stacking contexts (the nav's backdrop-filter would otherwise trap it). */
+    position:         fixed;
     min-width:        180px;
     background-color: rgba(15,18,26,.92);
     backdrop-filter:  blur(20px);
@@ -150,9 +151,10 @@ body {
     border:           1px solid rgba(255,255,255,.1);
     border-radius:    12px;
     box-shadow:       0 16px 40px rgba(0,0,0,.5);
-    z-index:          10;
+    z-index:          500;
     overflow:         hidden;
 }
+.dropdown-content.open { display: block; }
 
 .dropdown-content a {
     display:         block;
@@ -166,7 +168,6 @@ body {
 
 .dropdown-content a:last-child { border-bottom: none; }
 .dropdown-content a:hover     { background-color: rgba(255,255,255,.08); color: white; }
-.dropdown:hover .dropdown-content { display: block; }
 
 /* ===================================================
    PAGE LAYOUT
@@ -2670,6 +2671,8 @@ body.layout-vertical #random-button {
 /* Unsaved modal z-index */
 #unsaved-modal { z-index: 400; }
 #graph-modal   { z-index: 200; }
+#frequency-modal { z-index: 250; }
+#error-log-modal { z-index: 410; }
 
 /* =====================================================
    SETTINGS MODAL
