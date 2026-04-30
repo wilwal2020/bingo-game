@@ -4950,7 +4950,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                     ...Object.keys(this._bvLivePhones),
                     ...Object.keys(this._bvPersistedPapers),
                 ]);
-                const phoneList = [...ids].map(id => {
+                let phoneList = [...ids].map(id => {
                     const live = this._bvLivePhones[id];
                     const livePapers = (live && live.papers) || {};
                     const persistedPapers = this._bvPersistedPapers[id] || {};
@@ -4970,6 +4970,13 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                     if (a.online !== b.online) return a.online ? -1 : 1;
                     return a.online ? a.ts - b.ts : b.lastSeen - a.lastSeen;
                 });
+
+                // Dedupe: drop any OFFLINE entry whose papers exactly match an
+                // ONLINE entry's papers (same strips per game). This happens
+                // when a phone reconnects after browser storage was cleared
+                // and got a new phoneId — the old persisted entry would
+                // otherwise linger as a phantom offline duplicate.
+                phoneList = this._bvDedupeOfflineDuplicates(phoneList);
 
                 this._bvPhones = phoneList;
                 const onlineCount = phoneList.filter(p => p.online).length;
@@ -5057,6 +5064,48 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         this._bvChannelRef.child('papers_meta/' + phoneId).remove();
     }
 
+    // Drop any offline phoneList entry whose papers are an exact subset of
+    // some online entry's papers (same strips for every game the offline has).
+    // Also issues Firebase deletes for the stale entries so they don't pile
+    // up in storage. Called from recompute() on every snapshot change.
+    _bvDedupeOfflineDuplicates(phoneList) {
+        const online = phoneList.filter(p => p.online);
+        if (!online.length) return phoneList;
+
+        const stripsKey = strips => {
+            if (!Array.isArray(strips)) return null;
+            // Comparing on the strip IDs alone is enough — IDs are randomly
+            // assigned at generation/upload time and travel with the paper,
+            // so two BV instances with the same source data produce the same
+            // ID set. Sorting makes order irrelevant.
+            return strips.map(s => s && s.id).sort().join('|');
+        };
+
+        const result = [];
+        phoneList.forEach(p => {
+            if (p.online) { result.push(p); return; }
+            const offlineGames = Object.keys(p.papers || {});
+            if (!offlineGames.length) { result.push(p); return; }
+
+            const isDup = online.some(o => {
+                return offlineGames.every(g => {
+                    const okey = stripsKey(o.papers && o.papers[g]);
+                    const pkey = stripsKey(p.papers && p.papers[g]);
+                    return okey != null && okey === pkey;
+                });
+            });
+
+            if (isDup) {
+                // Side effect: clean it out of Firebase too so it doesn't
+                // come back on the next snapshot.
+                this.bvDeletePersistedPhone(p.id);
+            } else {
+                result.push(p);
+            }
+        });
+        return result;
+    }
+
     bvSend(number) {
         if (this._bvChannelRef) {
             const entry = { number, ts: Date.now(), game: this.currentTheme, rekke: this.slot.currentRekke };
@@ -5078,18 +5127,19 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
     _bvShowBallPing(number) {
         const phones = this._bvPhones || [];
         const game = this.currentTheme;
-        // Count phones that actually have a paper for this game (online + offline)
-        const totalPapers  = phones.filter(p => Array.isArray((p.papers || {})[game])).length;
+        // Only ping if at least one paper for this game is OFFLINE — the
+        // online phones already get visible feedback on their own screens,
+        // so a badge on the ball would just be noise.
         const offlinePapers = phones.filter(p => !p.online && Array.isArray((p.papers || {})[game])).length;
-        if (totalPapers === 0) return;
+        if (offlinePapers === 0) return;
         const ball = this._bvBallMap()[number];
         if (!ball) return;
         // Remove any prior badge so the animation can restart
         const old = ball.querySelector('.bv-ball-ping');
         if (old) old.remove();
         const badge = document.createElement('div');
-        badge.className = 'bv-ball-ping' + (offlinePapers > 0 ? ' bv-ball-ping-offline' : '');
-        badge.textContent = '📱' + totalPapers;
+        badge.className = 'bv-ball-ping bv-ball-ping-offline';
+        badge.textContent = '📱' + offlinePapers;
         ball.appendChild(badge);
         setTimeout(() => { if (badge.parentNode) badge.remove(); }, 1400);
     }
