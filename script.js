@@ -4912,12 +4912,23 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             console.log('[BV] hosting channel bingoview/' + code);
 
             // Host presence marker — re-register on every Firebase reconnect so phones
-            // can always find the host even after a brief network interruption
-            const hostRef = this._bvChannelRef.child('host');
+            // can always find the host even after a brief network interruption.
+            // Persisted papers / papers_meta are also wiped on host disconnect: a
+            // fresh page-load gets a fresh channel code anyway, so there's no
+            // value in keeping stale papers around past the host session.
+            const hostRef       = this._bvChannelRef.child('host');
+            const papersRef     = this._bvChannelRef.child('papers');
+            const papersMetaRef = this._bvChannelRef.child('papers_meta');
+            // Also wipe the papers/papers_meta on initial connect, in case the
+            // user opens the same code twice (rare with random codes, but safe).
+            papersRef.remove();
+            papersMetaRef.remove();
             const infoRef = firebase.database().ref('.info/connected');
             const infoHandler = (snap) => {
                 if (!snap.val()) return;
                 hostRef.onDisconnect().remove();
+                papersRef.onDisconnect().remove();
+                papersMetaRef.onDisconnect().remove();
                 hostRef.set({ ts: Date.now() });
             };
             infoRef.on('value', infoHandler);
