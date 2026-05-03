@@ -223,6 +223,7 @@ class BingoApp {
             bvHighlightEnabled:   true,
             bvHighlightRekke:     'current',
             bvHighlightThreshold: 2,
+            bvWinNotifyEnabled:   true,
         };
 
         // Init all slots
@@ -500,6 +501,8 @@ class BingoApp {
             bvThresholdValue:         document.getElementById('bv-threshold-value'),
             bvThresholdPlus:          document.getElementById('bv-threshold-plus'),
             bvThresholdMinus:         document.getElementById('bv-threshold-minus'),
+            bvWinNotifyEnabled:       document.getElementById('bv-win-notify-enabled'),
+            bvWinNoticeStack:         document.getElementById('bv-win-notice-stack'),
             settingOverAverageBlink:    document.getElementById('setting-over-average-blink'),
             settingBlur:                document.getElementById('setting-blur'),
             settingNextGameCountdown:   document.getElementById('setting-next-game-countdown'),
@@ -1149,6 +1152,13 @@ class BingoApp {
                 try { this._bvUpdatePaperHighlights(); } catch(e) {}
             });
         }
+        if (this.el.bvWinNotifyEnabled) {
+            this.el.bvWinNotifyEnabled.addEventListener('change', () => {
+                this.settings.bvWinNotifyEnabled = this.el.bvWinNotifyEnabled.checked;
+                this.saveSettings();
+                if (!this.settings.bvWinNotifyEnabled) this._bvClearWinNotices();
+            });
+        }
 
         // Per-theme color preset save buttons
         document.querySelectorAll('.color-preset-save-btn').forEach(btn => {
@@ -1441,6 +1451,8 @@ class BingoApp {
             this.el.bvHighlightRekke.value = s.bvHighlightRekke || 'current';
         if (this.el.bvThresholdValue)
             this.el.bvThresholdValue.textContent = s.bvHighlightThreshold ?? 2;
+        if (this.el.bvWinNotifyEnabled)
+            this.el.bvWinNotifyEnabled.checked = s.bvWinNotifyEnabled ?? true;
 
         // Next-game countdown
         if (this.el.settingNextGameCountdown) {
@@ -5322,6 +5334,11 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             }
         });
 
+        // Win detection — fires a one-time notification per (phone, game, rekke,
+        // strip) combo as it transitions to a winning state. Only online phones
+        // generate alerts.
+        this._bvProcessWinNotifications(phones, calledSet, rekke, game);
+
         this._bvRenderPhonesSection(phoneRows);
     }
 
@@ -5433,6 +5450,98 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         if (diff < 3_600_000)     return Math.floor(diff / 60_000) + ' min siden';
         if (diff < 86_400_000)    return Math.floor(diff / 3_600_000) + ' t siden';
         return Math.floor(diff / 86_400_000) + ' d siden';
+    }
+
+    // True when the strip has enough fully-called rows to satisfy the rekke.
+    _bvStripIsWinning(strip, calledSet, rekke) {
+        if (!strip || !Array.isArray(strip.rows)) return false;
+        const zeroCount = strip.rows.reduce((acc, nums) => {
+            const missing = (nums || []).filter(n => Number.isFinite(n) && !calledSet.has(n)).length;
+            return acc + (missing === 0 ? 1 : 0);
+        }, 0);
+        const need = rekke === 'Rekke3' ? 3 : (rekke === 'Rekke2' ? 2 : 1);
+        return zeroCount >= need;
+    }
+
+    // Called from _bvUpdatePaperHighlights. Diffs the current set of winning
+    // (phoneId, game, rekke, stripId) keys against the previous run; spawns a
+    // notice for each newly-appearing key when the toggle is on.
+    _bvProcessWinNotifications(phones, calledSet, rekke, game) {
+        const currentKeys = new Set();
+        const newWins     = [];
+        phones.forEach((phone, idx) => {
+            if (!phone.online) return;
+            const strips = (phone.papers || {})[game];
+            if (!Array.isArray(strips)) return;
+            strips.forEach(strip => {
+                if (!this._bvStripIsWinning(strip, calledSet, rekke)) return;
+                const key = `${phone.id}|${game}|${rekke}|${strip.id}`;
+                currentKeys.add(key);
+                if (!this._bvWinKeysPrev || !this._bvWinKeysPrev.has(key)) {
+                    newWins.push({ phoneIdx: idx, phoneId: phone.id, stripId: strip.id, rekke });
+                }
+            });
+        });
+        this._bvWinKeysPrev = currentKeys;
+        if (this.settings.bvWinNotifyEnabled !== false && newWins.length) {
+            newWins.forEach(w => this._bvShowWinNotice(w));
+        }
+    }
+
+    _bvShowWinNotice(win) {
+        const stack = this.el.bvWinNoticeStack || document.getElementById('bv-win-notice-stack');
+        if (!stack) return;
+        const phoneNum = (win.phoneIdx ?? 0) + 1;
+        const stripId  = win.stripId != null ? String(win.stripId) : '?';
+        const rekkeLbl = win.rekke === 'Rekke3' ? 'Hele arket'
+                       : win.rekke === 'Rekke2' ? '2 rekker'
+                       : '1 rekke';
+
+        const div = document.createElement('div');
+        div.className = 'bv-win-notice';
+
+        const icon = document.createElement('div');
+        icon.className = 'bv-win-notice-icon';
+        icon.textContent = '🎉';
+
+        const body = document.createElement('div');
+        body.className = 'bv-win-notice-body';
+        const title = document.createElement('div');
+        title.className = 'bv-win-notice-title';
+        title.textContent = `Bingo! Telefon ${phoneNum}`;
+        const detail = document.createElement('div');
+        detail.className = 'bv-win-notice-detail';
+        detail.textContent = `${rekkeLbl} · Kontrollnr ${stripId}`;
+        body.appendChild(title);
+        body.appendChild(detail);
+
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'bv-win-notice-close';
+        closeBtn.title = 'Lukk';
+        closeBtn.textContent = '×';
+
+        div.appendChild(icon);
+        div.appendChild(body);
+        div.appendChild(closeBtn);
+
+        const close = () => {
+            if (div.classList.contains('closing')) return;
+            div.classList.add('closing');
+            setTimeout(() => { if (div.parentNode) div.remove(); }, 300);
+        };
+        closeBtn.addEventListener('click', close);
+        const autoTimer = setTimeout(close, 9000);
+        div._bvAutoTimer = autoTimer;
+        stack.appendChild(div);
+    }
+
+    _bvClearWinNotices() {
+        const stack = this.el.bvWinNoticeStack || document.getElementById('bv-win-notice-stack');
+        if (!stack) return;
+        stack.querySelectorAll('.bv-win-notice').forEach(n => {
+            if (n._bvAutoTimer) clearTimeout(n._bvAutoTimer);
+            n.remove();
+        });
     }
 }
 

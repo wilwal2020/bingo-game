@@ -1315,6 +1315,13 @@
                         <button type="button" class="rekke-adjust-btn" id="bv-threshold-plus">+</button>
                     </div>
                 </div>
+                <div class="bv-settings-row">
+                    <div class="bv-settings-label">Vis varsel når telefon vinner</div>
+                    <label class="settings-toggle">
+                        <input type="checkbox" id="bv-win-notify-enabled" checked>
+                        <span class="settings-toggle-track"></span>
+                    </label>
+                </div>
             </div>
 
             <!-- Connected phones with their close-to-winning strips -->
@@ -1374,6 +1381,9 @@
             </div>
         </div>
     </div>
+
+    <!-- Phone-win notification stack — top-level so it's visible regardless of modal state -->
+    <div id="bv-win-notice-stack" aria-live="polite"></div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="script.js"></script>
