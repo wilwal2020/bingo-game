@@ -4970,12 +4970,14 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                     // to persisted for game keys the live phone hasn't published yet.
                     const papers = { ...persistedPapers, ...livePapers };
                     const meta = this._bvPapersMeta[id] || {};
+                    const userName = ((live && live.userName) || meta.userName || '').toString().trim();
                     return {
                         id,
                         online: !!live,
                         ts: (live && live.ts) || 0,
                         lastSeen: meta.lastSeen || 0,
                         papers,
+                        userName,
                     };
                 }).sort((a, b) => {
                     // Online first (sorted by connection ts), then offline (by lastSeen desc)
@@ -5005,6 +5007,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                     this._bvLivePhones[id] = {
                         ts: (data && data.ts) || 0,
                         papers: (data && data.papers) || {},
+                        userName: (data && data.userName) || '',
                     };
                 });
                 recompute();
@@ -5315,6 +5318,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             phoneRows.push({
                 idx, color, ts: phone.ts, online: !!phone.online, lastSeen: phone.lastSeen,
                 phoneId: phone.id, hasPaper: Array.isArray(strips), closeStrips,
+                userName: phone.userName || '',
             });
         });
 
@@ -5374,7 +5378,8 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             const offlineSuffix = row.online === false
                 ? ` · Frakoblet${row.lastSeen ? ' (' + this._bvFormatLastSeen(row.lastSeen) + ')' : ''}`
                 : '';
-            name.textContent = `Telefon ${row.idx + 1}${offlineSuffix}`;
+            const baseName = row.userName ? row.userName : `Telefon ${row.idx + 1}`;
+            name.textContent = `${baseName}${offlineSuffix}`;
             info.appendChild(name);
 
             const summary = document.createElement('div');
@@ -5477,7 +5482,14 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                 const key = `${phone.id}|${game}|${rekke}|${strip.id}`;
                 currentKeys.add(key);
                 if (!this._bvWinKeysPrev || !this._bvWinKeysPrev.has(key)) {
-                    newWins.push({ phoneIdx: idx, phoneId: phone.id, stripId: strip.id, rekke, online: !!phone.online });
+                    newWins.push({
+                        phoneIdx: idx,
+                        phoneId: phone.id,
+                        stripId: strip.id,
+                        rekke,
+                        online: !!phone.online,
+                        userName: phone.userName || '',
+                    });
                 }
             });
         });
@@ -5496,6 +5508,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                        : win.rekke === 'Rekke2' ? '2 rekker'
                        : '1 rekke';
         const isOffline = win.online === false;
+        const displayName = (win.userName && win.userName.trim()) || `Telefon ${phoneNum}`;
 
         const div = document.createElement('div');
         div.className = 'bv-win-notice' + (isOffline ? ' bv-win-notice-offline' : '');
@@ -5508,7 +5521,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         body.className = 'bv-win-notice-body';
         const title = document.createElement('div');
         title.className = 'bv-win-notice-title';
-        title.textContent = `Bingo! Telefon ${phoneNum}${isOffline ? ' (frakoblet)' : ''}`;
+        title.textContent = `Bingo! ${displayName}${isOffline ? ' (frakoblet)' : ''}`;
         const detail = document.createElement('div');
         detail.className = 'bv-win-notice-detail';
         detail.textContent = `${rekkeLbl} · Kontrollnr ${stripId}`;
