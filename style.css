@@ -293,29 +293,43 @@ body.layout-vertical #jackpot-btn-cell {
     pointer-events: none;
 }
 
+/* Inner span that absorbs every scale transform. Keeping the parent
+   .balls box at its layout size means the hover hit-area never changes,
+   so hovering at the edge can't oscillate between hover/unhover. */
+.ball-inner {
+    display: inline-block;
+    transition: transform .3s ease;
+    transform-origin: center;
+    pointer-events: none;
+}
+
 .balls:not(.spacer):not(.clicked):not(.grid-btn-cell):hover {
+    color: var(--accent-color);
+}
+.balls:not(.spacer):not(.clicked):not(.grid-btn-cell):hover .ball-inner {
     transform: scale(1.3);
-    color:     var(--accent-color);
 }
 
 @media (hover: none) {
     .balls:not(.spacer):not(.clicked):not(.grid-btn-cell):hover {
+        color: var(--balls-color);
+    }
+    .balls:not(.spacer):not(.clicked):not(.grid-btn-cell):hover .ball-inner {
         transform: none;
-        color:     var(--balls-color);
     }
 }
 
 .balls.clicked {
     color:     white;
-    transform: scale(1.05);
     text-shadow: 0 0 12px rgba(255,255,255,.3);
 }
+.balls.clicked .ball-inner { transform: scale(1.05); }
 
 .balls.last-clicked {
     color:       var(--accent-color);
-    transform:   scale(1.05);
     text-shadow: 0 0 10px rgba(var(--accent-rgb),.45);
 }
+.balls.last-clicked .ball-inner { transform: scale(1.05); }
 
 .balls.recently-selected { animation: ballSelect .4s ease-out; }
 
@@ -1490,6 +1504,15 @@ body.no-over-average-blink .circle.over-average { animation: none; }
 }
 
 .session-input::placeholder { color: rgba(255,255,255,.2); }
+
+/* Native <select> options inherit the OS chrome and on some platforms
+   render white-on-white until hovered. Force explicit dark colours so
+   they're readable in the closed and open state. */
+.session-input option,
+select.session-input option {
+    color: #fff;
+    background-color: #1a1a1a;
+}
 
 /* Edit-session date/time row */
 .edit-session-time-row {

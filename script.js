@@ -220,10 +220,11 @@ class BingoApp {
             nextGameCountdownSeconds: 0,
             blurEnabled: true,
             randomBtnEnabled: true,
-            bvHighlightEnabled:   true,
-            bvHighlightRekke:     'current',
-            bvHighlightThreshold: 2,
-            bvWinNotifyEnabled:   true,
+            bvHighlightEnabled:    true,
+            bvHighlightRekke:      'current',
+            bvHighlightThreshold:  2,
+            bvWinNotifyEnabled:    true,
+            bvWinAutoOpenWinModal: false,
         };
 
         // Init all slots
@@ -503,6 +504,7 @@ class BingoApp {
             bvThresholdMinus:         document.getElementById('bv-threshold-minus'),
             bvWinNotifyEnabled:       document.getElementById('bv-win-notify-enabled'),
             bvWinNoticeStack:         document.getElementById('bv-win-notice-stack'),
+            bvWinAutoOpen:            document.getElementById('bv-win-auto-open'),
             settingOverAverageBlink:    document.getElementById('setting-over-average-blink'),
             settingBlur:                document.getElementById('setting-blur'),
             settingNextGameCountdown:   document.getElementById('setting-next-game-countdown'),
@@ -537,6 +539,24 @@ class BingoApp {
             errorLogClose:              document.getElementById('error-log-close'),
             frequencyBtn:               document.getElementById('frequency-btn'),
         };
+
+        // Wrap each ball's text in an inner span so hover/clicked scale
+        // transforms target the inner element. The parent's hit-area then
+        // stays fixed at its layout size and can't flicker hover state when
+        // the cursor sits right on the edge.
+        this.el.balls.forEach(ball => {
+            if (ball.classList.contains('grid-btn-cell')) return;
+            if (ball.querySelector(':scope > .ball-inner')) return;
+            for (const node of [...ball.childNodes]) {
+                if (node.nodeType === 3 && node.textContent.trim()) {
+                    const span = document.createElement('span');
+                    span.className = 'ball-inner';
+                    span.textContent = node.textContent;
+                    ball.replaceChild(span, node);
+                    break;
+                }
+            }
+        });
 
         // O(1) number→element lookup — avoids spread+find across all 90 balls
         this.el.ballMap = new Map();
@@ -1159,6 +1179,12 @@ class BingoApp {
                 if (!this.settings.bvWinNotifyEnabled) this._bvClearWinNotices();
             });
         }
+        if (this.el.bvWinAutoOpen) {
+            this.el.bvWinAutoOpen.addEventListener('change', () => {
+                this.settings.bvWinAutoOpenWinModal = this.el.bvWinAutoOpen.checked;
+                this.saveSettings();
+            });
+        }
 
         // Per-theme color preset save buttons
         document.querySelectorAll('.color-preset-save-btn').forEach(btn => {
@@ -1453,6 +1479,8 @@ class BingoApp {
             this.el.bvThresholdValue.textContent = s.bvHighlightThreshold ?? 2;
         if (this.el.bvWinNotifyEnabled)
             this.el.bvWinNotifyEnabled.checked = s.bvWinNotifyEnabled ?? true;
+        if (this.el.bvWinAutoOpen)
+            this.el.bvWinAutoOpen.checked = s.bvWinAutoOpenWinModal ?? false;
 
         // Next-game countdown
         if (this.el.settingNextGameCountdown) {
@@ -5512,6 +5540,16 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         this._bvWinKeysPrev = currentKeys;
         if (this.settings.bvWinNotifyEnabled !== false && newWins.length) {
             newWins.forEach(w => this._bvShowWinNotice(w));
+        }
+        if (this.settings.bvWinAutoOpenWinModal && newWins.length) {
+            // Open the winner-logging modal once, even if multiple wins
+            // arrived in the same tick. Skip if any winner-related modal is
+            // already open so we don't fight the user.
+            const winnerOpen   = this.el.winnerModal?.style.display === 'flex';
+            const addWinOpen   = this.el.addWinModal?.style.display === 'flex';
+            if (!winnerOpen && !addWinOpen) {
+                try { this.openWinnerModal(); } catch (e) {}
+            }
         }
     }
 
