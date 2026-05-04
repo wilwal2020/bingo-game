@@ -3906,6 +3906,11 @@ body.flare-no-pulse-ring .balls.clicked::after { display: none; }
 .bv-win-notice.closing {
     animation: bv-win-notice-out 0.3s ease-in forwards;
 }
+.bv-win-notice.bv-win-notice-offline {
+    background: linear-gradient(135deg, #b87a14 0%, #d99425 100%);
+    border-color: rgba(255,255,255,0.18);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5), 0 0 18px rgba(217,148,37,.4);
+}
 .bv-win-notice-icon {
     font-size: 1.8rem;
     flex-shrink: 0;

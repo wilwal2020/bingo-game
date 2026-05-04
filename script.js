@@ -5470,7 +5470,6 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         const currentKeys = new Set();
         const newWins     = [];
         phones.forEach((phone, idx) => {
-            if (!phone.online) return;
             const strips = (phone.papers || {})[game];
             if (!Array.isArray(strips)) return;
             strips.forEach(strip => {
@@ -5478,7 +5477,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                 const key = `${phone.id}|${game}|${rekke}|${strip.id}`;
                 currentKeys.add(key);
                 if (!this._bvWinKeysPrev || !this._bvWinKeysPrev.has(key)) {
-                    newWins.push({ phoneIdx: idx, phoneId: phone.id, stripId: strip.id, rekke });
+                    newWins.push({ phoneIdx: idx, phoneId: phone.id, stripId: strip.id, rekke, online: !!phone.online });
                 }
             });
         });
@@ -5496,9 +5495,10 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         const rekkeLbl = win.rekke === 'Rekke3' ? 'Hele arket'
                        : win.rekke === 'Rekke2' ? '2 rekker'
                        : '1 rekke';
+        const isOffline = win.online === false;
 
         const div = document.createElement('div');
-        div.className = 'bv-win-notice';
+        div.className = 'bv-win-notice' + (isOffline ? ' bv-win-notice-offline' : '');
 
         const icon = document.createElement('div');
         icon.className = 'bv-win-notice-icon';
@@ -5508,7 +5508,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         body.className = 'bv-win-notice-body';
         const title = document.createElement('div');
         title.className = 'bv-win-notice-title';
-        title.textContent = `Bingo! Telefon ${phoneNum}`;
+        title.textContent = `Bingo! Telefon ${phoneNum}${isOffline ? ' (frakoblet)' : ''}`;
         const detail = document.createElement('div');
         detail.className = 'bv-win-notice-detail';
         detail.textContent = `${rekkeLbl} · Kontrollnr ${stripId}`;
