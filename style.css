@@ -3487,12 +3487,21 @@ body.flare-no-pulse-ring .balls.clicked::after { display: none; }
     gap: 4px;
     flex: 1;
     min-width: 160px;
+    align-items: center;
 }
 .frequency-control-label {
     font-size: 0.75rem;
     color: rgba(255,255,255,0.6);
     letter-spacing: 0.04em;
     text-transform: uppercase;
+    text-align: center;
+}
+/* Override the global .session-input width (70px is far too narrow for
+   these dropdowns and clips the option text). */
+.frequency-control .session-input {
+    width: 100%;
+    max-width: 220px;
+    text-align-last: center;
 }
 .frequency-summary {
     padding: 8px 12px;
@@ -3542,6 +3551,15 @@ body.flare-no-pulse-ring .balls.clicked::after { display: none; }
     font-size: 0.78rem;
 }
 .freq-bar-num { text-align: right; color: rgba(255,255,255,0.7); font-variant-numeric: tabular-nums; }
+.freq-bar-row-ranked {
+    grid-template-columns: 38px 32px 1fr 40px;
+}
+.freq-bar-rank {
+    text-align: right;
+    color: rgba(255,255,255,0.45);
+    font-variant-numeric: tabular-nums;
+    font-size: 0.72rem;
+}
 .freq-bar-track {
     height: 14px;
     background: rgba(255,255,255,0.06);

@@ -3213,6 +3213,22 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             };
             wrap.appendChild(mkSection('Topp 10 mest trukket', top));
             wrap.appendChild(mkSection('Bunn 10 minst trukket', bot));
+        } else if (display === 'ranked') {
+            // Every number sorted by frequency (most → least, ties by ascending number)
+            const ranked = [];
+            for (let n = 1; n <= 90; n++) ranked.push({ n, c: counts[n] });
+            ranked.sort((a, b) => b.c - a.c || a.n - b.n);
+            ranked.forEach(({ n, c }, i) => {
+                const row = document.createElement('div');
+                row.className = 'freq-bar-row freq-bar-row-ranked';
+                const pct = max > 0 ? Math.round((c / max) * 100) : 0;
+                row.innerHTML =
+                    `<span class="freq-bar-rank">#${i + 1}</span>` +
+                    `<span class="freq-bar-num">${n}</span>` +
+                    `<div class="freq-bar-track"><div class="freq-bar-fill" style="width:${pct}%"></div></div>` +
+                    `<span class="freq-bar-count">${c}</span>`;
+                wrap.appendChild(row);
+            });
         }
     }
 
