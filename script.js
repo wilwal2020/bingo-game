@@ -61,6 +61,7 @@ const CLICK_JACKPOT_WAV = 'Sounds/click__and_for_clicking_on_a_number_with_jackp
 const CLOSE_WAV = 'Sounds/close.wav';
 const SAVE_CONFIRM_2_WAV = 'Sounds/save_and_confirm_2.wav';
 const OVERTIME_WAV = 'Sounds/when_you_enter_overtime__should_play_after_the_number_click_sound_is_done.wav';
+const FIRSTNUMBER_WAV = 'Sounds/fxprosound-metal-plate-gong-4-248610.wav';
 
 // All bundled sounds available for selection in the upload modal
 const BUNDLED_SOUNDS = [
@@ -82,7 +83,7 @@ const BUNDLED_SOUNDS = [
     { src: SAVE_CONFIRM_2_WAV,    name: 'Save / Confirm 2' },
     { src: OVERTIME_WAV,          name: 'Overtid' },
     { src: 'Sounds/62274159.wav', name: '62274159' },
-    { src: 'Sounds/fxprosound-metal-plate-gong-4-248610.wav', name: 'Metal Plate Gong' },
+    { src: FIRSTNUMBER_WAV,       name: 'Metal Plate Gong' },
 ];
 
 /* =====================================================

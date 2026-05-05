@@ -11,7 +11,18 @@
       "Bash(gh run *)",
       "WebFetch(domain:wilwal2020.github.io)",
       "Bash(start \"\" \"index.html\")",
-      "Bash(awk -F: '$1 < 1050 && $1 > 700')"
+      "Bash(awk -F: '$1 < 1050 && $1 > 700')",
+      "Bash(git -C \"C:/BILDER 2/bilder bra/index.html/bingo modernise - with sounds - bug fix 2\" status)",
+      "Bash(git -C \"C:/BILDER 2/bilder bra/index.html/bingo modernise - with sounds - bug fix 2\" diff --stat)",
+      "Bash(git -C \"C:/BILDER 2/bilder bra/index.html/BingoView\" status)",
+      "Bash(git -C \"C:/BILDER 2/bilder bra/index.html/BingoView\" diff --stat)",
+      "Bash(git -C \"C:/BILDER 2/bilder bra/index.html/bingo modernise - with sounds - bug fix 2\" log --oneline -3)",
+      "Bash(git -C \"C:/BILDER 2/bilder bra/index.html/bingo modernise - with sounds - bug fix 2\" add index.html script.js style.css)",
+      "Bash(git -C 'C:/BILDER 2/bilder bra/index.html/bingo modernise - with sounds - bug fix 2' commit -m ' *)",
+      "Bash(git -C \"C:/BILDER 2/bilder bra/index.html/BingoView\" add index.html)",
+      "Bash(git -C 'C:/BILDER 2/bilder bra/index.html/BingoView' commit -m ' *)",
+      "Bash(git -C \"C:/BILDER 2/bilder bra/index.html/bingo modernise - with sounds - bug fix 2\" push origin master)",
+      "Bash(git -C \"C:/BILDER 2/bilder bra/index.html/BingoView\" push origin main)"
     ]
   }
 }
