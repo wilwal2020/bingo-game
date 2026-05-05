@@ -862,6 +862,11 @@ class BingoApp {
         // Edit session
         this.el.editSessionSave.addEventListener('click',   () => this.saveEditedSession());
         this.el.editSessionCancel.addEventListener('click', () => this.promptUnsavedClose(() => this.closeEditSessionModal()));
+        document.getElementById('edit-session-add-winner').addEventListener('click', () => {
+            const container = document.getElementById('edit-session-winners');
+            const idx = container.children.length;
+            container.appendChild(this.createWinnerRow({ name: '', game: GAME_THEMES[0], rekke: 'Rekke1', ballCount: '' }, idx));
+        });
 
         // Delete confirm
         this.el.deleteConfirm.addEventListener('click', () => this.confirmDelete());
@@ -3704,6 +3709,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         this.resetConfirm = false;
 
         this.updateAverages();
+        this.switchTheme(GAME_THEMES[0]);   // Auto-select game 1 after reset
         this.saveSlotToStorage();
         this.applySlotToDOM();
         this.bvSendReset('all');
@@ -4191,7 +4197,37 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             });
         });
 
+        // Render winner rows
+        this.renderEditSessionWinners(session.winners || []);
+
         this.el.editSessionModal.style.display = 'flex';
+    }
+
+    renderEditSessionWinners(winners) {
+        const container = document.getElementById('edit-session-winners');
+        container.innerHTML = '';
+        (winners || []).forEach((w, i) => container.appendChild(this.createWinnerRow(w, i)));
+    }
+
+    createWinnerRow(w, idx) {
+        const row = document.createElement('div');
+        row.className = 'winner-edit-row';
+        row.dataset.idx = idx;
+        row.innerHTML = `
+            <input type="text" placeholder="Navn" value="${w.name || ''}" data-field="name">
+            <select data-field="game">
+                ${GAME_THEMES.map(t => `<option value="${t}" ${w.game === t ? 'selected' : ''}>${GAME_NAMES[t]}</option>`).join('')}
+            </select>
+            <select data-field="rekke">
+                <option value="Rekke1" ${w.rekke === 'Rekke1' ? 'selected' : ''}>Rekke 1</option>
+                <option value="Rekke2" ${w.rekke === 'Rekke2' ? 'selected' : ''}>Rekke 2</option>
+                <option value="Rekke3" ${w.rekke === 'Rekke3' ? 'selected' : ''}>Rekke 3</option>
+            </select>
+            <input type="number" placeholder="Tall" min="1" max="90" value="${w.ballCount || ''}" data-field="ballCount" title="Antall tall trukket">
+            <button type="button" class="winner-remove-btn" title="Fjern">&times;</button>
+        `;
+        row.querySelector('.winner-remove-btn').addEventListener('click', () => row.remove());
+        return row;
     }
 
     saveEditedSession() {
@@ -4208,6 +4244,27 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         });
 
         sessions[this.editingSessionIdx].games = GAME_THEMES.map(t => games[t]);
+
+        // Collect winners from the editor rows
+        const winnerRows = document.querySelectorAll('#edit-session-winners .winner-edit-row');
+        const winners = [];
+        winnerRows.forEach(row => {
+            const name = row.querySelector('[data-field="name"]').value.trim();
+            const game = row.querySelector('[data-field="game"]').value;
+            const rekke = row.querySelector('[data-field="rekke"]').value;
+            const ballCount = Number(row.querySelector('[data-field="ballCount"]').value) || null;
+            if (name || ballCount) {
+                winners.push({
+                    name: name || 'Ukjent',
+                    game,
+                    gameName: GAME_NAMES[game],
+                    rekke,
+                    ballCount,
+                    date: sessions[this.editingSessionIdx].date
+                });
+            }
+        });
+        sessions[this.editingSessionIdx].winners = winners;
 
         // Save edited date if the user changed it
         const rawDt = this.el.editSessionDateInput.value;
@@ -4360,6 +4417,8 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
     // ── Next-game countdown ──────────────────────────
     startNextGameCountdown() {
         if (!this.settings.nextGameCountdownEnabled) return;
+        // Don't show timer after the LAST game (game 4 / grey)
+        if (this.currentTheme === GAME_THEMES[GAME_THEMES.length - 1]) return;
         this.stopNextGameCountdown();
         const totalSeconds = (this.settings.nextGameCountdownMinutes ?? 3) * 60
                            + (this.settings.nextGameCountdownSeconds ?? 0);

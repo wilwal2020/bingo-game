@@ -1549,6 +1549,42 @@ select.session-input option {
     box-shadow:   0 0 0 2px rgba(var(--accent-rgb),.25);
 }
 
+/* Winner editor rows inside the edit-session modal */
+.winner-edit-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    padding: 6px 8px;
+    background: rgba(255,255,255,.04);
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: var(--btn-radius-sm, 6px);
+    margin-bottom: 6px;
+}
+.winner-edit-row input,
+.winner-edit-row select {
+    background: rgba(255,255,255,.07);
+    border: 1px solid rgba(255,255,255,.15);
+    border-radius: 4px;
+    color: #fff;
+    font-family: inherit;
+    font-size: .78rem;
+    padding: 4px 6px;
+}
+.winner-edit-row input[type="text"] { flex: 1; min-width: 80px; max-width: 140px; }
+.winner-edit-row input[type="number"] { width: 56px; }
+.winner-edit-row select { min-width: 70px; }
+.winner-edit-row .winner-remove-btn {
+    background: transparent;
+    border: none;
+    color: #c44;
+    font-size: 1.1rem;
+    cursor: pointer;
+    padding: 2px 6px;
+    line-height: 1;
+}
+.winner-edit-row .winner-remove-btn:hover { color: #f66; }
+
 /* Fullscreen button */
 .fullscreen-btn {
     position:         fixed;
