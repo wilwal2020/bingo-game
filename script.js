@@ -4944,6 +4944,33 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             if (e.target === modal) this.closeBingoViewModal();
         });
 
+        // Custom code input — load saved code and wire up apply button
+        const customInput = document.getElementById('bv-custom-code');
+        const applyBtn = document.getElementById('bv-apply-code');
+        if (customInput && applyBtn) {
+            try { customInput.value = localStorage.getItem('bv_customCode') || ''; } catch(e) {}
+            applyBtn.addEventListener('click', () => {
+                const val = customInput.value.trim();
+                if (!val) {
+                    // Clear custom code → next refresh uses random
+                    this.bvClearCustomCode();
+                    // Force reconnect with random code
+                    this._bvCode = null;
+                    if (this._bvChannelRef) { try { this._bvChannelRef.off(); } catch(e) {} this._bvChannelRef = null; }
+                    this.bvConnect();
+                    const el = document.getElementById('bv-code-display');
+                    if (el) el.textContent = this._bvCode;
+                    const qrEl = document.getElementById('bv-qr-code');
+                    if (qrEl) { qrEl.innerHTML = ''; qrEl._qrDone = false; }
+                    this.openBingoViewModal();
+                } else if (val.length < 4) {
+                    alert('Koden må ha minst 4 tegn');
+                } else {
+                    this.bvSetCustomCode(val);
+                }
+            });
+        }
+
         // Load Firebase SDK dynamically
         if (!window.firebase) {
             const cfg = {
@@ -4999,10 +5026,45 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
 
     bvGenerateCode() {
         if (this._bvCode) return this._bvCode;
-        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-        this._bvCode = Array.from({length: 6}, () =>
-            chars[Math.floor(Math.random() * chars.length)]).join('');
+        // Check for persisted custom code first
+        let custom = '';
+        try { custom = (localStorage.getItem('bv_customCode') || '').trim().toUpperCase(); } catch(e) {}
+        if (custom && custom.length >= 4) {
+            this._bvCode = custom;
+        } else {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            this._bvCode = Array.from({length: 6}, () =>
+                chars[Math.floor(Math.random() * chars.length)]).join('');
+        }
         return this._bvCode;
+    }
+
+    bvSetCustomCode(code) {
+        const clean = (code || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+        if (clean.length < 4) return false;
+        try { localStorage.setItem('bv_customCode', clean); } catch(e) {}
+        // Force reconnect with new code
+        this._bvCode = null;
+        if (this._bvChannelRef) {
+            try { this._bvChannelRef.off(); } catch(e) {}
+            this._bvChannelRef = null;
+        }
+        this.bvConnect();
+        // Update display
+        const el = document.getElementById('bv-code-display');
+        if (el) el.textContent = this._bvCode;
+        // Regenerate QR
+        const qrEl = document.getElementById('bv-qr-code');
+        if (qrEl) {
+            qrEl.innerHTML = '';
+            qrEl._qrDone = false;
+        }
+        this.openBingoViewModal();
+        return true;
+    }
+
+    bvClearCustomCode() {
+        try { localStorage.removeItem('bv_customCode'); } catch(e) {}
     }
 
     closeBingoViewModal() {
