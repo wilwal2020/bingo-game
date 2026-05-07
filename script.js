@@ -5128,6 +5128,19 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                     ...Object.keys(this._bvLivePhones),
                     ...Object.keys(this._bvPersistedPapers),
                 ]);
+
+                // Build a set of base phone IDs that are truly online
+                // (have a ts field, meaning they registered proper presence).
+                const onlineBaseIds = new Set();
+                Object.entries(this._bvLivePhones).forEach(([id, data]) => {
+                    // Only count phones with a real ts as online
+                    if (data && data.ts) {
+                        // Extract base ID (strip _bN suffix if present)
+                        const baseId = id.replace(/_b\d+$/, '');
+                        onlineBaseIds.add(baseId);
+                    }
+                });
+
                 let phoneList = [...ids].map(id => {
                     const live = this._bvLivePhones[id];
                     const livePapers = (live && live.papers) || {};
@@ -5137,9 +5150,17 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                     const papers = { ...persistedPapers, ...livePapers };
                     const meta = this._bvPapersMeta[id] || {};
                     const userName = ((live && live.userName) || meta.userName || '').toString().trim();
+
+                    // A phone is online only if it (or its base phone) has real
+                    // presence. Virtual block phones (ABC_b1, ABC_b2) follow
+                    // their base phone's status — if the base phone disconnected,
+                    // all its blocks are offline too.
+                    const baseId = id.replace(/_b\d+$/, '');
+                    const isOnline = !!live && onlineBaseIds.has(baseId);
+
                     return {
                         id,
-                        online: !!live,
+                        online: isOnline,
                         ts: (live && live.ts) || 0,
                         lastSeen: meta.lastSeen || 0,
                         papers,
@@ -5159,7 +5180,12 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                 phoneList = this._bvDedupeOfflineDuplicates(phoneList);
 
                 this._bvPhones = phoneList;
-                const onlineCount = phoneList.filter(p => p.online).length;
+                // Count unique online DEVICES (not blocks) — strip _bN suffix
+                const onlineDevices = new Set();
+                phoneList.forEach(p => {
+                    if (p.online) onlineDevices.add(p.id.replace(/_b\d+$/, ''));
+                });
+                const onlineCount = onlineDevices.size;
                 this._bvOnlineCount = onlineCount;
                 this._bvUpdatePresenceUI(onlineCount);
                 if (onlineCount > 0) this.bvSendState();
