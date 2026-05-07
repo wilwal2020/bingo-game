@@ -5337,8 +5337,15 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         // Only ping if at least one paper for this game is OFFLINE — the
         // online phones already get visible feedback on their own screens,
         // so a badge on the ball would just be noise.
-        const offlinePapers = phones.filter(p => !p.online && Array.isArray((p.papers || {})[game])).length;
-        if (offlinePapers === 0) return;
+        // Count unique offline DEVICES with papers (not individual block entries)
+        const offlineDevices = new Set();
+        phones.forEach(p => {
+            if (!p.online && Array.isArray((p.papers || {})[game])) {
+                offlineDevices.add(p.id.replace(/_b\d+$/, ''));
+            }
+        });
+        if (offlineDevices.size === 0) return;
+        const offlinePapers = offlineDevices.size;
         const ball = this._bvBallMap()[number];
         if (!ball) return;
         // Remove any prior badge so the animation can restart
