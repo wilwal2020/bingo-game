@@ -4525,11 +4525,8 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             stored[key] = { src: base64, name, categories };
             localStorage.setItem('bingoUserSounds', JSON.stringify(stored));
 
-            // Preload into audio pool
-            const audio = new Audio(base64);
-            audio.preload = 'auto';
-            if (!this._audioPool) this._audioPool = {};
-            this._audioPool[key] = audio;
+            // Decode into AudioBuffer cache for instant first-play
+            this._decodeAndCacheWav(key, base64);
 
             // Inject into relevant dropdowns
             this.injectUserSoundOptions();
@@ -4544,7 +4541,8 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
     previewBundledSound() {
         const src = this.el.bundledSoundSelect.value;
         if (!src) return;
-        new Audio(src).play().catch(() => {});
+        // Use the buffered playback path to avoid leaking HTMLAudioElements
+        this.playWav(src, 'preview_' + src, 1.0);
     }
 
     useBundledSound() {
@@ -4566,10 +4564,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         stored[key] = { src, name, categories };
         localStorage.setItem('bingoUserSounds', JSON.stringify(stored));
 
-        if (!this._audioPool) this._audioPool = {};
-        const audio = new Audio(src);
-        audio.preload = 'auto';
-        this._audioPool[key] = audio;
+        this._decodeAndCacheWav(key, src);
 
         this.injectUserSoundOptions();
         this.closeUploadSoundModal();
@@ -4621,13 +4616,25 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         });
     }
 
+    // Decode a WAV into the AudioBuffer cache so the first play is instant.
+    // Silently no-ops if AudioContext isn't available yet.
+    _decodeAndCacheWav(key, src) {
+        if (!this._wavBuffers) this._wavBuffers = {};
+        if (this._wavBuffers[key]) return;
+        try {
+            const ctx = this.getAudioContext();
+            fetch(src)
+                .then(r => r.arrayBuffer())
+                .then(ab => ctx.decodeAudioData(ab))
+                .then(buf => { this._wavBuffers[key] = buf; })
+                .catch(() => {});
+        } catch (e) { /* AudioContext not ready */ }
+    }
+
     loadUserSoundsIntoPool() {
         const sounds = this.getUserSounds();
-        if (!this._audioPool) this._audioPool = {};
         Object.entries(sounds).forEach(([key, data]) => {
-            const audio = new Audio(data.src);
-            audio.preload = 'auto';
-            this._audioPool[key] = audio;
+            this._decodeAndCacheWav(key, data.src);
         });
         this.injectUserSoundOptions();
     }
@@ -4652,26 +4659,59 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             save_confirm_2:    SAVE_CONFIRM_2_WAV,
             overtime:          OVERTIME_WAV,
         };
-        if (!this._audioPool) this._audioPool = {};
         Object.entries(wavs).forEach(([key, src]) => {
-            const audio = new Audio(src);
-            audio.preload = 'auto';
-            this._audioPool[key] = audio;
+            this._decodeAndCacheWav(key, src);
         });
     }
 
+    // Play a WAV via the Web Audio API. Decodes the file once into an
+    // AudioBuffer (cached by key) and plays each instance through a fresh
+    // BufferSource node which the browser auto-GCs when finished.
+    //
+    // This replaces the old HTMLAudioElement.cloneNode() approach, which
+    // accumulated detached audio elements and exhausted iOS Safari's
+    // decoder slots on long sessions — causing sound effects to cut out
+    // (only the tail playing) after ~30-90 calls on iPad.
     playWav(src, cacheKey, volume = 1.0) {
-        if (!this._audioPool) this._audioPool = {};
-        let audio = this._audioPool[cacheKey];
-        if (!audio) {
-            audio = new Audio(src);
-            audio.preload = 'auto';
-            this._audioPool[cacheKey] = audio;
+        if (!this._wavBuffers)   this._wavBuffers   = {};
+        if (!this._wavLoading)   this._wavLoading   = {};
+        const ctx = this.getAudioContext();
+        if (ctx.state === 'suspended') ctx.resume();
+
+        const playBuffer = (buf) => {
+            try {
+                const src = ctx.createBufferSource();
+                src.buffer = buf;
+                const g = ctx.createGain();
+                g.gain.value = Math.min(1, Math.max(0, volume));
+                src.connect(g); g.connect(ctx.destination);
+                src.start(0);
+                // Cleanup: disconnect once the source finishes so nodes don't
+                // pile up across thousands of plays.
+                src.onended = () => { try { src.disconnect(); g.disconnect(); } catch (e) {} };
+            } catch (e) { /* ignore */ }
+        };
+
+        const cached = this._wavBuffers[cacheKey];
+        if (cached) { playBuffer(cached); return; }
+
+        // De-dupe parallel loads of the same key
+        if (this._wavLoading[cacheKey]) {
+            this._wavLoading[cacheKey].push(playBuffer);
+            return;
         }
-        // Clone so overlapping plays work (e.g. rapid hover)
-        const clone = audio.cloneNode();
-        clone.volume = Math.min(1, Math.max(0, volume));
-        clone.play().catch(() => {});
+        this._wavLoading[cacheKey] = [playBuffer];
+
+        fetch(src)
+            .then(r => r.arrayBuffer())
+            .then(ab => ctx.decodeAudioData(ab))
+            .then(buf => {
+                this._wavBuffers[cacheKey] = buf;
+                const queue = this._wavLoading[cacheKey] || [];
+                delete this._wavLoading[cacheKey];
+                queue.forEach(fn => fn(buf));
+            })
+            .catch(() => { delete this._wavLoading[cacheKey]; });
     }
 
     playSound(type) {
