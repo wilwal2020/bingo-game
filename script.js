@@ -5072,10 +5072,17 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                 s2.onload = () => {
                     firebase.initializeApp(cfg);
                     console.log('[BV] Firebase initialized');
+                    // Auto-connect so phones can join even if the modal
+                    // hasn't been opened yet. The code is the same whether
+                    // we generate it now or on first modal open.
+                    if (!this._bvChannelRef) this.bvConnect();
                 };
                 document.head.appendChild(s2);
             };
             document.head.appendChild(s1);
+        } else if (window.firebase && window.firebase.database) {
+            // Firebase already loaded (e.g. hot reload) — connect immediately
+            if (!this._bvChannelRef) this.bvConnect();
         }
     }
 
@@ -5582,8 +5589,11 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         // Clear previous styling on every ball
         const ballMap = this._bvBallMap();
         Object.values(ballMap).forEach(el => {
-            el.classList.remove('bv-watch', 'bv-pulse');
+            el.classList.remove('bv-watch', 'bv-pulse', 'bv-watch-flip');
             el.style.removeProperty('--bv-rings');
+            // Remove old name labels
+            const oldLabel = el.querySelector('.bv-watch-names');
+            if (oldLabel) oldLabel.remove();
         });
 
         const phones = this._bvPhones || [];
@@ -5595,7 +5605,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         const threshold = this.settings.bvHighlightThreshold ?? 2;
         const game  = this.currentTheme;
 
-        // Aggregate: { number: [{phoneIdx, level}, ...] }
+        // Aggregate: { number: [{phoneIdx, level, color, name}, ...] }
         const byBall = {};
         // For modal rendering, also collect close strips per phone
         const phoneRows = [];
@@ -5605,6 +5615,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             const papers = phone.papers || {};
             const strips = papers[game];
             const closeStrips = [];
+            const displayName = (phone.userName || '').trim() || `Telefon ${idx + 1}`;
 
             if (highlightOn && Array.isArray(strips)) {
                 strips.forEach(strip => {
@@ -5613,7 +5624,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                         closeStrips.push({ id: strip.id, ...info });
                         info.numbers.forEach(num => {
                             if (!byBall[num]) byBall[num] = [];
-                            byBall[num].push({ phoneIdx: idx, color, level: info.level });
+                            byBall[num].push({ phoneIdx: idx, color, level: info.level, name: displayName });
                         });
                     });
                 });
@@ -5640,6 +5651,36 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             if (entries.some(e => e.level === 'strong')) {
                 ball.classList.add('bv-pulse');
             }
+
+            // Add name label(s) beside the ball — dedupe per phone (a phone can
+            // appear multiple times if multiple strips need this same number).
+            const seen = new Set();
+            const uniqueEntries = entries.filter(e => {
+                if (seen.has(e.phoneIdx)) return false;
+                seen.add(e.phoneIdx); return true;
+            });
+            const label = document.createElement('div');
+            label.className = 'bv-watch-names';
+            uniqueEntries.forEach(e => {
+                const tag = document.createElement('span');
+                tag.className = 'bv-watch-name';
+                tag.textContent = e.name;
+                tag.style.setProperty('--bv-name-color', e.color);
+                label.appendChild(tag);
+            });
+            ball.appendChild(label);
+        });
+
+        // After labels render, flip to left side any that would overflow
+        // off the right edge of the viewport.
+        requestAnimationFrame(() => {
+            const vw = window.innerWidth;
+            document.querySelectorAll('.balls.bv-watch').forEach(ball => {
+                const lbl = ball.querySelector('.bv-watch-names');
+                if (!lbl) return;
+                const r = lbl.getBoundingClientRect();
+                if (r.right > vw - 4) ball.classList.add('bv-watch-flip');
+            });
         });
 
         // Win detection — fires a one-time notification per (phone, game, rekke,
