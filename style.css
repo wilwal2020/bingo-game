@@ -59,8 +59,36 @@
     box-sizing: border-box;
 }
 
-/* Theme colour transitions — short enough to feel snappy, long enough to look smooth */
-*, *::before, *::after {
+/* Theme colour transitions — scoped to actual themed components instead of every
+   element on the page (the universal selector forced thousands of nodes to set
+   up transitions on each class toggle). */
+body,
+button,
+input,
+textarea,
+select,
+.flex-container,
+.flex-item,
+.balls,
+.theme-button,
+.rekke-btn,
+.rekke-confirm-btn,
+.circle,
+.number-box,
+.session-input,
+.modal,
+.modal-content,
+.modal-btn,
+.dropbtn,
+.dropdown-content,
+.dropdown-content a,
+.player-chip,
+.winner-selected-tag,
+.frequency-cell,
+.settings-row,
+.settings-toggle-track,
+.settings-panel,
+.bv-phone-row {
     transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease;
 }
 
@@ -428,7 +456,7 @@ body.layout-vertical #jackpot-btn-cell {
     margin:          0 auto 30px;
     position:        relative;
     text-shadow:     0 2px 24px rgba(0,0,0,.8);
-    transition:      all .3s ease;
+    transition:      color .3s ease, background-color .3s ease, transform .3s ease, box-shadow .3s ease;
     filter:          drop-shadow(0 0 1px rgba(255,255,255,.05));
 }
 
@@ -3224,10 +3252,21 @@ option.user-sound {
     position:       absolute;
     width:          480px;
     height:         320px;
+    left:           var(--blob-x, 50%);
+    top:            var(--blob-y, 80%);
     border-radius:  50%;
     filter:         blur(100px);
     opacity:        var(--flare-aurora-opacity, .07);
-    transform:      translate(-50%, -50%);
+    will-change:    transform;
+    animation:      flare-aurora-drift 24s ease-in-out infinite;
+}
+
+@keyframes flare-aurora-drift {
+    0%   { transform: translate(-50%, -50%); }
+    25%  { transform: translate(calc(-50% + 10%), calc(-50% + 5%)); }
+    50%  { transform: translate(-50%, calc(-50% - 5%)); }
+    75%  { transform: translate(calc(-50% - 10%), calc(-50% + 5%)); }
+    100% { transform: translate(-50%, -50%); }
 }
 
 /* ── Header shimmer ─────────────────────────────────────── */
@@ -3235,19 +3274,23 @@ option.user-sound {
 
 .flare-header-shimmer {
     position:       absolute;
-    top: 0; left: -80%; width: 55%; height: 100%;
+    top: 0; left: 0; width: 55%; height: 100%;
     background:     linear-gradient(to right,
                         transparent 0%,
                         rgba(255,255,255,.10) 50%,
                         transparent 100%);
     pointer-events: none;
     z-index:        100;
+    will-change:    transform;
+    transform:      translateX(-145%);
     animation:      flare-shimmer-sweep 1.4s ease-in-out forwards;
 }
 
+/* Animating transform stays on the compositor (no layout). The original
+   keyframes animated `left`, which forced layout every frame. */
 @keyframes flare-shimmer-sweep {
-    0%   { left: -80%; }
-    100% { left: 200%; }
+    0%   { transform: translateX(-145%); }
+    100% { transform: translateX(364%); }
 }
 
 /* ── Ball-click ripple ──────────────────────────────────── */
