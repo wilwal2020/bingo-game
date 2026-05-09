@@ -1866,7 +1866,11 @@ class BingoApp {
         const isWhite = !!this._fillIsWhite;
         this._progressCompleted = false;
 
-        // Read initial colours for background setup (will also be read live per-frame)
+        // Read initial colours for background setup. We snapshot the accent
+        // once at run start instead of re-reading each frame: getComputedStyle
+        // forces a style flush, which on iPad costs measurable time at 60fps.
+        // Live accent edits during a single ~5s progress run are vanishingly
+        // rare; the next call picks up the new value.
         const initAccent = getComputedStyle(document.body)
             .getPropertyValue('--accent-color').trim() || '#F1B924';
         const initBgColor = isWhite ? initAccent : '#ffffff';
@@ -1886,14 +1890,12 @@ class BingoApp {
 
         const ctx = canvas.getContext('2d');
         const startTime = performance.now();
+        const fillColor = isWhite ? '#ffffff' : initAccent;
+        const bigNumberBg = isWhite ? initAccent : '#ffffff';
+        // Apply once; no need to re-set every frame
+        this.el.bigNumber.style.backgroundColor = bigNumberBg;
 
         const drawFrame = (p, elapsed) => {
-            // Re-read accent each frame so live colour changes are reflected immediately
-            const liveAccent = getComputedStyle(document.body)
-                .getPropertyValue('--accent-color').trim() || '#F1B924';
-            const fillColor = isWhite ? '#ffffff' : liveAccent;
-            this.el.bigNumber.style.backgroundColor = isWhite ? liveAccent : '#ffffff';
-
             const w = canvas.width, h = canvas.height;
             ctx.clearRect(0, 0, w, h);
             ctx.fillStyle = fillColor;
@@ -2418,9 +2420,9 @@ class BingoApp {
             winners: this.getPendingWinners(),
         };
 
-        const sessions = this.getSessions();
+        const sessions = this.getSessions().slice();
         sessions.push(session);
-        localStorage.setItem('bingoSessions', JSON.stringify(sessions));
+        this.saveSessions(sessions);
 
         // Record called-number history (used by frequency heatmap).
         // Snapshots numbers from each game slot at session-save time.
@@ -2545,44 +2547,70 @@ class BingoApp {
         this.updateWinnerModalState();
     }
 
+    // Build the chip list once per player set. Subsequent typing only updates
+    // CSS classes / highlight spans on the existing chips — no DOM rebuild,
+    // no listener churn. Click is handled via delegation on the container.
     renderPlayerQuickselect() {
         const players   = this.getPlayers();
         const container = this.el.playerQuickselect;
-        const query     = this.el.winnerNameInput.value.trim().toLowerCase();
-        container.innerHTML = '';
-        players.forEach(name => {
-            const isSelected = this.winnerSelectedPlayers.includes(name);
-            const chip = document.createElement('button');
-            chip.className = 'player-chip' + (isSelected ? ' active' : '');
 
-            // Highlight matching letters in the name
-            if (query && name.toLowerCase().includes(query)) {
-                const idx  = name.toLowerCase().indexOf(query);
-                const pre  = name.slice(0, idx);
-                const match = name.slice(idx, idx + query.length);
-                const post = name.slice(idx + query.length);
-                chip.innerHTML = `${pre}<span class="chip-match">${match}</span>${post}`;
-            } else {
-                chip.textContent = name;
-            }
-            chip.addEventListener('click', () => {
-                const idx = this.winnerSelectedPlayers.indexOf(name);
-                if (idx > -1) {
-                    // Deselect
-                    this.winnerSelectedPlayers.splice(idx, 1);
-                } else {
-                    // Only select if slots available
-                    const slotsUsed = this.winnerSelectedPlayers.length + (this.el.winnerNameInput.value.trim() ? 0 : 0);
-                    if (this.winnerSelectedPlayers.length < this.winnerSplitCount) {
+        const playersKey = players.join('\x1f');
+        const needsRebuild = container._playersKey !== playersKey;
+
+        if (needsRebuild) {
+            container._playersKey = playersKey;
+            container.innerHTML = '';
+            players.forEach(name => {
+                const chip = document.createElement('button');
+                chip.className = 'player-chip';
+                chip.dataset.name = name;
+                // Pre-build the highlight wrapper inside the chip so we can
+                // restyle without recreating elements on every keystroke.
+                const text = document.createElement('span');
+                text.className = 'chip-text';
+                text.textContent = name;
+                chip.appendChild(text);
+                container.appendChild(chip);
+            });
+
+            // One-time delegated click handler
+            if (!container._delegatedClick) {
+                container._delegatedClick = true;
+                container.addEventListener('click', e => {
+                    const chip = e.target.closest('.player-chip');
+                    if (!chip || !container.contains(chip)) return;
+                    const name = chip.dataset.name;
+                    const idx  = this.winnerSelectedPlayers.indexOf(name);
+                    if (idx > -1) {
+                        this.winnerSelectedPlayers.splice(idx, 1);
+                    } else if (this.winnerSelectedPlayers.length < this.winnerSplitCount) {
                         this.winnerSelectedPlayers.push(name);
                     }
-                }
-                this.renderPlayerQuickselect();
-                this.renderWinnerSelectedList();
-                this.updateWinnerModalState();
-            });
-            container.appendChild(chip);
-        });
+                    this.renderPlayerQuickselect();
+                    this.renderWinnerSelectedList();
+                    this.updateWinnerModalState();
+                });
+            }
+        }
+
+        // Update each chip's selected/highlight state in place
+        const query = this.el.winnerNameInput.value.trim().toLowerCase();
+        const chips = container.children;
+        for (let i = 0; i < chips.length; i++) {
+            const chip = chips[i];
+            const name = chip.dataset.name;
+            chip.classList.toggle('active', this.winnerSelectedPlayers.includes(name));
+            const text = chip.firstElementChild;
+            if (query && name.toLowerCase().includes(query)) {
+                const idx   = name.toLowerCase().indexOf(query);
+                const pre   = name.slice(0, idx);
+                const match = name.slice(idx, idx + query.length);
+                const post  = name.slice(idx + query.length);
+                text.innerHTML = `${pre}<span class="chip-match">${match}</span>${post}`;
+            } else if (text.textContent !== name) {
+                text.textContent = name;
+            }
+        }
     }
 
     renderWinnerSelectedList() {
@@ -3018,9 +3046,23 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
     }
 
     getSessions() {
+        // Parsed result is cached because getSessions() is called from many
+        // places (~14) and the JSON grows linearly with session history. The
+        // cache is invalidated by saveSessions() and any other site that
+        // writes to 'bingoSessions'. Callers must NOT mutate the returned
+        // array — treat it as read-only. Use saveSessions() to persist.
+        if (this._sessionsCache) return this._sessionsCache;
         try {
-            return JSON.parse(localStorage.getItem('bingoSessions') || '[]');
-        } catch(e) { return []; }
+            this._sessionsCache = JSON.parse(localStorage.getItem('bingoSessions') || '[]');
+        } catch(e) {
+            this._sessionsCache = [];
+        }
+        return this._sessionsCache;
+    }
+
+    saveSessions(sessions) {
+        this._sessionsCache = sessions;
+        localStorage.setItem('bingoSessions', JSON.stringify(sessions));
     }
 
     getCallHistory() {
@@ -3654,7 +3696,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                 // Only add sessions whose date doesn't already exist
                 const toAdd = imported.filter(s => !existDates.has(s.date));
                 const merged = [...existing, ...toAdd];
-                localStorage.setItem('bingoSessions', JSON.stringify(merged));
+                this.saveSessions(merged);
 
                 this.renderSessionList();
                 this.updateAverages();
@@ -4272,7 +4314,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             sessions[this.editingSessionIdx].date = new Date(rawDt).toISOString();
         }
 
-        localStorage.setItem('bingoSessions', JSON.stringify(sessions));
+        this.saveSessions(sessions);
 
         this.closeEditSessionModal();
         this.renderSessionList();
@@ -4297,9 +4339,9 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
 
     confirmDelete() {
         this.playSound('confirm');
-        const sessions = this.getSessions();
+        const sessions = this.getSessions().slice();
         sessions.splice(this.deletingSessionIdx, 1);
-        localStorage.setItem('bingoSessions', JSON.stringify(sessions));
+        this.saveSessions(sessions);
         this.closeDeleteModal();
         this.renderSessionList();
         this.updateAverages();
@@ -5037,28 +5079,51 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         }
     }
 
+    _loadQRCodeLib() {
+        if (window.QRCode) return Promise.resolve();
+        if (this._qrLoadPromise) return this._qrLoadPromise;
+        this._qrLoadPromise = new Promise((resolve, reject) => {
+            const s = document.createElement('script');
+            s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+            s.onload  = () => resolve();
+            s.onerror = () => { this._qrLoadPromise = null; reject(new Error('QR lib failed to load')); };
+            document.head.appendChild(s);
+        });
+        return this._qrLoadPromise;
+    }
+
     openBingoViewModal() {
         const modal = document.getElementById('bingoview-modal');
         modal.style.display = 'flex';
         document.body.style.overflow = 'hidden';
 
+        // Render the phones section now that the modal is visible. We skip
+        // rendering on Firebase snapshots while the modal is hidden, so this
+        // catches up on whatever the latest state is.
+        try { this._bvUpdatePaperHighlights(); } catch(e) {}
+
         const code = this.bvGenerateCode();
         const el = document.getElementById('bv-code-display');
         if (el) el.textContent = code;
 
-        // Generate QR code pointing to BingoView with the code pre-filled
+        // Generate QR code pointing to BingoView with the code pre-filled.
+        // qrcode.min.js is lazy-loaded the first time the BingoView modal
+        // opens — it's only used here, so loading it on every page hit was
+        // pure render-blocking weight on the critical path.
         const qrEl = document.getElementById('bv-qr-code');
         if (qrEl && !qrEl._qrDone) {
             qrEl._qrDone = true;
             const bvUrl = 'https://wilwal2020.github.io/BingoView/?code=' + code;
-            new QRCode(qrEl, {
-                text:         bvUrl,
-                width:        160,
-                height:       160,
-                colorDark:    '#000000',
-                colorLight:   '#ffffff',
-                correctLevel: QRCode.CorrectLevel.M
-            });
+            this._loadQRCodeLib().then(() => {
+                new QRCode(qrEl, {
+                    text:         bvUrl,
+                    width:        160,
+                    height:       160,
+                    colorDark:    '#000000',
+                    colorLight:   '#ffffff',
+                    correctLevel: QRCode.CorrectLevel.M
+                });
+            }).catch(() => { qrEl._qrDone = false; });
         }
 
         if (!this._bvChannelRef) this.bvConnect();
@@ -5590,6 +5655,22 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         const list    = document.getElementById('bv-phones-list');
         if (!section || !list) return;
 
+        // Skip the entire DOM rebuild when the BingoView modal isn't visible.
+        // Firebase snapshots fire several times per second during play and the
+        // phones modal is closed almost always — building hundreds of nodes
+        // into a hidden container is wasted work and a source of detached-node
+        // accumulation. The next openBingoViewModal call triggers a fresh
+        // recompute via _bvUpdatePaperHighlights.
+        const modal = document.getElementById('bingoview-modal');
+        const modalVisible = modal && modal.style.display === 'flex';
+        if (!modalVisible) {
+            // Cache the latest rows so we can render on open without waiting
+            // for the next snapshot.
+            this._bvPendingRows = rows;
+            return;
+        }
+        this._bvPendingRows = null;
+
         if (!rows.length) {
             section.style.display = 'none';
             list.innerHTML = '';
@@ -5597,6 +5678,31 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         }
         section.style.display = '';
         list.innerHTML = '';
+
+        // One-time delegated click handler for the delete buttons. Beats
+        // attaching a fresh listener on every row of every render.
+        if (!list._bvDelegatedClick) {
+            list._bvDelegatedClick = true;
+            list.addEventListener('click', e => {
+                const del = e.target.closest('.bv-phone-delete-btn');
+                if (!del || !list.contains(del)) return;
+                e.stopPropagation();
+                const phoneId = del.dataset.phoneId;
+                if (!phoneId) return;
+                if (del.dataset.confirming === '1') {
+                    this.bvDeletePersistedPhone(phoneId);
+                } else {
+                    del.dataset.confirming = '1';
+                    del.textContent = 'Bekreft?';
+                    del.classList.add('bv-phone-delete-confirm');
+                    setTimeout(() => {
+                        del.dataset.confirming = '';
+                        del.textContent = 'Slett';
+                        del.classList.remove('bv-phone-delete-confirm');
+                    }, 2500);
+                }
+            });
+        }
 
         // Did a call just happen? If so, the offline rows below get a brief
         // pulse animation as feedback that the system is still processing
@@ -5660,27 +5766,13 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
 
             div.appendChild(info);
 
-            // Slett button for offline persisted phones
+            // Slett button for offline persisted phones (handled via delegation above)
             if (row.online === false && row.phoneId) {
                 const del = document.createElement('button');
                 del.className = 'bv-phone-delete-btn';
                 del.title = 'Slett ark for denne frakoblede telefonen';
                 del.textContent = 'Slett';
-                del.addEventListener('click', e => {
-                    e.stopPropagation();
-                    if (del.dataset.confirming === '1') {
-                        this.bvDeletePersistedPhone(row.phoneId);
-                    } else {
-                        del.dataset.confirming = '1';
-                        del.textContent = 'Bekreft?';
-                        del.classList.add('bv-phone-delete-confirm');
-                        setTimeout(() => {
-                            del.dataset.confirming = '';
-                            del.textContent = 'Slett';
-                            del.classList.remove('bv-phone-delete-confirm');
-                        }, 2500);
-                    }
-                });
+                del.dataset.phoneId = row.phoneId;
                 div.appendChild(del);
             }
 
@@ -5918,6 +6010,10 @@ document.addEventListener('DOMContentLoaded', () => { window.bingoApp = new Bing
 
         scheduleNextStar();
         scheduleNextShimmer();
+        // Toggling particles/rain/stars on must wake the rAF loop
+        if (typeof ensureLoopRunning === 'function') ensureLoopRunning();
+        // Cursor-trail toggle binds/unbinds its mousemove listener
+        if (typeof syncCursorTrailBinding === 'function') syncCursorTrailBinding();
     }
 
     const MAX_PARTS = 100;
@@ -5967,11 +6063,41 @@ document.addEventListener('DOMContentLoaded', () => { window.bingoApp = new Bing
         clearTimeout(starTimer);
         if (!S.shootingStars) return;
         const delay = (S.shootingStarsFreq || 10) * 1000 * (0.5 + Math.random());
-        starTimer = setTimeout(() => { spawnStar(); scheduleNextStar(); }, delay);
+        starTimer = setTimeout(() => {
+            spawnStar();
+            ensureLoopRunning();
+            scheduleNextStar();
+        }, delay);
+    }
+
+    let rafHandle = 0;
+    let canvasCleared = false;
+
+    function loopActive() {
+        // Aurora blobs animate via CSS keyframes now, so they don't drive the loop.
+        // Only canvas-based effects (particles / rain / shooting stars) need rAF.
+        return S.particles || S.numberRain || S.shootingStars || stars.length > 0;
     }
 
     function mainLoop() {
+        rafHandle = 0;
+
+        if (document.hidden) {
+            // Re-enter when the tab is visible again
+            return;
+        }
+
+        if (!loopActive()) {
+            // Clear once on the way down so leftover pixels don't stick
+            if (!canvasCleared) {
+                ctx.clearRect(0, 0, W, H);
+                canvasCleared = true;
+            }
+            return;
+        }
+
         ctx.clearRect(0, 0, W, H);
+        canvasCleared = false;
         const [r, g, b] = cachedRGB;
 
         const pCount = S.particles
@@ -6004,8 +6130,13 @@ document.addEventListener('DOMContentLoaded', () => { window.bingoApp = new Bing
             ctx.fillText(d.num, d.x, d.y);
         }
 
-        if (S.shootingStars) {
-            stars = stars.filter(s => s.alpha > 0.015);
+        if (S.shootingStars || stars.length) {
+            // In-place compaction — avoids allocating a fresh array every frame
+            let w = 0;
+            for (let i = 0; i < stars.length; i++) {
+                if (stars[i].alpha > 0.015) stars[w++] = stars[i];
+            }
+            stars.length = w;
             for (const s of stars) {
                 s.x += Math.cos(s.angle) * s.speed;
                 s.y += Math.sin(s.angle) * s.speed;
@@ -6022,14 +6153,18 @@ document.addEventListener('DOMContentLoaded', () => { window.bingoApp = new Bing
             }
         }
 
-        blobs.forEach(blob => {
-            blob.phase += 0.004;
-            blob.el.style.left = `${blob.baseX + Math.sin(blob.phase) * 10}%`;
-            blob.el.style.top  = `${blob.baseY + Math.cos(blob.phase * 0.65) * 5}%`;
-        });
-
-        requestAnimationFrame(mainLoop);
+        rafHandle = requestAnimationFrame(mainLoop);
     }
+
+    function ensureLoopRunning() {
+        if (rafHandle) return;
+        if (!loopActive()) return;
+        rafHandle = requestAnimationFrame(mainLoop);
+    }
+
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) ensureLoopRunning();
+    });
 
     const overlay = document.createElement('div');
     overlay.id = 'flare-overlay';
@@ -6042,11 +6177,16 @@ document.addEventListener('DOMContentLoaded', () => { window.bingoApp = new Bing
     const blobs = Array.from({ length: 3 }, (_, i) => {
         const el = document.createElement('div');
         el.className = 'flare-aurora-blob';
+        // Position via CSS variables; animation lives in stylesheet so the
+        // compositor handles motion without per-frame JS writes.
+        el.style.setProperty('--blob-x', `${18 + i * 28}%`);
+        el.style.setProperty('--blob-y', `80%`);
+        el.style.animationDelay = `${(i / 3) * -8}s`;
         auroraWrap.appendChild(el);
-        return { el, phase: (i / 3) * Math.PI * 2, baseX: 18 + i * 28, baseY: 80 };
+        return { el };
     });
 
-    mainLoop();
+    ensureLoopRunning();
 
     let shimmerTimer = null;
 
@@ -6128,9 +6268,13 @@ document.addEventListener('DOMContentLoaded', () => { window.bingoApp = new Bing
         }).observe(bigText, { childList: true, characterData: true, subtree: true });
     }
 
+    // Cursor trail — bind/unbind based on the setting so we don't pay the
+    // mousemove listener cost (and create+destroy DOM nodes) when the user
+    // has it switched off. Over an 8-hour iPad host session this avoids
+    // hundreds of thousands of needless allocations. syncCursorTrailBinding
+    // is also invoked from applyAllSettings whenever the toggle flips.
     let lastTrail = 0;
-    document.addEventListener('mousemove', e => {
-        if (!S.cursorTrail) return;
+    const cursorTrailHandler = e => {
         const now = Date.now();
         if (now - lastTrail < S.cursorTrailDensity) return;
         lastTrail = now;
@@ -6139,7 +6283,19 @@ document.addEventListener('DOMContentLoaded', () => { window.bingoApp = new Bing
         dot.style.cssText = `left:${e.clientX}px;top:${e.clientY}px`;
         document.body.appendChild(dot);
         dot.addEventListener('animationend', () => dot.remove(), { once: true });
-    });
+    };
+
+    let cursorTrailBound = false;
+    function syncCursorTrailBinding() {
+        if (S.cursorTrail && !cursorTrailBound) {
+            document.addEventListener('mousemove', cursorTrailHandler);
+            cursorTrailBound = true;
+        } else if (!S.cursorTrail && cursorTrailBound) {
+            document.removeEventListener('mousemove', cursorTrailHandler);
+            cursorTrailBound = false;
+        }
+    }
+    syncCursorTrailBinding();
 
     const CONFETTI_COLORS = [
         '#f0c030','#ff4444','#00aeff','#ff0096',

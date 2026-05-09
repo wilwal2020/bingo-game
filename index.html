@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#101c2d">
     <title>Geithus Bingo</title>
     <link rel="stylesheet" href="style.css">
 </head>
@@ -11,7 +12,7 @@
     <!-- HEADER / NAV -->
     <header>
         <nav class="flex-container">
-            <img src="" class="logo" alt="Geithus Bingo logo">
+            <div class="logo" role="img" aria-label="Geithus Bingo logo"></div>
             <button class="flex-item settings-nav-btn" id="bingoview-btn" aria-label="BingoView telefon" title="Koble til telefon"><span class="bv-btn-icon">📱</span><span class="bv-nav-badge" id="bv-nav-badge" style="display:none">0</span></button>
             <button class="flex-item settings-nav-btn" id="settings-btn" aria-label="Innstillinger">⚙</button>
             <div class="dropdown">
@@ -1398,7 +1399,6 @@
     <!-- Phone-win notification stack — top-level so it's visible regardless of modal state -->
     <div id="bv-win-notice-stack" aria-live="polite"></div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <script src="script.js"></script>
+    <script src="script.js" defer></script>
 </body>
 </html>
