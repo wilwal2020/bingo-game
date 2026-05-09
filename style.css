@@ -3239,60 +3239,6 @@ option.user-sound {
     );
 }
 
-/* ── Aurora blobs  (opacity driven by CSS var) ───────────── */
-#flare-aurora {
-    position:       fixed;
-    inset:          0;
-    z-index:        -1;
-    pointer-events: none;
-    overflow:       hidden;
-}
-
-.flare-aurora-blob {
-    position:       absolute;
-    width:          480px;
-    height:         320px;
-    left:           var(--blob-x, 50%);
-    top:            var(--blob-y, 80%);
-    border-radius:  50%;
-    filter:         blur(100px);
-    opacity:        var(--flare-aurora-opacity, .07);
-    will-change:    transform;
-    animation:      flare-aurora-drift 24s ease-in-out infinite;
-}
-
-@keyframes flare-aurora-drift {
-    0%   { transform: translate(-50%, -50%); }
-    25%  { transform: translate(calc(-50% + 10%), calc(-50% + 5%)); }
-    50%  { transform: translate(-50%, calc(-50% - 5%)); }
-    75%  { transform: translate(calc(-50% - 10%), calc(-50% + 5%)); }
-    100% { transform: translate(-50%, -50%); }
-}
-
-/* ── Header shimmer ─────────────────────────────────────── */
-.flex-container { overflow: hidden; }
-
-.flare-header-shimmer {
-    position:       absolute;
-    top: 0; left: 0; width: 55%; height: 100%;
-    background:     linear-gradient(to right,
-                        transparent 0%,
-                        rgba(255,255,255,.10) 50%,
-                        transparent 100%);
-    pointer-events: none;
-    z-index:        100;
-    will-change:    transform;
-    transform:      translateX(-145%);
-    animation:      flare-shimmer-sweep 1.4s ease-in-out forwards;
-}
-
-/* Animating transform stays on the compositor (no layout). The original
-   keyframes animated `left`, which forced layout every frame. */
-@keyframes flare-shimmer-sweep {
-    0%   { transform: translateX(-145%); }
-    100% { transform: translateX(364%); }
-}
-
 /* ── Ball-click ripple ──────────────────────────────────── */
 .flare-ripple {
     position:       fixed;
@@ -3350,45 +3296,6 @@ option.user-sound {
     25%  { opacity: .75; transform: translate(-50%, -22px) scale(1.0);  }
     100% { opacity: 0;   transform: translate(-50%, -90px) scale(.65);  }
 }
-
-/* ── Big-number glow burst ──────────────────────────────── */
-.flare-big-glow {
-    position:       fixed;
-    border-radius:  50%;
-    transform:      translate(-50%, -50%);
-    pointer-events: none;
-    z-index:        9996;
-    background:     radial-gradient(circle,
-                        rgba(var(--accent-rgb),.45) 0%,
-                        rgba(var(--accent-rgb),.12) 40%,
-                        transparent 70%);
-    animation:      flare-big-glow-anim .85s ease-out forwards;
-}
-
-@keyframes flare-big-glow-anim {
-    0%   { width: 60px;  height: 60px;  opacity: 1;  }
-    40%  { width: 240px; height: 240px; opacity: .8; }
-    100% { width: 320px; height: 320px; opacity: 0;  }
-}
-
-/* ── Cursor sparkle dots ────────────────────────────────── */
-.flare-cursor-dot {
-    position:       fixed;
-    width: 5px; height: 5px;
-    border-radius:  50%;
-    background:     var(--accent-color);
-    box-shadow:     0 0 6px 2px var(--accent-color);
-    transform:      translate(-50%, -50%);
-    pointer-events: none;
-    z-index:        9997;
-    animation:      flare-dot-fade .6s ease-out forwards;
-}
-
-@keyframes flare-dot-fade {
-    0%   { opacity: .75; transform: translate(-50%,-50%) scale(1);   }
-    100% { opacity: 0;   transform: translate(-50%,-50%) scale(.05); }
-}
-
 /* ── Confetti ───────────────────────────────────────────── */
 .flare-confetti {
     position:       fixed;
@@ -3402,43 +3309,6 @@ option.user-sound {
     0%   { opacity: 1;  transform: translateY(0) translateX(0) rotate(0deg); }
     75%  { opacity: 1;  }
     100% { opacity: 0;  transform: translateY(var(--fall)) translateX(var(--drift)) rotate(var(--rot)); }
-}
-
-/* ── Rekke button flash ─────────────────────────────────── */
-.flare-rekke-flash {
-    animation: flare-rekke-flash-anim .45s ease-out forwards !important;
-}
-
-@keyframes flare-rekke-flash-anim {
-    0%   { box-shadow: 0 0  0   0  var(--accent-color); }
-    30%  { box-shadow: 0 0 18px 6px var(--accent-color); }
-    100% { box-shadow: 0 0  0   0  transparent; }
-}
-
-/* ── Selected ball pulse ring ───────────────────────────── */
-.balls {
-    position: relative;
-    overflow: visible !important;
-}
-
-.balls.clicked::after {
-    content:        '';
-    position:       absolute;
-    inset:          -5px;
-    border-radius:  50%;
-    border:         1.5px solid var(--accent-color);
-    opacity:        0;
-    pointer-events: none;
-    animation:      flare-ball-ring 2.8s ease-in-out infinite;
-}
-
-body.flare-no-pulse-ring .balls.clicked::after { display: none; }
-
-@keyframes flare-ball-ring {
-    0%   { opacity: 0;   transform: scale(1);   }
-    20%  { opacity: .55; transform: scale(1);   }
-    70%  { opacity: 0;   transform: scale(1.2); }
-    100% { opacity: 0;   transform: scale(1.2); }
 }
 
 /* ══════════════════════════════════════════════════════════
