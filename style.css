@@ -3993,18 +3993,18 @@ body.flare-no-pulse-ring .balls.clicked::after { display: none; }
     0%, 100% { opacity: 0.55; transform: scale(1); }
     50%      { opacity: 1;    transform: scale(1.12); }
 }
-/* Name label(s) beside a watched ball — shows which phone(s) need this
-   number. One pill per phone, color-matched to the ring. Anchored to the
-   right of the ball; shifts left for balls in the right column to stay
-   on-screen. */
+/* Name label(s) above a watched ball — shows which phone(s) need this
+   number. One pill per phone, color-matched to the ring. Anchored above
+   the ball so it doesn't cover neighboring numbers. */
 .bv-watch-names {
     position: absolute;
-    left: 100%;
-    top: 50%;
-    transform: translateY(-50%);
-    margin-left: 8px;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-bottom: 6px;
     display: flex;
     flex-direction: column;
+    align-items: center;
     gap: 2px;
     pointer-events: none;
     z-index: 6;
@@ -4026,14 +4026,13 @@ body.flare-no-pulse-ring .balls.clicked::after { display: none; }
     text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
 }
-/* Flip to the left side when the label would otherwise overflow off
-   the right edge of the screen (set dynamically by JS). */
+/* Flip below the ball when the label would otherwise overflow off the
+   top edge of the screen (set dynamically by JS). */
 .balls.bv-watch.bv-watch-flip .bv-watch-names {
-    left: auto;
-    right: 100%;
-    margin-left: 0;
-    margin-right: 8px;
-    align-items: flex-end;
+    bottom: auto;
+    top: 100%;
+    margin-bottom: 0;
+    margin-top: 6px;
 }
 
 /* Phone-win notification stack — slides in from the top-right when a

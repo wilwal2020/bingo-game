@@ -5671,15 +5671,14 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             ball.appendChild(label);
         });
 
-        // After labels render, flip to left side any that would overflow
-        // off the right edge of the viewport.
+        // After labels render, flip below the ball any that would overflow
+        // off the top edge of the viewport.
         requestAnimationFrame(() => {
-            const vw = window.innerWidth;
             document.querySelectorAll('.balls.bv-watch').forEach(ball => {
                 const lbl = ball.querySelector('.bv-watch-names');
                 if (!lbl) return;
                 const r = lbl.getBoundingClientRect();
-                if (r.right > vw - 4) ball.classList.add('bv-watch-flip');
+                if (r.top < 4) ball.classList.add('bv-watch-flip');
             });
         });
 
