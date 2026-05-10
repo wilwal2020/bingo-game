@@ -3994,37 +3994,37 @@ body.flare-no-pulse-ring .balls.clicked::after { display: none; }
     50%      { opacity: 1;    transform: scale(1.12); }
 }
 /* Name label(s) above a watched ball — shows which phone(s) need this
-   number. One pill per phone, color-matched to the ring. Anchored above
-   the ball so it doesn't cover neighboring numbers. */
+   number. Designed to match the bingo site's chunky retro aesthetic:
+   colored block with offset shadow, uppercase Barlow Condensed text. */
 .bv-watch-names {
     position: absolute;
     bottom: 100%;
     left: 50%;
     transform: translateX(-50%);
-    margin-bottom: 6px;
+    margin-bottom: 8px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 2px;
+    gap: 3px;
     pointer-events: none;
     z-index: 6;
     white-space: nowrap;
 }
 .bv-watch-name {
-    background: rgba(0, 0, 0, 0.78);
-    border: 1px solid var(--bv-name-color, #fff);
-    color: var(--bv-name-color, #fff);
-    font-family: 'Barlow Condensed', sans-serif;
-    font-size: 0.72rem;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    padding: 1px 6px;
-    border-radius: 10px;
-    max-width: 140px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+    background:     var(--bv-name-color, #fff);
+    color:          #0c0d1a;
+    font-family:    'Barlow Condensed', sans-serif;
+    font-size:      0.85rem;
+    font-weight:    700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding:        2px 8px 1px;
+    border-radius:  3px;
+    max-width:      150px;
+    overflow:       hidden;
+    text-overflow:  ellipsis;
+    box-shadow:     2px 2px 0 rgba(0, 0, 0, 0.55);
+    line-height:    1.15;
 }
 /* Flip below the ball when the label would otherwise overflow off the
    top edge of the screen (set dynamically by JS). */
@@ -4032,7 +4032,7 @@ body.flare-no-pulse-ring .balls.clicked::after { display: none; }
     bottom: auto;
     top: 100%;
     margin-bottom: 0;
-    margin-top: 6px;
+    margin-top: 8px;
 }
 
 /* Phone-win notification stack — slides in from the top-right when a
