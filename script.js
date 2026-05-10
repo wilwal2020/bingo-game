@@ -5615,7 +5615,11 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             const papers = phone.papers || {};
             const strips = papers[game];
             const closeStrips = [];
-            const displayName = (phone.userName || '').trim() || `Telefon ${idx + 1}`;
+            // Strip " (Blokk N)" suffix — the colored ring/label already
+            // makes it obvious which block; only the base name is useful here.
+            const rawName = (phone.userName || '').trim();
+            const displayName = rawName.replace(/\s*\(Blokk\s*\d+\)\s*$/i, '')
+                              || `Telefon ${idx + 1}`;
 
             if (highlightOn && Array.isArray(strips)) {
                 strips.forEach(strip => {
