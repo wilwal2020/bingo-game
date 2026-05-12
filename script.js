@@ -5291,6 +5291,12 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                 // otherwise linger as a phantom offline duplicate.
                 phoneList = this._bvDedupeOfflineDuplicates(phoneList);
 
+                // Merge: when multiple blocks have identical papers (same
+                // strip-IDs for every game), they're the same paper shared
+                // between people. Collapse to a single entry whose name
+                // combines all owners (e.g. "wilwal + ola").
+                phoneList = this._bvMergeIdenticalBlocks(phoneList);
+
                 this._bvPhones = phoneList;
                 // Count unique online DEVICES (not blocks) — strip _bN suffix
                 const onlineDevices = new Set();
@@ -5387,6 +5393,75 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
     // some online entry's papers (same strips for every game the offline has).
     // Also issues Firebase deletes for the stale entries so they don't pile
     // up in storage. Called from recompute() on every snapshot change.
+    // Merge blocks that share an identical paper (same set of games, same
+    // strip-IDs per game). Happens when one person shares their block to
+    // another via the BingoView share URL — both phones publish the same
+    // strips and previously showed up as two rings on every watched ball.
+    //
+    // Strategy: group by paper fingerprint, keep the entry with the
+    // earliest ts (first to publish), and combine usernames from all
+    // members. Strips "(Blokk N)" suffixes so the joined label stays
+    // readable, e.g. "wilwal + ola".
+    _bvMergeIdenticalBlocks(phoneList) {
+        const stripBlokk = s => (s || '').replace(/\s*\(Blokk\s*\d+\)\s*$/i, '').trim();
+
+        const fingerprint = phone => {
+            const papers = phone.papers || {};
+            const gameKeys = Object.keys(papers)
+                .filter(g => Array.isArray(papers[g]) && papers[g].length)
+                .sort();
+            if (!gameKeys.length) return null;
+            const parts = gameKeys.map(g => {
+                const ids = papers[g].map(s => s && s.id).filter(Boolean).sort();
+                return g + ':' + ids.join(',');
+            });
+            return parts.join('|');
+        };
+
+        // Bucket by fingerprint
+        const buckets = new Map();
+        const unbucketed = [];
+        phoneList.forEach(p => {
+            const fp = fingerprint(p);
+            if (!fp) { unbucketed.push(p); return; }
+            if (!buckets.has(fp)) buckets.set(fp, []);
+            buckets.get(fp).push(p);
+        });
+
+        const merged = [];
+        buckets.forEach(group => {
+            if (group.length === 1) { merged.push(group[0]); return; }
+            // Pick canonical: prefer online, then earliest ts
+            group.sort((a, b) => {
+                if (a.online !== b.online) return a.online ? -1 : 1;
+                if (a.online) return (a.ts || 0) - (b.ts || 0);
+                return (b.lastSeen || 0) - (a.lastSeen || 0);
+            });
+            const head = group[0];
+            // Build combined display name from unique base names (no Blokk N)
+            const seen = new Set();
+            const names = [];
+            group.forEach(p => {
+                const base = stripBlokk(p.userName);
+                if (!base) return;
+                const key = base.toLowerCase();
+                if (seen.has(key)) return;
+                seen.add(key);
+                names.push(base);
+            });
+            if (names.length > 1) head.userName = names.join(' + ');
+            else if (names.length === 1) head.userName = names[0];
+            head._mergedIds = group.slice(1).map(p => p.id);
+            merged.push(head);
+        });
+
+        return [...merged, ...unbucketed].sort((a, b) => {
+            if (a.online !== b.online) return a.online ? -1 : 1;
+            return a.online ? (a.ts || 0) - (b.ts || 0)
+                            : (b.lastSeen || 0) - (a.lastSeen || 0);
+        });
+    }
+
     _bvDedupeOfflineDuplicates(phoneList) {
         const online = phoneList.filter(p => p.online);
         if (!online.length) return phoneList;
