@@ -559,9 +559,15 @@ class BingoApp {
             }
         });
 
-        // O(1) number→element lookup — avoids spread+find across all 90 balls
+        // O(1) number→element lookup — avoids spread+find across all 90 balls.
+        // Also stash the number on data-num so callers read it cleanly even
+        // when child elements (like BV watch labels) get appended to the ball.
         this.el.ballMap = new Map();
-        this.el.balls.forEach(ball => this.el.ballMap.set(ball.textContent.trim(), ball));
+        this.el.balls.forEach(ball => {
+            const n = ball.textContent.trim();
+            ball.dataset.num = n;
+            this.el.ballMap.set(n, ball);
+        });
 
         // O(1) rekke/theme button lookups — avoids spread+find on every keypress
         this.el.rekkeBtnMap    = new Map([...this.el.rekkeBtns].map(b => [b.dataset.rekke, b]));
@@ -1609,7 +1615,7 @@ class BingoApp {
         const last = nums[nums.length - 1];
         // Find and deselect the ball
         this.el.balls.forEach(ball => {
-            if (ball.textContent.trim() === last) {
+            if (ball.dataset.num === last) {
                 ball.classList.remove('clicked', 'recently-selected', 'last-clicked');
                 if (this._lastClickedBall === ball) this._lastClickedBall = null;
             }
@@ -1620,7 +1626,7 @@ class BingoApp {
         // Re-mark new last-clicked
         if (this.slot.bigNumber) {
             this.el.balls.forEach(ball => {
-                if (ball.textContent.trim() === this.slot.bigNumber) {
+                if (ball.dataset.num === this.slot.bigNumber) {
                     ball.classList.add('last-clicked');
                     this._lastClickedBall = ball;
                 }
@@ -1692,7 +1698,7 @@ class BingoApp {
         this._lastClickedBall = null;
         this.el.balls.forEach(ball => {
             ball.classList.remove('clicked', 'recently-selected', 'jackpot', 'last-clicked');
-            const num = ball.textContent.trim();
+            const num = ball.dataset.num;
             if (s.selectedNumbers.includes(num)) {
                 ball.classList.add('clicked');
                 if (num === s.bigNumber) {
@@ -1735,7 +1741,8 @@ class BingoApp {
     handleBallClick(event) {
         const ball = event.currentTarget;
         if (ball.dataset.skipBall) return;  // ignore grid button cells
-        const number = ball.textContent.trim();
+        const number = ball.dataset.num;
+        if (!number) return;  // safety: ball wasn't initialised
         if (this.jackpotMode) {
             this.handleJackpotClick(ball, number);
         } else {
@@ -3600,7 +3607,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         const exactNum = parseInt(buf, 10);
         this.el.balls.forEach(ball => {
             if (ball.classList.contains('clicked')) return;
-            const ballText = ball.textContent.trim();
+            const ballText = ball.dataset.num || ball.textContent.trim();
             // Exact match — full highlight
             if (ballText === String(exactNum)) {
                 ball.classList.add('typing-preview');
@@ -6359,7 +6366,7 @@ document.addEventListener('DOMContentLoaded', () => { window.bingoApp = new Bing
         if (S.ghostNumber) {
             setTimeout(() => {
                 if (!ball.classList.contains('clicked')) return;
-                const num = ball.textContent.trim();
+                const num = ball.dataset.num || ball.textContent.trim();
                 if (!num) return;
                 const ghost = document.createElement('div');
                 ghost.className    = 'flare-ghost';
