@@ -4038,118 +4038,168 @@ body.flare-no-pulse-ring .balls.clicked::after { display: none; }
 /* Phone-win notification stack — slides in from the top-right when a
    connected phone's paper completes a winning row (controlled by the
    "Vis varsel når telefon vinner" setting). */
-#bv-win-notice-stack {
+/* Full-screen phone-win modal — styled like the BingoView win banner
+   (chunky green header + a strip-row of called numbers below) so it's
+   readable from across the room. */
+.bv-win-modal {
     position: fixed;
-    top: 20px;
-    right: 20px;
+    inset: 0;
     z-index: 1500;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    animation: bv-win-modal-fadein 0.25s ease-out;
+}
+.bv-win-modal.bv-win-modal-offline .bv-win-modal-card {
+    background: linear-gradient(180deg, #1f1408 0%, #16100a 70%);
+    border-color: #d99425;
+}
+.bv-win-modal-card {
+    width: min(100%, 900px);
+    max-height: 90vh;
+    background: linear-gradient(180deg, #06140b 0%, #0a1f10 70%);
+    border: 2px solid #29a25a;
+    border-radius: 14px;
+    box-shadow: 0 16px 60px rgba(0, 0, 0, 0.7),
+                0 0 60px rgba(46, 204, 113, 0.35);
+    color: #fff;
+    font-family: 'Barlow Condensed', sans-serif;
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    pointer-events: none;
+    overflow: hidden;
+    animation: bv-win-modal-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-.bv-win-notice {
-    pointer-events: auto;
-    min-width: 260px;
-    max-width: 360px;
+.bv-win-header {
     background: linear-gradient(135deg, #1a7a40 0%, #29a25a 100%);
-    color: #fff;
-    border: 2px solid rgba(255,255,255,0.2);
-    border-radius: 10px;
-    padding: 14px 16px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.5), 0 0 18px rgba(46, 204, 113, .45);
-    font-family: 'Barlow Condensed', sans-serif;
+    padding: 18px 28px;
     display: flex;
     align-items: center;
-    gap: 12px;
-    animation: bv-win-notice-in 0.35s cubic-bezier(0.34,1.56,0.64,1);
-}
-.bv-win-notice.closing {
-    animation: bv-win-notice-out 0.3s ease-in forwards;
-}
-.bv-win-notice.bv-win-notice-offline {
-    background: linear-gradient(135deg, #b87a14 0%, #d99425 100%);
-    border-color: rgba(255,255,255,0.18);
-    box-shadow: 0 8px 24px rgba(0,0,0,0.5), 0 0 18px rgba(217,148,37,.4);
-}
-.bv-win-notice-icon {
-    font-size: 1.8rem;
-    flex-shrink: 0;
-}
-.bv-win-notice-body { flex: 1; min-width: 0; }
-.bv-win-notice-title {
-    font-size: 1.1rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-}
-.bv-win-notice-detail {
-    font-size: 0.95rem;
-    margin-top: 2px;
-    opacity: 0.92;
-}
-/* Winning numbers — listed as chips so the host can read them at a glance */
-.bv-win-notice-nums {
-    margin-top: 8px;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-.bv-win-row-line {
-    display: flex;
+    justify-content: center;
+    gap: 18px;
     flex-wrap: wrap;
-    align-items: center;
-    gap: 4px;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
+    border-bottom: 2px solid rgba(0, 0, 0, 0.25);
 }
-.bv-win-row-label {
-    font-size: 0.78rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    opacity: 0.85;
-    margin-right: 4px;
+.bv-win-modal-offline .bv-win-header {
+    background: linear-gradient(135deg, #b87a14 0%, #d99425 100%);
 }
-.bv-win-num {
-    background: rgba(255, 255, 255, 0.18);
-    border: 1px solid rgba(255, 255, 255, 0.25);
-    color: #fff;
+.bv-win-trophy {
+    font-size: 3.2rem;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.4));
+}
+.bv-win-id {
     font-family: 'Barlow Condensed', sans-serif;
-    font-weight: 700;
-    font-size: 0.95rem;
-    padding: 1px 7px;
-    border-radius: 4px;
-    min-width: 24px;
-    text-align: center;
-}
-.bv-win-num.bv-win-num-control {
-    background: #ffe14a;
-    color: #1a3a1a;
-    border-color: #ffe14a;
-    box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.4);
-}
-.bv-win-notice-control {
-    margin-top: 6px;
-    font-size: 0.85rem;
+    font-size: 4.4rem;
     font-weight: 700;
     letter-spacing: 0.04em;
-    color: #ffe14a;
-}
-.bv-win-notice-close {
-    background: transparent;
-    border: none;
-    color: rgba(255,255,255,0.75);
-    font-size: 1.3rem;
     line-height: 1;
+}
+.bv-win-dot {
+    font-size: 3rem;
+    opacity: 0.55;
+    font-weight: 400;
+}
+.bv-win-label {
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    opacity: 0.9;
+}
+.bv-win-control {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 4.4rem;
+    font-weight: 700;
+    line-height: 1;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 4px 22px;
+    border-radius: 10px;
+}
+.bv-win-name {
+    text-align: center;
+    font-size: 2.4rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 18px 24px 4px;
+    color: #fff;
+}
+.bv-win-rekke {
+    text-align: center;
+    font-size: 1.1rem;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.75);
+    padding-bottom: 18px;
+}
+/* Winning row(s) — a strip of cells with called numbers, blanks rendered
+   visually empty so the row keeps its layout. */
+.bv-win-rows {
+    padding: 0 18px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.bv-win-row {
+    display: grid;
+    grid-template-columns: repeat(var(--bv-row-cols, 5), 1fr);
+    gap: 4px;
+    background: #0a1f10;
+    border: 1.5px solid #1a7a40;
+    border-radius: 6px;
+    padding: 4px;
+}
+.bv-win-cell {
+    background: #103a1d;
+    color: #fff;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 2.6rem;
+    text-align: center;
+    padding: 8px 0;
+    border-radius: 3px;
+    min-width: 0;
+}
+.bv-win-cell.bv-win-cell-control {
+    background: #ffe14a;
+    color: #0c2310;
+    box-shadow: 0 0 14px rgba(255, 225, 74, 0.55);
+}
+.bv-win-modal-close {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1.5px solid rgba(255, 255, 255, 0.2);
+    color: #fff;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 1.2rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 12px 22px;
+    margin: 0 22px 22px;
+    border-radius: 8px;
     cursor: pointer;
-    padding: 0 4px;
-    flex-shrink: 0;
+    transition: background 0.15s, border-color 0.15s;
 }
-.bv-win-notice-close:hover { color: #fff; }
-@keyframes bv-win-notice-in {
-    0%   { opacity: 0; transform: translateX(40px); }
-    100% { opacity: 1; transform: translateX(0); }
+.bv-win-modal-close:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.4);
 }
-@keyframes bv-win-notice-out {
-    0%   { opacity: 1; transform: translateX(0); }
-    100% { opacity: 0; transform: translateX(40px); }
+@keyframes bv-win-modal-fadein {
+    0%   { opacity: 0; }
+    100% { opacity: 1; }
+}
+@keyframes bv-win-modal-pop {
+    0%   { opacity: 0; transform: scale(0.85); }
+    100% { opacity: 1; transform: scale(1); }
+}
+/* Phone-sized screens: shrink the type so it still fits */
+@media (max-width: 640px) {
+    .bv-win-trophy   { font-size: 2.2rem; }
+    .bv-win-id,
+    .bv-win-control { font-size: 2.8rem; padding: 2px 14px; }
+    .bv-win-name    { font-size: 1.6rem; padding-top: 14px; }
+    .bv-win-rekke   { font-size: 0.9rem; padding-bottom: 14px; }
+    .bv-win-cell    { font-size: 1.6rem; padding: 6px 0; }
 }

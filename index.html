@@ -1396,8 +1396,22 @@
         </div>
     </div>
 
-    <!-- Phone-win notification stack — top-level so it's visible regardless of modal state -->
-    <div id="bv-win-notice-stack" aria-live="polite"></div>
+    <!-- Phone-win full-screen modal — replaces the prior side-popup stack -->
+    <div id="bv-win-modal" class="bv-win-modal" style="display:none" aria-live="polite" role="dialog" aria-modal="true">
+      <div class="bv-win-modal-card">
+        <div class="bv-win-header">
+          <span class="bv-win-trophy">🏆</span>
+          <span class="bv-win-id"></span>
+          <span class="bv-win-dot">·</span>
+          <span class="bv-win-label">TALL</span>
+          <span class="bv-win-control"></span>
+        </div>
+        <div class="bv-win-name"></div>
+        <div class="bv-win-rekke"></div>
+        <div class="bv-win-rows"></div>
+        <button class="bv-win-modal-close" type="button">Lukk</button>
+      </div>
+    </div>
 
     <script src="script.js" defer></script>
 </body>

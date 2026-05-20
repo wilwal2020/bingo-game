@@ -504,7 +504,7 @@ class BingoApp {
             bvThresholdPlus:          document.getElementById('bv-threshold-plus'),
             bvThresholdMinus:         document.getElementById('bv-threshold-minus'),
             bvWinNotifyEnabled:       document.getElementById('bv-win-notify-enabled'),
-            bvWinNoticeStack:         document.getElementById('bv-win-notice-stack'),
+            bvWinModal:               document.getElementById('bv-win-modal'),
             bvWinAutoOpen:            document.getElementById('bv-win-auto-open'),
             settingOverAverageBlink:    document.getElementById('setting-over-average-blink'),
             settingBlur:                document.getElementById('setting-blur'),
@@ -5983,8 +5983,8 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
     }
 
     _bvShowWinNotice(win) {
-        const stack = this.el.bvWinNoticeStack || document.getElementById('bv-win-notice-stack');
-        if (!stack) return;
+        const modal = document.getElementById('bv-win-modal');
+        if (!modal) return;
         const phoneNum = (win.phoneIdx ?? 0) + 1;
         const stripId  = win.stripId != null ? String(win.stripId) : '?';
         const rekkeLbl = win.rekke === 'Rekke3' ? 'Hele arket'
@@ -5993,84 +5993,54 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         const isOffline = win.online === false;
         const displayName = (win.userName && win.userName.trim()) || `Telefon ${phoneNum}`;
 
-        const div = document.createElement('div');
-        div.className = 'bv-win-notice' + (isOffline ? ' bv-win-notice-offline' : '');
+        modal.classList.toggle('bv-win-modal-offline', isOffline);
+        modal.querySelector('.bv-win-id').textContent      = stripId;
+        modal.querySelector('.bv-win-control').textContent =
+            win.controlNum != null ? String(win.controlNum) : '?';
+        modal.querySelector('.bv-win-name').textContent    =
+            displayName + (isOffline ? ' (frakoblet)' : '');
+        modal.querySelector('.bv-win-rekke').textContent   = rekkeLbl;
 
-        const icon = document.createElement('div');
-        icon.className = 'bv-win-notice-icon';
-        icon.textContent = '🎉';
-
-        const body = document.createElement('div');
-        body.className = 'bv-win-notice-body';
-        const title = document.createElement('div');
-        title.className = 'bv-win-notice-title';
-        title.textContent = `Bingo! ${displayName}${isOffline ? ' (frakoblet)' : ''}`;
-        const detail = document.createElement('div');
-        detail.className = 'bv-win-notice-detail';
-        detail.textContent = `${rekkeLbl} · Kontrollnr ${stripId}`;
-        body.appendChild(title);
-        body.appendChild(detail);
-
-        // Show the actual winning row numbers + the called number that
-        // triggered the win, so the host can read them aloud immediately.
+        const rowsWrap = modal.querySelector('.bv-win-rows');
+        rowsWrap.innerHTML = '';
         if (Array.isArray(win.winningRows) && win.winningRows.length) {
-            const numsLine = document.createElement('div');
-            numsLine.className = 'bv-win-notice-nums';
-            // Each row gets its own line, with the triggering call bolded
-            win.winningRows.forEach((row, ri) => {
-                const lineEl = document.createElement('div');
-                lineEl.className = 'bv-win-row-line';
-                const label = document.createElement('span');
-                label.className = 'bv-win-row-label';
-                label.textContent = win.winningRows.length > 1
-                    ? `Rekke ${ri + 1}:`
-                    : 'Vinnernumre:';
-                lineEl.appendChild(label);
+            win.winningRows.forEach(row => {
+                const rowEl = document.createElement('div');
+                rowEl.className = 'bv-win-row';
+                rowEl.style.setProperty('--bv-row-cols', row.length);
                 row.forEach(n => {
-                    const chip = document.createElement('span');
-                    chip.className = 'bv-win-num';
-                    if (n === win.controlNum) chip.classList.add('bv-win-num-control');
-                    chip.textContent = n;
-                    lineEl.appendChild(chip);
+                    const cell = document.createElement('div');
+                    cell.className = 'bv-win-cell';
+                    if (n === win.controlNum) cell.classList.add('bv-win-cell-control');
+                    cell.textContent = n;
+                    rowEl.appendChild(cell);
                 });
-                numsLine.appendChild(lineEl);
+                rowsWrap.appendChild(rowEl);
             });
-            body.appendChild(numsLine);
-            if (win.controlNum != null) {
-                const ctrl = document.createElement('div');
-                ctrl.className = 'bv-win-notice-control';
-                ctrl.textContent = `Tallet som ga bingo: ${win.controlNum}`;
-                body.appendChild(ctrl);
-            }
         }
 
-        const closeBtn = document.createElement('button');
-        closeBtn.className = 'bv-win-notice-close';
-        closeBtn.title = 'Lukk';
-        closeBtn.textContent = '×';
-
-        div.appendChild(icon);
-        div.appendChild(body);
-        div.appendChild(closeBtn);
-
+        const closeBtn = modal.querySelector('.bv-win-modal-close');
         const close = () => {
-            if (div.classList.contains('closing')) return;
-            div.classList.add('closing');
-            setTimeout(() => { if (div.parentNode) div.remove(); }, 300);
+            modal.style.display = 'none';
+            modal.removeEventListener('click', backdropClose);
+            closeBtn.removeEventListener('click', close);
+            if (modal._bvWinKeyHandler) {
+                document.removeEventListener('keydown', modal._bvWinKeyHandler);
+                modal._bvWinKeyHandler = null;
+            }
         };
+        const backdropClose = (e) => { if (e.target === modal) close(); };
+        modal.addEventListener('click', backdropClose);
         closeBtn.addEventListener('click', close);
-        const autoTimer = setTimeout(close, 9000);
-        div._bvAutoTimer = autoTimer;
-        stack.appendChild(div);
+        modal._bvWinKeyHandler = (e) => { if (e.key === 'Escape') close(); };
+        document.addEventListener('keydown', modal._bvWinKeyHandler);
+
+        modal.style.display = 'flex';
     }
 
     _bvClearWinNotices() {
-        const stack = this.el.bvWinNoticeStack || document.getElementById('bv-win-notice-stack');
-        if (!stack) return;
-        stack.querySelectorAll('.bv-win-notice').forEach(n => {
-            if (n._bvAutoTimer) clearTimeout(n._bvAutoTimer);
-            n.remove();
-        });
+        const modal = document.getElementById('bv-win-modal');
+        if (modal) modal.style.display = 'none';
     }
 }
 
