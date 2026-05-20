@@ -5931,6 +5931,10 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
     _bvProcessWinNotifications(phones, calledSet, rekke, game) {
         const currentKeys = new Set();
         const newWins     = [];
+        // The most recently called number is the "control number" — the one
+        // that triggered the win. Pull it off the host's selectedNumbers tail.
+        const sel = (this.slot && this.slot.selectedNumbers) || [];
+        const controlNum = sel.length ? Number(sel[sel.length - 1]) : null;
         phones.forEach((phone, idx) => {
             const strips = (phone.papers || {})[game];
             if (!Array.isArray(strips)) return;
@@ -5939,6 +5943,16 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                 const key = `${phone.id}|${game}|${rekke}|${strip.id}`;
                 currentKeys.add(key);
                 if (!this._bvWinKeysPrev || !this._bvWinKeysPrev.has(key)) {
+                    // Collect the numbers from the completed row(s) so the
+                    // host can show them alongside the control number.
+                    const winningRows = [];
+                    (strip.rows || []).forEach(nums => {
+                        const valid = (nums || []).filter(n => Number.isFinite(n));
+                        const missing = valid.filter(n => !calledSet.has(n));
+                        if (valid.length && !missing.length) {
+                            winningRows.push(valid.slice().sort((a, b) => a - b));
+                        }
+                    });
                     newWins.push({
                         phoneIdx: idx,
                         phoneId: phone.id,
@@ -5946,6 +5960,8 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                         rekke,
                         online: !!phone.online,
                         userName: phone.userName || '',
+                        winningRows,
+                        controlNum,
                     });
                 }
             });
@@ -5994,6 +6010,39 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         detail.textContent = `${rekkeLbl} · Kontrollnr ${stripId}`;
         body.appendChild(title);
         body.appendChild(detail);
+
+        // Show the actual winning row numbers + the called number that
+        // triggered the win, so the host can read them aloud immediately.
+        if (Array.isArray(win.winningRows) && win.winningRows.length) {
+            const numsLine = document.createElement('div');
+            numsLine.className = 'bv-win-notice-nums';
+            // Each row gets its own line, with the triggering call bolded
+            win.winningRows.forEach((row, ri) => {
+                const lineEl = document.createElement('div');
+                lineEl.className = 'bv-win-row-line';
+                const label = document.createElement('span');
+                label.className = 'bv-win-row-label';
+                label.textContent = win.winningRows.length > 1
+                    ? `Rekke ${ri + 1}:`
+                    : 'Vinnernumre:';
+                lineEl.appendChild(label);
+                row.forEach(n => {
+                    const chip = document.createElement('span');
+                    chip.className = 'bv-win-num';
+                    if (n === win.controlNum) chip.classList.add('bv-win-num-control');
+                    chip.textContent = n;
+                    lineEl.appendChild(chip);
+                });
+                numsLine.appendChild(lineEl);
+            });
+            body.appendChild(numsLine);
+            if (win.controlNum != null) {
+                const ctrl = document.createElement('div');
+                ctrl.className = 'bv-win-notice-control';
+                ctrl.textContent = `Tallet som ga bingo: ${win.controlNum}`;
+                body.appendChild(ctrl);
+            }
+        }
 
         const closeBtn = document.createElement('button');
         closeBtn.className = 'bv-win-notice-close';

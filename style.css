@@ -4088,6 +4088,52 @@ body.flare-no-pulse-ring .balls.clicked::after { display: none; }
     margin-top: 2px;
     opacity: 0.92;
 }
+/* Winning numbers — listed as chips so the host can read them at a glance */
+.bv-win-notice-nums {
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.bv-win-row-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+}
+.bv-win-row-label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    opacity: 0.85;
+    margin-right: 4px;
+}
+.bv-win-num {
+    background: rgba(255, 255, 255, 0.18);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    color: #fff;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 0.95rem;
+    padding: 1px 7px;
+    border-radius: 4px;
+    min-width: 24px;
+    text-align: center;
+}
+.bv-win-num.bv-win-num-control {
+    background: #ffe14a;
+    color: #1a3a1a;
+    border-color: #ffe14a;
+    box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.4);
+}
+.bv-win-notice-control {
+    margin-top: 6px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: #ffe14a;
+}
 .bv-win-notice-close {
     background: transparent;
     border: none;
