@@ -1827,6 +1827,9 @@ class BingoApp {
             this.slot.bigNumber = number;
             this.el.bigNumberText.textContent = number;
             this.el.bigNumber.classList.add('number-update');
+            // If the "Neste spill om" countdown is running, a new call means
+            // the next game hasn't actually started yet — cancel the timer.
+            this.stopNextGameCountdown();
             this.bvSend(number);
             this.playSound('call');
             if (isFirstOfRekke) setTimeout(() => this.playSound('first-rekke'), 80);
@@ -5269,6 +5272,10 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                     const papers = { ...persistedPapers, ...livePapers };
                     const meta = this._bvPapersMeta[id] || {};
                     const userName = ((live && live.userName) || meta.userName || '').toString().trim();
+                    // sharedAway = the phone published this block via "Del ark"
+                    // and is now considered to have given it up. The receiver's
+                    // identical block wins on the merged display.
+                    const sharedAway = !!((live && live.sharedAway) || meta.sharedAway);
 
                     // A phone is online only if it (or its base phone) has real
                     // presence. Virtual block phones (ABC_b1, ABC_b2) follow
@@ -5284,6 +5291,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                         lastSeen: meta.lastSeen || 0,
                         papers,
                         userName,
+                        sharedAway,
                     };
                 }).sort((a, b) => {
                     // Online first (sorted by connection ts), then offline (by lastSeen desc)
@@ -5325,6 +5333,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                         ts: (data && data.ts) || 0,
                         papers: (data && data.papers) || {},
                         userName: (data && data.userName) || '',
+                        sharedAway: !!(data && data.sharedAway),
                     };
                 });
                 recompute();
@@ -5445,10 +5454,15 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                 return (b.lastSeen || 0) - (a.lastSeen || 0);
             });
             const head = group[0];
-            // Build combined display name from unique base names (no Blokk N)
+            // Build combined display name from unique base names (no Blokk N).
+            // Skip phones that marked their block as sharedAway — the receiver
+            // is the new owner and only their name should show.
+            const nameCandidates = group.filter(p => !p.sharedAway).length
+                ? group.filter(p => !p.sharedAway)
+                : group;  // fall back if ALL are sharedAway
             const seen = new Set();
             const names = [];
-            group.forEach(p => {
+            nameCandidates.forEach(p => {
                 const base = stripBlokk(p.userName);
                 if (!base) return;
                 const key = base.toLowerCase();
