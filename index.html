@@ -1376,19 +1376,12 @@
         </div>
     </div>
 
-    <!-- Phone-win full-screen modal — replaces the prior side-popup stack -->
+    <!-- Phone-win full-screen modal — populated dynamically per win.
+         If multiple winners fire on the same called number, all of them
+         stack inside this single modal. -->
     <div id="bv-win-modal" class="bv-win-modal" style="display:none" aria-live="polite" role="dialog" aria-modal="true">
-      <div class="bv-win-modal-card">
-        <div class="bv-win-header">
-          <span class="bv-win-trophy">🏆</span>
-          <span class="bv-win-id"></span>
-          <span class="bv-win-dot">·</span>
-          <span class="bv-win-label">TALL</span>
-          <span class="bv-win-control"></span>
-        </div>
-        <div class="bv-win-name"></div>
-        <div class="bv-win-rekke"></div>
-        <div class="bv-win-rows"></div>
+      <div class="bv-win-modal-scroller">
+        <div id="bv-win-cards" class="bv-win-cards"></div>
         <button class="bv-win-modal-close" type="button">Lukk</button>
       </div>
     </div>

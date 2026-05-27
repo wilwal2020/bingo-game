@@ -5982,7 +5982,10 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         });
         this._bvWinKeysPrev = currentKeys;
         if (this.settings.bvWinNotifyEnabled !== false && newWins.length) {
-            newWins.forEach(w => this._bvShowWinNotice(w));
+            // Show ALL fresh wins in the modal at once (two or more
+            // phones bingoing on the same called number stack in the
+            // same modal instead of overwriting each other).
+            this._bvShowWinNotice(newWins);
         }
         if (this.settings.bvWinAutoOpenWinModal && newWins.length) {
             // Open the winner-logging modal once, even if multiple wins
@@ -5996,42 +5999,80 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         }
     }
 
-    _bvShowWinNotice(win) {
+    // Accepts either a single win object or an array of wins. When more
+    // than one win arrives in the same tick (two phones bingoing on the
+    // same called number) all of them stack inside the same modal.
+    _bvShowWinNotice(winOrWins) {
         const modal = document.getElementById('bv-win-modal');
         if (!modal) return;
-        const phoneNum = (win.phoneIdx ?? 0) + 1;
-        const stripId  = win.stripId != null ? String(win.stripId) : '?';
-        const rekkeLbl = win.rekke === 'Rekke3' ? 'Hele arket'
-                       : win.rekke === 'Rekke2' ? '2 rekker'
-                       : '1 rekke';
-        const isOffline = win.online === false;
-        const displayName = (win.userName && win.userName.trim()) || `Telefon ${phoneNum}`;
+        const wins = Array.isArray(winOrWins) ? winOrWins : [winOrWins];
+        if (!wins.length) return;
 
-        modal.classList.toggle('bv-win-modal-offline', isOffline);
-        modal.querySelector('.bv-win-id').textContent      = stripId;
-        modal.querySelector('.bv-win-control').textContent =
-            win.controlNum != null ? String(win.controlNum) : '?';
-        modal.querySelector('.bv-win-name').textContent    =
-            displayName + (isOffline ? ' (frakoblet)' : '');
-        modal.querySelector('.bv-win-rekke').textContent   = rekkeLbl;
+        const cardsEl = modal.querySelector('#bv-win-cards');
+        cardsEl.innerHTML = '';
+        // Multi-win class on the modal so spacing / size can adapt
+        modal.classList.toggle('bv-win-modal-multi', wins.length > 1);
+        // If ALL wins are offline, tint the modal amber; otherwise green
+        const allOffline = wins.every(w => w.online === false);
+        modal.classList.toggle('bv-win-modal-offline', allOffline);
 
-        const rowsWrap = modal.querySelector('.bv-win-rows');
-        rowsWrap.innerHTML = '';
-        if (Array.isArray(win.winningRows) && win.winningRows.length) {
-            win.winningRows.forEach(row => {
-                const rowEl = document.createElement('div');
-                rowEl.className = 'bv-win-row';
-                rowEl.style.setProperty('--bv-row-cols', row.length);
-                row.forEach(n => {
-                    const cell = document.createElement('div');
-                    cell.className = 'bv-win-cell';
-                    if (n === win.controlNum) cell.classList.add('bv-win-cell-control');
-                    cell.textContent = n;
-                    rowEl.appendChild(cell);
+        wins.forEach((win, wIdx) => {
+            const phoneNum = (win.phoneIdx ?? 0) + 1;
+            const stripId  = win.stripId != null ? String(win.stripId) : '?';
+            const rekkeLbl = win.rekke === 'Rekke3' ? 'Hele arket'
+                           : win.rekke === 'Rekke2' ? '2 rekker'
+                           : '1 rekke';
+            const isOffline   = win.online === false;
+            const displayName = (win.userName && win.userName.trim()) || `Telefon ${phoneNum}`;
+
+            const card = document.createElement('div');
+            card.className = 'bv-win-modal-card'
+                           + (isOffline ? ' bv-win-card-offline' : '');
+
+            const header = document.createElement('div');
+            header.className = 'bv-win-header';
+            header.innerHTML =
+                '<span class="bv-win-trophy">🏆</span>'
+              + '<span class="bv-win-id"></span>'
+              + '<span class="bv-win-dot">·</span>'
+              + '<span class="bv-win-label">TALL</span>'
+              + '<span class="bv-win-control"></span>';
+            header.querySelector('.bv-win-id').textContent      = stripId;
+            header.querySelector('.bv-win-control').textContent =
+                win.controlNum != null ? String(win.controlNum) : '?';
+            card.appendChild(header);
+
+            const nameEl = document.createElement('div');
+            nameEl.className = 'bv-win-name';
+            nameEl.textContent = displayName + (isOffline ? ' (frakoblet)' : '');
+            card.appendChild(nameEl);
+
+            const rekkeEl = document.createElement('div');
+            rekkeEl.className = 'bv-win-rekke';
+            rekkeEl.textContent = rekkeLbl;
+            card.appendChild(rekkeEl);
+
+            const rowsWrap = document.createElement('div');
+            rowsWrap.className = 'bv-win-rows';
+            if (Array.isArray(win.winningRows) && win.winningRows.length) {
+                win.winningRows.forEach(row => {
+                    const rowEl = document.createElement('div');
+                    rowEl.className = 'bv-win-row';
+                    rowEl.style.setProperty('--bv-row-cols', row.length);
+                    row.forEach(n => {
+                        const cell = document.createElement('div');
+                        cell.className = 'bv-win-cell';
+                        if (n === win.controlNum) cell.classList.add('bv-win-cell-control');
+                        cell.textContent = n;
+                        rowEl.appendChild(cell);
+                    });
+                    rowsWrap.appendChild(rowEl);
                 });
-                rowsWrap.appendChild(rowEl);
-            });
-        }
+            }
+            card.appendChild(rowsWrap);
+
+            cardsEl.appendChild(card);
+        });
 
         const closeBtn = modal.querySelector('.bv-win-modal-close');
         const close = () => {
