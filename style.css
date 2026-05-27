@@ -3614,17 +3614,26 @@ body.flare-no-pulse-ring .balls.clicked::after { display: none; }
     margin-bottom: 10px;
 }
 .frequency-display-wrap {
-    max-height: 55vh;
+    /* Stretch to fill the remaining modal space rather than capping at
+       55vh — on iPad the heatmap was overflowing and required scrolling. */
+    flex: 1 1 auto;
+    min-height: 0;
     overflow-y: auto;
     padding: 8px 4px;
+    display: flex;
+    flex-direction: column;
 }
 .freq-grid {
     display: grid;
     grid-template-columns: repeat(10, 1fr);
     gap: 4px;
+    flex: 1 1 auto;
+    min-height: 0;
 }
 .freq-cell {
-    aspect-ratio: 1;
+    /* Drop fixed aspect-ratio: 1 — was forcing cells to be square, which
+       made the 9-row × 10-col grid taller than the iPad's available height.
+       Now each cell fills its grid row equally and the whole grid fits. */
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -3636,6 +3645,8 @@ body.flare-no-pulse-ring .balls.clicked::after { display: none; }
     font-size: 0.95rem;
     transition: transform 0.12s;
     position: relative;
+    min-height: 36px;
+    padding: 4px 0;
 }
 .freq-cell:hover { transform: scale(1.06); z-index: 2; }
 .freq-cell-count {
