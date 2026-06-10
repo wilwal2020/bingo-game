@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#101c2d">
     <title>Geithus Bingo</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=2">
 </head>
 <body>
 
@@ -16,7 +16,7 @@
             <button class="flex-item settings-nav-btn" id="bingoview-btn" aria-label="BingoView telefon" title="Koble til telefon"><span class="bv-btn-icon">📱</span><span class="bv-nav-badge" id="bv-nav-badge" style="display:none">0</span></button>
             <button class="flex-item settings-nav-btn" id="settings-btn" aria-label="Innstillinger">⚙</button>
             <div class="dropdown">
-                <button class="dropbtn flex-item" aria-label="Apne meny" style="font-size:1.3rem;">
+                <button class="dropbtn flex-item" aria-label="Åpne meny" style="font-size:1.3rem;">
                     ☰
                 </button>
                 <div class="dropdown-content">
@@ -71,7 +71,7 @@
 
         <!-- Column 2: Counter / Stats -->
         <div class="container">
-            <div class="title">Tall som har gatt:</div>
+            <div class="title">Tall som har gått:</div>
             <div class="circle">0</div>
             <div class="average">
                 <div class="text">Gjennomsnittlig<br>antall rekke 1</div>
@@ -1089,6 +1089,7 @@
                                 <select id="setting-confirm-style" class="session-input" style="width:130px;">
                                     <option value="synth">Synth (tre toner)</option>
                                     <option value="re4-select">RE4 select</option>
+                                    <option value="re4-switch">RE4 switch</option>
                                     <option value="custom-save-confirm-2">Custom bekreft 2</option>
                                 </select>
                                 <input type="range" id="vol-confirm" class="vol-slider" min="0" max="1" step="0.05" value="0.9">
@@ -1149,6 +1150,7 @@
                             <div class="sound-row-controls">
                                 <select id="setting-overtime-style" class="session-input" style="width:130px;">
                                     <option value="custom">Custom overtid</option>
+                                    <option value="custom-62274159">62274159</option>
                                     <option value="synth">Synth</option>
                                     <option value="off">Av</option>
                                 </select>
@@ -1163,6 +1165,7 @@
                             </div>
                             <div class="sound-row-controls">
                                 <select id="setting-first-rekke-style" class="session-input" style="width:130px;">
+                                    <option value="gong">Metal Plate Gong</option>
                                     <option value="synth">Synth (arpeggio)</option>
                                     <option value="off">Av</option>
                                 </select>
@@ -1386,6 +1389,6 @@
       </div>
     </div>
 
-    <script src="script.js" defer></script>
+    <script src="script.js?v=2" defer></script>
 </body>
 </html>

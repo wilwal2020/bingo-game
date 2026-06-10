@@ -192,11 +192,11 @@ class BingoApp {
             callStyle:       're4-select-number',
             selectStyle:     're4-select',
             switchStyle:     're4-switch',
-            confirmStyle:    'user_re4_switch',
+            confirmStyle:    're4-switch',
             cancelStyle:     're4-cancel',
             resetStyle:      're4-cancel-big',
             resetHardStyle:  're4-cancel-big',
-            overtimeStyle:   'user_62274159',
+            overtimeStyle:   'custom-62274159',
             overtimeEnabled: true,
             volOvertime: 1,
             typingDelay: 5,
@@ -212,7 +212,7 @@ class BingoApp {
             volCancel:  1,
             volReset:   1,
             volResetHard: 1,
-            firstRekkeStyle: 'user_fxprosound_metal_plate_gong_4_248610',
+            firstRekkeStyle: 'gong',
             volFirstRekke: 1,
             mutedSounds: { 'first-rekke': false },
             overAverageBlinkEnabled: true,
@@ -233,6 +233,11 @@ class BingoApp {
             this.slots[t] = freshSlotState();
         });
 
+        // In-memory mirror of the user-sound library. Backed by IndexedDB
+        // (store 'sounds' in db 'bingoSounds') so big base64 WAVs don't eat
+        // the ~5MB localStorage quota. Populated async by loadUserSoundsIntoPool.
+        this._userSounds = {};
+
         // Debounced-write registry: key → { timer, build }. Coalesces bursts of
         // writes (e.g. dragging a slider fires input events every frame) into a
         // single setItem per key. Flushed on pagehide so no state is lost.
@@ -243,13 +248,21 @@ class BingoApp {
 
     // ── Initialisation ──────────────────────────────
     init() {
+        // Opened directly from disk? fetch() of the bundled Sounds/*.wav files
+        // is blocked on file:// — every non-synth sound goes silent. Surface
+        // it instead of failing quietly.
+        if (location.protocol === 'file:') {
+            console.warn('[Lyd] Siden kjører fra file:// — nettleseren blokkerer lasting av lydfilene i Sounds/. Kjør via en lokal server (f.eks. "npx http-server") for å få lyd.');
+        }
         this.cacheElements();
         this.setupDropdownPortal();
         this.bindEvents();
         this.loadFromStorage();
-        this.applySettings();
         this.preloadSounds();
+        // Inject user-sound <option>s BEFORE applySettings — otherwise dropdowns
+        // whose saved style is a user sound can't sync (no matching option yet).
         this.loadUserSoundsIntoPool();
+        this.applySettings();
         this.applySlotToDOM();
         this.updateAverages();
         this.updateAverageHighlight();
@@ -260,7 +273,12 @@ class BingoApp {
         this.initBingoView();
 
         // Ensure any pending debounced writes are persisted before unload.
+        // Also flush on hide: iOS Safari can kill a backgrounded tab without
+        // ever firing pagehide, which would drop the last ~300ms of state.
         window.addEventListener('pagehide', () => this.flushPendingWrites());
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'hidden') this.flushPendingWrites();
+        });
     }
 
     // Schedule a localStorage write, coalescing rapid repeat calls for the same
@@ -745,6 +763,12 @@ class BingoApp {
         this.el.graphBtn.addEventListener('click',   () => this.openGraph());
         this.el.graphClose.addEventListener('click', () => this.closeGraph());
 
+        // Statistikk (session viewer) from nav menu
+        const navStatistikk = document.getElementById('nav-statistikk');
+        if (navStatistikk) {
+            navStatistikk.addEventListener('click', e => { e.preventDefault(); this.openViewerModal(); });
+        }
+
         // Frequency heatmap
         if (this.el.navFrequency) {
             this.el.navFrequency.addEventListener('click', e => { e.preventDefault(); this.openFrequencyModal(); });
@@ -989,7 +1013,8 @@ class BingoApp {
         const bindVol = (el, key, type) => {
             if (!el) return;
             el.addEventListener('input', () => {
-                this.settings[key] = parseFloat(el.value);
+                const v = parseFloat(el.value);
+                this.settings[key] = Number.isFinite(v) ? v : 1;
                 this.saveSettings();
             });
             el.addEventListener('change', () => this.playSound(type));
@@ -1559,13 +1584,17 @@ class BingoApp {
     }
 
     exportSettings() {
-        const jsonKeys  = ['bingoSettings', 'bingoThemeColors', 'bingoColorPresets', 'bingoUserSounds', 'bingoFlareSettings'];
+        const jsonKeys  = ['bingoSettings', 'bingoThemeColors', 'bingoColorPresets', 'bingoFlareSettings'];
         const plainKeys = ['bingoTheme'];
         const data = {};
         jsonKeys.forEach(k => {
             const val = localStorage.getItem(k);
             if (val !== null) try { data[k] = JSON.parse(val); } catch(e) {}
         });
+        // User sounds live in IndexedDB now — export from the in-memory mirror
+        if (Object.keys(this._userSounds || {}).length) {
+            data.bingoUserSounds = this._userSounds;
+        }
         plainKeys.forEach(k => {
             const val = localStorage.getItem(k);
             if (val !== null) data[k] = val;
@@ -1584,10 +1613,10 @@ class BingoApp {
     importSettings(file) {
         if (!file) return;
         const reader = new FileReader();
-        reader.onload = (e) => {
+        reader.onload = async (e) => {
             try {
                 const data = JSON.parse(e.target.result);
-                const jsonKeys  = ['bingoSettings', 'bingoThemeColors', 'bingoColorPresets', 'bingoUserSounds', 'bingoFlareSettings'];
+                const jsonKeys  = ['bingoSettings', 'bingoThemeColors', 'bingoColorPresets', 'bingoFlareSettings'];
                 const plainKeys = ['bingoTheme'];
                 let imported = 0;
                 jsonKeys.forEach(k => {
@@ -1596,6 +1625,14 @@ class BingoApp {
                 plainKeys.forEach(k => {
                     if (k in data) { localStorage.setItem(k, data[k]); imported++; }
                 });
+                // User sounds go straight to IndexedDB (too big for localStorage).
+                // Await the writes so they survive the reload below.
+                if (data.bingoUserSounds && typeof data.bingoUserSounds === 'object') {
+                    for (const [key, snd] of Object.entries(data.bingoUserSounds)) {
+                        await this._idbPutSound(key, snd);
+                    }
+                    imported++;
+                }
                 if (imported === 0) {
                     alert('Ingen gyldige innstillinger funnet i filen.');
                     return;
@@ -1607,33 +1644,6 @@ class BingoApp {
             }
         };
         reader.readAsText(file);
-    }
-
-    undoLastNumber() {
-        const nums = this.slot.selectedNumbers;
-        if (nums.length === 0) return;
-        const last = nums[nums.length - 1];
-        // Find and deselect the ball
-        this.el.balls.forEach(ball => {
-            if (ball.dataset.num === last) {
-                ball.classList.remove('clicked', 'recently-selected', 'last-clicked');
-                if (this._lastClickedBall === ball) this._lastClickedBall = null;
-            }
-        });
-        this.slot.selectedNumbers = nums.slice(0, -1);
-        this.slot.bigNumber = this.slot.selectedNumbers[this.slot.selectedNumbers.length - 1] || '';
-        this.el.bigNumberText.textContent = this.slot.bigNumber;
-        // Re-mark new last-clicked
-        if (this.slot.bigNumber) {
-            this.el.balls.forEach(ball => {
-                if (ball.dataset.num === this.slot.bigNumber) {
-                    ball.classList.add('last-clicked');
-                    this._lastClickedBall = ball;
-                }
-            });
-        }
-        this.updateDisplay();
-        this.saveSlotToStorage();
     }
 
     // ── Slot helpers ────────────────────────────────
@@ -1667,6 +1677,15 @@ class BingoApp {
         if (savedSettings) {
             try { Object.assign(this.settings, JSON.parse(savedSettings)); } catch(e) {}
         }
+        // Repair corrupt volume values. Old builds could persist NaN (JSON
+        // null) from parseFloat on an empty slider, and a null/NaN volume
+        // makes every sound of that type silently fail — gain ends up 0 or
+        // assignment throws inside playSound's try/catch.
+        Object.keys(this.settings).forEach(k => {
+            if (k.startsWith('vol') && !Number.isFinite(this.settings[k])) {
+                this.settings[k] = 1;
+            }
+        });
         const savedThemeColors = localStorage.getItem('bingoThemeColors');
         if (savedThemeColors) {
             try {
@@ -1803,8 +1822,19 @@ class BingoApp {
             this.slot.selectedNumbers = nums.filter(n => n !== number);
             ball.classList.remove('clicked', 'recently-selected', 'last-clicked');
             if (this._lastClickedBall === ball) this._lastClickedBall = null;
-            this.slot.bigNumber = '';
-            this.el.bigNumberText.textContent = '';
+            // Fall back to the most recent remaining call — deselecting an OLD
+            // number shouldn't blank the big display; only deselecting the
+            // latest call should step the display back to the previous one.
+            const remaining = this.slot.selectedNumbers;
+            this.slot.bigNumber = remaining.length ? remaining[remaining.length - 1] : '';
+            this.el.bigNumberText.textContent = this.slot.bigNumber;
+            if (this.slot.bigNumber && !this._lastClickedBall) {
+                const newLast = this.el.ballMap.get(this.slot.bigNumber);
+                if (newLast) {
+                    newLast.classList.add('last-clicked');
+                    this._lastClickedBall = newLast;
+                }
+            }
             this.bvSendUncall(number);
         } else {
             // If this is the jackpot number being called, break the circle
@@ -2304,7 +2334,7 @@ class BingoApp {
         const gameWinners = pending.filter(w => w.game === theme);
         if (gameWinners.length > 0) {
             const winnerLines = gameWinners
-                .map(w => `🏆 ${w.name} · ${w.rekke.replace('Rekke','R')} · ${w.prize} kr${w.split > 1 ? ` (1/${w.split})` : ''}`)
+                .map(w => `🏆 ${this._escapeHtml(w.name)} · ${w.rekke.replace('Rekke','R')} · ${w.prize} kr${w.split > 1 ? ` (1/${w.split})` : ''}`)
                 .join('<br>');
             html += `<br><span style="font-size:.8rem;opacity:.85">${winnerLines}</span>`;
         }
@@ -2630,7 +2660,7 @@ class BingoApp {
         this.winnerSelectedPlayers.forEach((name, i) => {
             const tag = document.createElement('span');
             tag.className = 'winner-selected-tag';
-            tag.innerHTML = `${name} <button class="winner-tag-remove" data-idx="${i}">✕</button>`;
+            tag.innerHTML = `${this._escapeHtml(name)} <button class="winner-tag-remove" data-idx="${i}">✕</button>`;
             tag.querySelector('.winner-tag-remove').addEventListener('click', () => {
                 this.winnerSelectedPlayers.splice(i, 1);
                 this.renderPlayerQuickselect();
@@ -2800,7 +2830,7 @@ class BingoApp {
         players.forEach((name, i) => {
             const item = document.createElement('div');
             item.className = 'player-list-item';
-            item.innerHTML = `<span>${name}</span>`;
+            item.innerHTML = `<span>${this._escapeHtml(name)}</span>`;
             const del = document.createElement('button');
             const addWin = document.createElement('button');
             addWin.className   = 'player-add-win-btn';
@@ -2983,7 +3013,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
 
             item.innerHTML = `
                 <div class="leaderboard-rank ${rankClass}">${medal}</div>
-                <div class="leaderboard-name">${entry.name}</div>
+                <div class="leaderboard-name">${this._escapeHtml(entry.name)}</div>
                 <div class="leaderboard-stats">
                     <div class="leaderboard-wins">${entry.wins} seier${entry.wins !== 1 ? 'er' : ''}</div>
                     <div class="leaderboard-money">${entry.money.toLocaleString('no-NO')} kr</div>
@@ -3037,7 +3067,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                 const winsHtml = session.wins.map(w => {
                     const splitText = w.split > 1 ? ` (delt på ${w.split})` : '';
                     const rc = w.rekke.replace('Rekke','Rekke ');
-                    return `${w.gameName} · ${rc} · ${w.ballCount} tall · ${w.prize} kr${splitText}`;
+                    return `${this._escapeHtml(w.gameName)} · ${rc} · ${w.ballCount} tall · ${w.prize} kr${splitText}`;
                 }).join('<br>');
 
                 item.innerHTML = `
@@ -3555,7 +3585,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                     this.slot.selectedNumbers = this.slot.selectedNumbers.filter(n => n !== firstStr);
                     const prevBall = this.el.ballMap.get(firstStr);
                     if (prevBall) prevBall.classList.remove('clicked', 'recently-selected', 'last-clicked');
-                    if (this._lastClickedBall && this._lastClickedBall.textContent.trim() === firstStr) {
+                    if (this._lastClickedBall && this._lastClickedBall.dataset.num === firstStr) {
                         this._lastClickedBall = null;
                     }
                 }
@@ -3575,7 +3605,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                     if (!isNaN(num) && num >= 1 && num <= 90) {
                         const numStr = String(num);
                         if (!this.slot.selectedNumbers.includes(numStr)) {
-                            const ball = [...this.el.balls].find(b => b.textContent.trim() === numStr);
+                            const ball = this.el.ballMap.get(numStr);
                             if (ball) {
                                 this.handleNormalClick(ball, numStr);
                                 this._lastOverwriteNum = num;
@@ -3681,8 +3711,18 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
 
     // ── Export / Import ──────────────────────────────
     exportSessions() {
-        const sessions = this.getSessions();
-        const blob = new Blob([JSON.stringify(sessions, null, 2)], { type: 'application/json' });
+        // v2 format: sessions plus everything else needed to move the
+        // statistics to a new device. The importer also accepts the old
+        // bare-array format.
+        const payload = {
+            format:      'geithus-bingo-v2',
+            exported:    new Date().toISOString(),
+            sessions:    this.getSessions(),
+            players:     this.getPlayers(),
+            manualWins:  this.getManualWins(),
+            callHistory: this.getCallHistory(),
+        };
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
         const url  = URL.createObjectURL(blob);
         const a    = document.createElement('a');
         a.href     = url;
@@ -3697,16 +3737,49 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         const reader = new FileReader();
         reader.onload = (e) => {
             try {
-                const imported = JSON.parse(e.target.result);
+                const parsed = JSON.parse(e.target.result);
+                // v2 = object wrapper with sessions + players/manualWins/callHistory.
+                // v1 = bare array of sessions.
+                const isV2 = parsed && !Array.isArray(parsed) && Array.isArray(parsed.sessions);
+                const imported = isV2 ? parsed.sessions : parsed;
                 if (!Array.isArray(imported)) throw new Error('Ugyldig format');
 
                 const existing  = this.getSessions();
                 const existDates = new Set(existing.map(s => s.date));
 
-                // Only add sessions whose date doesn't already exist
+                // Only add sessions whose date doesn't already exist; keep the
+                // list chronological so "siste N" filters stay correct.
                 const toAdd = imported.filter(s => !existDates.has(s.date));
-                const merged = [...existing, ...toAdd];
+                const merged = [...existing, ...toAdd]
+                    .sort((a, b) => new Date(a.date) - new Date(b.date));
                 this.saveSessions(merged);
+
+                if (isV2) {
+                    // Players: union
+                    const players = this.getPlayers();
+                    (parsed.players || []).forEach(p => {
+                        if (typeof p === 'string' && !players.includes(p)) players.push(p);
+                    });
+                    this.savePlayers(players);
+
+                    // Manual wins: dedupe on name+prize+date
+                    const manuals = this.getManualWins();
+                    const seenWins = new Set(manuals.map(m => `${m.name}|${m.prize}|${m.date}`));
+                    (parsed.manualWins || []).forEach(m => {
+                        const k = `${m.name}|${m.prize}|${m.date}`;
+                        if (!seenWins.has(k)) { seenWins.add(k); manuals.push(m); }
+                    });
+                    localStorage.setItem('bingoManualWins', JSON.stringify(manuals));
+
+                    // Call history: dedupe on session date, keep chronological
+                    const hist = this.getCallHistory();
+                    const histDates = new Set(hist.map(h => h && h.date));
+                    (parsed.callHistory || []).forEach(h => {
+                        if (h && h.date && !histDates.has(h.date)) hist.push(h);
+                    });
+                    hist.sort((a, b) => new Date(a.date) - new Date(b.date));
+                    localStorage.setItem('bingoCallHistory', JSON.stringify(hist));
+                }
 
                 this.renderSessionList();
                 this.updateAverages();
@@ -4189,7 +4262,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                 details.className = 'session-winner-details';
                 const winnerLines = session.winners.map(w => {
                     const splitText = w.split > 1 ? ` (1/${w.split})` : '';
-                    return `🏆 <strong>${w.name}</strong> · ${w.gameName} · ${w.rekke.replace('Rekke','Rekke ')} · ${w.prize} kr${splitText}`;
+                    return `🏆 <strong>${this._escapeHtml(w.name)}</strong> · ${this._escapeHtml(w.gameName)} · ${w.rekke.replace('Rekke','Rekke ')} · ${w.prize} kr${splitText}`;
                 }).join('<br>');
                 details.innerHTML = winnerLines;
                 item.appendChild(details);
@@ -4266,7 +4339,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         row.className = 'winner-edit-row';
         row.dataset.idx = idx;
         row.innerHTML = `
-            <input type="text" placeholder="Navn" value="${w.name || ''}" data-field="name">
+            <input type="text" placeholder="Navn" data-field="name">
             <select data-field="game">
                 ${GAME_THEMES.map(t => `<option value="${t}" ${w.game === t ? 'selected' : ''}>${GAME_NAMES[t]}</option>`).join('')}
             </select>
@@ -4278,6 +4351,8 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             <input type="number" placeholder="Tall" min="1" max="90" value="${w.ballCount || ''}" data-field="ballCount" title="Antall tall trukket">
             <button type="button" class="winner-remove-btn" title="Fjern">&times;</button>
         `;
+        // Set via property, not attribute interpolation — names can contain quotes
+        row.querySelector('[data-field="name"]').value = w.name || '';
         row.querySelector('.winner-remove-btn').addEventListener('click', () => row.remove());
         return row;
     }
@@ -4572,10 +4647,12 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             const name = file.name.replace(/\.[^.]+$/, ''); // strip extension
             const key = 'user_' + name.replace(/[^a-zA-Z0-9]/g, '_');
 
-            // Store in localStorage: { src: base64, name, categories }
-            const stored = this.getUserSounds();
-            stored[key] = { src: base64, name, categories };
-            localStorage.setItem('bingoUserSounds', JSON.stringify(stored));
+            // Store in IndexedDB: { src: base64, name, categories }
+            const entry = { src: base64, name, categories };
+            this._userSounds[key] = entry;
+            this._idbPutSound(key, entry).catch(() => {
+                alert('Kunne ikke lagre lyden permanent — den fungerer i denne økten, men forsvinner ved omlasting.');
+            });
 
             // Decode into AudioBuffer cache for instant first-play
             this._decodeAndCacheWav(key, base64);
@@ -4612,9 +4689,9 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         const filename = src.split('/').pop().replace(/\.[^.]+$/, '');
         const key = 'bundled_' + filename.replace(/[^a-zA-Z0-9]/g, '_');
 
-        const stored = this.getUserSounds();
-        stored[key] = { src, name, categories };
-        localStorage.setItem('bingoUserSounds', JSON.stringify(stored));
+        const entry = { src, name, categories };
+        this._userSounds[key] = entry;
+        this._idbPutSound(key, entry).catch(() => {});
 
         this._decodeAndCacheWav(key, src);
 
@@ -4623,9 +4700,46 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         this.playSound('confirm');
     }
 
+    // Synchronous read of the user-sound library (in-memory mirror of IndexedDB).
     getUserSounds() {
-        try { return JSON.parse(localStorage.getItem('bingoUserSounds') || '{}'); }
-        catch(e) { return {}; }
+        return this._userSounds || {};
+    }
+
+    // ── IndexedDB persistence for uploaded sounds ────
+    _soundDB() {
+        if (this._soundDBPromise) return this._soundDBPromise;
+        this._soundDBPromise = new Promise((resolve, reject) => {
+            const req = indexedDB.open('bingoSounds', 1);
+            req.onupgradeneeded = () => req.result.createObjectStore('sounds');
+            req.onsuccess = () => resolve(req.result);
+            req.onerror   = () => reject(req.error);
+        });
+        return this._soundDBPromise;
+    }
+
+    async _idbPutSound(key, data) {
+        const db = await this._soundDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('sounds', 'readwrite');
+            tx.objectStore('sounds').put(data, key);
+            tx.oncomplete = () => resolve();
+            tx.onerror    = () => reject(tx.error);
+        });
+    }
+
+    async _idbGetAllSounds() {
+        const db = await this._soundDB();
+        return new Promise((resolve, reject) => {
+            const tx  = db.transaction('sounds', 'readonly');
+            const cur = tx.objectStore('sounds').openCursor();
+            const out = {};
+            cur.onsuccess = () => {
+                const c = cur.result;
+                if (c) { out[c.key] = c.value; c.continue(); }
+                else resolve(out);
+            };
+            cur.onerror = () => reject(cur.error);
+        });
     }
 
     // Map sound category → dropdown element id
@@ -4676,19 +4790,55 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         try {
             const ctx = this.getAudioContext();
             fetch(src)
-                .then(r => r.arrayBuffer())
+                .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); })
                 .then(ab => ctx.decodeAudioData(ab))
                 .then(buf => { this._wavBuffers[key] = buf; })
-                .catch(() => {});
+                .catch(err => this._reportSoundLoadFailure(key, src, err));
         } catch (e) { /* AudioContext not ready */ }
     }
 
-    loadUserSoundsIntoPool() {
-        const sounds = this.getUserSounds();
-        Object.entries(sounds).forEach(([key, data]) => {
+    async loadUserSoundsIntoPool() {
+        // One-time migration: older versions kept base64 WAVs in localStorage
+        // under 'bingoUserSounds'. Move them into IndexedDB and free the quota.
+        let legacy = null;
+        try { legacy = JSON.parse(localStorage.getItem('bingoUserSounds') || 'null'); } catch(e) {}
+        try {
+            if (legacy && typeof legacy === 'object') {
+                for (const [key, data] of Object.entries(legacy)) {
+                    await this._idbPutSound(key, data);
+                }
+                localStorage.removeItem('bingoUserSounds');
+            }
+            this._userSounds = await this._idbGetAllSounds();
+        } catch (e) {
+            // IndexedDB unavailable (private mode etc.) — keep the legacy copy
+            this._userSounds = legacy || {};
+        }
+        Object.entries(this._userSounds).forEach(([key, data]) => {
             this._decodeAndCacheWav(key, data.src);
         });
         this.injectUserSoundOptions();
+        // The IDB load resolves after applySettings has already synced the
+        // dropdowns, so re-apply saved styles now that user options exist.
+        this.syncSoundStyleDropdowns();
+    }
+
+    // Re-sync the sound-style <select>s from settings. Safe to call any time;
+    // needed after user-sound options are injected asynchronously.
+    syncSoundStyleDropdowns() {
+        const s = this.settings;
+        [
+            [this.el.settingHoverStyle,      s.hoverStyle],
+            [this.el.settingCallStyle,       s.callStyle],
+            [this.el.settingSelectStyle,     s.selectStyle],
+            [this.el.settingSwitchStyle,     s.switchStyle],
+            [this.el.settingConfirmStyle,    s.confirmStyle],
+            [this.el.settingCancelStyle,     s.cancelStyle],
+            [this.el.settingResetStyle,      s.resetStyle],
+            [this.el.settingResetHardStyle,  s.resetHardStyle],
+            [this.el.settingOvertimeStyle,   s.overtimeStyle],
+            [this.el.settingFirstRekkeStyle, s.firstRekkeStyle],
+        ].forEach(([el, val]) => { if (el && val != null) el.value = val; });
     }
 
     preloadSounds() {
@@ -4710,6 +4860,8 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             close:             CLOSE_WAV,
             save_confirm_2:    SAVE_CONFIRM_2_WAV,
             overtime:          OVERTIME_WAV,
+            sound_62274159:    'Sounds/62274159.wav',
+            firstnumber_gong:  FIRSTNUMBER_WAV,
         };
         Object.entries(wavs).forEach(([key, src]) => {
             this._decodeAndCacheWav(key, src);
@@ -4730,12 +4882,16 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         const ctx = this.getAudioContext();
         if (ctx.state === 'suspended') ctx.resume();
 
+        // Non-finite volume (null/NaN from corrupt settings) must not kill
+        // the sound: treat it as full volume rather than gain 0 / a throw.
+        const vol = Number.isFinite(volume) ? Math.min(1, Math.max(0, volume)) : 1;
+
         const playBuffer = (buf) => {
             try {
                 const src = ctx.createBufferSource();
                 src.buffer = buf;
                 const g = ctx.createGain();
-                g.gain.value = Math.min(1, Math.max(0, volume));
+                g.gain.value = vol;
                 src.connect(g); g.connect(ctx.destination);
                 src.start(0);
                 // Cleanup: disconnect once the source finishes so nodes don't
@@ -4755,7 +4911,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         this._wavLoading[cacheKey] = [playBuffer];
 
         fetch(src)
-            .then(r => r.arrayBuffer())
+            .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); })
             .then(ab => ctx.decodeAudioData(ab))
             .then(buf => {
                 this._wavBuffers[cacheKey] = buf;
@@ -4763,7 +4919,26 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                 delete this._wavLoading[cacheKey];
                 queue.forEach(fn => fn(buf));
             })
-            .catch(() => { delete this._wavLoading[cacheKey]; });
+            .catch(err => {
+                delete this._wavLoading[cacheKey];
+                this._reportSoundLoadFailure(cacheKey, src, err);
+            });
+    }
+
+    // Sound files failing to load used to be swallowed silently, which made
+    // "this sound just doesn't play" impossible to diagnose. Log each failed
+    // key once to the error log (visible under Feil-logg in the nav menu).
+    _reportSoundLoadFailure(cacheKey, src, err) {
+        if (!this._soundFailuresReported) this._soundFailuresReported = new Set();
+        if (this._soundFailuresReported.has(cacheKey)) return;
+        this._soundFailuresReported.add(cacheKey);
+        const srcLabel = String(src).startsWith('data:') ? '(opplastet lyd)' : src;
+        try {
+            window.bingoErrorLog.record('sound',
+                `Lydfil kunne ikke lastes: ${cacheKey} ← ${srcLabel}` +
+                (location.protocol === 'file:' ? ' — siden kjører fra file://, da blokkeres lydfiler. Bruk en lokal server.' : ''),
+                err && err.message);
+        } catch (e) {}
     }
 
     playSound(type) {
@@ -4782,7 +4957,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                 if (style) {
                     const sounds = this.getUserSounds();
                     if (sounds[style]) {
-                        this.playWav(sounds[style].src, style, this.settings['vol' + styleKey.replace('Style','').replace(/^\w/, c => c.toUpperCase())] || 0.8);
+                        this.playWav(sounds[style].src, style, this.settings['vol' + styleKey.replace('Style','').replace(/^\w/, c => c.toUpperCase())] ?? 0.8);
                         return;
                     }
                 }
@@ -4793,9 +4968,12 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             const D = ctx.destination;
             const s = this.settings;
 
-            // Master gain node for all synth sounds — respects per-type volume
+            // Master gain node for all synth sounds — respects per-type volume.
+            // Non-finite vol (corrupt settings) falls back to 1 instead of
+            // throwing / silencing the whole sound.
             const masterGain = (vol) => {
-                const g = ctx.createGain(); g.gain.value = vol;
+                const g = ctx.createGain();
+                g.gain.value = Number.isFinite(vol) ? Math.min(1, Math.max(0, vol)) : 1;
                 g.connect(D); return g;
             };
 
@@ -4822,8 +5000,6 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                 o.connect(g); g.connect(d); o.start(n); o.stop(n+0.1);
 
             } else if (type === 'call') {
-                const style = this.settings.callStyle;
-                if (style === 're4-select-number') { this.playWav(RE4_SELECT_NUMBER_WAV, 're4_select_number', 0.9); return; }
                 if (s.callStyle === 're4-select-number') { this.playWav(RE4_SELECT_NUMBER_WAV, 're4_select_number', s.volCall); return; }
                 if (s.callStyle === 're4-select')        { this.playWav(RE4_SELECT_WAV, 're4_select', s.volCall); return; }
                 if (s.callStyle === 'custom-click')      { this.playWav(CLICK_WAV, 'click', s.volCall); return; }
@@ -4878,6 +5054,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
 
             } else if (type === 'first-rekke') {
                 if (s.firstRekkeStyle === 'off') return;
+                if (s.firstRekkeStyle === 'gong') { this.playWav(FIRSTNUMBER_WAV, 'firstnumber_gong', s.volFirstRekke); return; }
                 // synth: rising three-note arpeggio to signal rekke start
                 { const md = MD(s.volFirstRekke);
                 [440, 554, 660].forEach((freq, i) => {
@@ -4924,6 +5101,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
 
             } else if (type === 'confirm') {
                 if (s.confirmStyle === 're4-select') { this.playWav(RE4_SELECT_WAV, 're4_select', s.volConfirm); return; }
+                if (s.confirmStyle === 're4-switch') { this.playWav(RE4_SWITCH_WAV, 're4_switch', s.volConfirm); return; }
                 if (s.confirmStyle === 'custom-save-confirm-2') { this.playWav(SAVE_CONFIRM_2_WAV, 'save_confirm_2', s.volConfirm); return; }
                 { const md = MD(s.volConfirm);
                 [400, 520, 720].forEach((freq, i) => {
@@ -4942,9 +5120,15 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                     g.gain.setValueAtTime(0, n+d); g.gain.linearRampToValueAtTime(0.18, n+d+0.01); g.gain.exponentialRampToValueAtTime(0.001, n+d+0.12);
                     o.connect(g); g.connect(md); o.start(n+d); o.stop(n+d+0.12);
                 }); }
+            } else if (type === 'close') {
+                // Deselect / undo. This type had no handler at all, so every
+                // playSound('close') call site was silent.
+                this.playWav(CLOSE_WAV, 'close', s.volCancel ?? 1);
+
             } else if (type === 'overtime') {
                 if (s.overtimeStyle === 'off') return;
                 if (s.overtimeStyle === 'custom') { this.playWav(OVERTIME_WAV, 'overtime', s.volOvertime); return; }
+                if (s.overtimeStyle === 'custom-62274159') { this.playWav('Sounds/62274159.wav', 'sound_62274159', s.volOvertime); return; }
                 // Synth fallback: rising tension sting
                 { const md = MD(s.volOvertime);
                 const o = osc('sawtooth', 180); const g = gn();
@@ -4974,7 +5158,9 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         if (style === 'custom-click-hover-2') { this.playWav(CLICK_AND_HOVER_2_WAV, 'click_and_hover_2', vol); return; }
         if (style === 'custom-click-hover-3') { this.playWav(CLICK_AND_HOVER_3_WAV, 'click_and_hover_3', vol); return; }
 
-        const md = ctx.createGain(); md.gain.value = vol; md.connect(D);
+        const md = ctx.createGain();
+        md.gain.value = Number.isFinite(vol) ? Math.min(1, Math.max(0, vol)) : 1;
+        md.connect(D);
 
         if (style === 'click-air') {
             const no = nz(0.012); const hp = flt('highpass', 2500, 0.7); const g = gn();
@@ -5213,22 +5399,33 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
 
             // Host presence marker — re-register on every Firebase reconnect so phones
             // can always find the host even after a brief network interruption.
-            // Persisted papers / papers_meta are also wiped on host disconnect: a
-            // fresh page-load gets a fresh channel code anyway, so there's no
-            // value in keeping stale papers around past the host session.
+            //
+            // Papers lifetime depends on the code type:
+            //  - RANDOM code: a fresh page-load gets a fresh code, so stale
+            //    papers are worthless — wipe on connect and on host disconnect.
+            //  - CUSTOM code: the code survives host refreshes, so wiping here
+            //    would delete offline phones' persisted papers every time the
+            //    host reloads. Keep them; the per-phone "Slett" button and the
+            //    offline-duplicate cleanup handle stale entries.
+            const isCustomCode = (() => {
+                try { return !!(localStorage.getItem('bv_customCode') || '').trim(); }
+                catch (e) { return false; }
+            })();
             const hostRef       = this._bvChannelRef.child('host');
             const papersRef     = this._bvChannelRef.child('papers');
             const papersMetaRef = this._bvChannelRef.child('papers_meta');
-            // Also wipe the papers/papers_meta on initial connect, in case the
-            // user opens the same code twice (rare with random codes, but safe).
-            papersRef.remove();
-            papersMetaRef.remove();
+            if (!isCustomCode) {
+                papersRef.remove();
+                papersMetaRef.remove();
+            }
             const infoRef = firebase.database().ref('.info/connected');
             const infoHandler = (snap) => {
                 if (!snap.val()) return;
                 hostRef.onDisconnect().remove();
-                papersRef.onDisconnect().remove();
-                papersMetaRef.onDisconnect().remove();
+                if (!isCustomCode) {
+                    papersRef.onDisconnect().remove();
+                    papersMetaRef.onDisconnect().remove();
+                }
                 hostRef.set({ ts: Date.now() });
             };
             infoRef.on('value', infoHandler);
@@ -6075,20 +6272,24 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         });
 
         const closeBtn = modal.querySelector('.bv-win-modal-close');
+        // Detach any handlers from a previous (possibly still-open) notice so
+        // repeated wins don't stack document-level keydown listeners.
+        if (modal._bvWinCleanup) modal._bvWinCleanup();
         const close = () => {
             modal.style.display = 'none';
-            modal.removeEventListener('click', backdropClose);
-            closeBtn.removeEventListener('click', close);
-            if (modal._bvWinKeyHandler) {
-                document.removeEventListener('keydown', modal._bvWinKeyHandler);
-                modal._bvWinKeyHandler = null;
-            }
+            if (modal._bvWinCleanup) modal._bvWinCleanup();
         };
         const backdropClose = (e) => { if (e.target === modal) close(); };
+        const keyHandler    = (e) => { if (e.key === 'Escape') close(); };
+        modal._bvWinCleanup = () => {
+            modal.removeEventListener('click', backdropClose);
+            closeBtn.removeEventListener('click', close);
+            document.removeEventListener('keydown', keyHandler);
+            modal._bvWinCleanup = null;
+        };
         modal.addEventListener('click', backdropClose);
         closeBtn.addEventListener('click', close);
-        modal._bvWinKeyHandler = (e) => { if (e.key === 'Escape') close(); };
-        document.addEventListener('keydown', modal._bvWinKeyHandler);
+        document.addEventListener('keydown', keyHandler);
 
         modal.style.display = 'flex';
     }
