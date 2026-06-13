@@ -226,6 +226,7 @@ class BingoApp {
             bvHighlightThreshold:  2,
             bvWinNotifyEnabled:    true,
             bvWinAutoOpenWinModal: false,
+            autoBackupDownload:    true,
         };
 
         // Init all slots
@@ -557,6 +558,20 @@ class BingoApp {
             errorLogClear:              document.getElementById('error-log-clear'),
             errorLogClose:              document.getElementById('error-log-close'),
             frequencyBtn:               document.getElementById('frequency-btn'),
+            // Statistics modal
+            statsBtn:                   document.getElementById('stats-btn'),
+            statsModal:                 document.getElementById('stats-modal'),
+            statsSubtitle:              document.getElementById('stats-subtitle'),
+            statsContent:               document.getElementById('stats-content'),
+            statsClose:                 document.getElementById('stats-close'),
+            // Backups
+            backupNowBtn:               document.getElementById('backup-now-btn'),
+            backupsOpenBtn:             document.getElementById('backups-open-btn'),
+            backupsModal:               document.getElementById('backups-modal'),
+            backupsList:                document.getElementById('backups-list'),
+            backupsClose:               document.getElementById('backups-close'),
+            viewerBackupStatus:         document.getElementById('viewer-backup-status'),
+            settingAutoBackup:          document.getElementById('setting-auto-backup'),
         };
 
         // Wrap each ball's text in an inner span so hover/clicked scale
@@ -657,6 +672,8 @@ class BingoApp {
             ['unsaved-modal',        () => this.closeUnsavedModal()],
             ['upload-sound-modal',   () => this.closeUploadSoundModal()],
             ['settings-modal',       () => this.closeSettingsModal()],
+            ['stats-modal',          () => this.closeStatsModal()],
+            ['backups-modal',        () => this.closeBackupsModal()],
             ['suggest-save-modal',   () => { this.playSound('cancel'); this.el.suggestSaveModal.style.display = 'none'; }],
         ];
         backdropMap.forEach(([id, closeFn]) => {
@@ -762,6 +779,33 @@ class BingoApp {
         // Graph
         this.el.graphBtn.addEventListener('click',   () => this.openGraph());
         this.el.graphClose.addEventListener('click', () => this.closeGraph());
+
+        // Statistics
+        if (this.el.statsBtn) {
+            this.el.statsBtn.addEventListener('click',   () => this.openStatsModal());
+            this.el.statsClose.addEventListener('click', () => this.closeStatsModal());
+        }
+
+        // Backups
+        if (this.el.backupNowBtn) {
+            this.el.backupNowBtn.addEventListener('click', () => {
+                this.playSound('confirm');
+                this.el.viewerIoDropdown.classList.remove('open');
+                this.performAutoBackup({ download: true });
+            });
+            this.el.backupsOpenBtn.addEventListener('click', () => {
+                this.playSound('select');
+                this.el.viewerIoDropdown.classList.remove('open');
+                this.openBackupsModal();
+            });
+            this.el.backupsClose.addEventListener('click', () => this.closeBackupsModal());
+        }
+        if (this.el.settingAutoBackup) {
+            this.el.settingAutoBackup.addEventListener('change', () => {
+                this.settings.autoBackupDownload = this.el.settingAutoBackup.checked;
+                this.saveSettings();
+            });
+        }
 
         // Statistikk (session viewer) from nav menu
         const navStatistikk = document.getElementById('nav-statistikk');
@@ -1486,6 +1530,11 @@ class BingoApp {
         if (this.el.settingOverAverageBlink) {
             this.el.settingOverAverageBlink.checked = s.overAverageBlinkEnabled ?? true;
             document.body.classList.toggle('no-over-average-blink', !(s.overAverageBlinkEnabled ?? true));
+        }
+
+        // Auto backup
+        if (this.el.settingAutoBackup) {
+            this.el.settingAutoBackup.checked = s.autoBackupDownload ?? true;
         }
 
         // Blur
@@ -2497,6 +2546,10 @@ class BingoApp {
         // If dynamic mode, the new session shifts the average — restart so it's live
         if (!this.settings.countdownFixed) this.startCountdown();
         this.updateWinnerIndicator();
+
+        // Automatic backup: internal IndexedDB snapshot always; file download
+        // too unless the user switched it off in settings.
+        this.performAutoBackup();
     }
 
     closeSessionModal() {
@@ -3011,9 +3064,12 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             const rankClass = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
             const medal     = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}.`;
 
+            const dry = this._drySpellText(entry.name);
             item.innerHTML = `
                 <div class="leaderboard-rank ${rankClass}">${medal}</div>
-                <div class="leaderboard-name">${this._escapeHtml(entry.name)}</div>
+                <div class="leaderboard-name">${this._escapeHtml(entry.name)}${
+                    dry ? `<span class="leaderboard-last">Sist seier: ${dry}</span>` : ''
+                }</div>
                 <div class="leaderboard-stats">
                     <div class="leaderboard-wins">${entry.wins} seier${entry.wins !== 1 ? 'er' : ''}</div>
                     <div class="leaderboard-money">${entry.money.toLocaleString('no-NO')} kr</div>
@@ -3047,8 +3103,10 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         const totalWins  = playerWins.reduce((sum, s) => sum + s.wins.length, 0);
 
         this.el.playerHistoryTitle.textContent    = `🏆 ${name}`;
+        const drySpell = this._drySpellText(name);
         this.el.playerHistorySubtitle.textContent =
-            `${totalWins} seier${totalWins !== 1 ? 'er' : ''} · ${totalMoney.toLocaleString('no-NO')} kr totalt`;
+            `${totalWins} seier${totalWins !== 1 ? 'er' : ''} · ${totalMoney.toLocaleString('no-NO')} kr totalt`
+            + (drySpell ? ` · Sist seier: ${drySpell}` : '');
 
         const list     = this.el.playerHistoryList;
         list.innerHTML = '';
@@ -3109,6 +3167,310 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         try {
             return JSON.parse(localStorage.getItem('bingoCallHistory') || '[]');
         } catch(e) { return []; }
+    }
+
+    // ── Automatic backups ─────────────────────────────
+    // Rolling snapshots in IndexedDB (db 'bingoBackups') + optional file
+    // download. One snapshot per session save, last 10 kept. The payload is
+    // compatible with BOTH existing importers: the session importer reads
+    // .sessions/.players/..., the settings importer reads bingoSettings etc.
+    _backupDB() {
+        if (this._backupDBPromise) return this._backupDBPromise;
+        this._backupDBPromise = new Promise((resolve, reject) => {
+            const req = indexedDB.open('bingoBackups', 1);
+            req.onupgradeneeded = () => req.result.createObjectStore('backups');
+            req.onsuccess = () => resolve(req.result);
+            req.onerror   = () => reject(req.error);
+        });
+        return this._backupDBPromise;
+    }
+
+    async _idbBackupTx(mode, fn) {
+        const db = await this._backupDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('backups', mode);
+            const result = fn(tx.objectStore('backups'));
+            tx.oncomplete = () => resolve(result && 'result' in result ? result.result : undefined);
+            tx.onerror    = () => reject(tx.error);
+        });
+    }
+
+    async _idbListBackups() {
+        const db = await this._backupDB();
+        return new Promise((resolve, reject) => {
+            const out = [];
+            const cur = db.transaction('backups', 'readonly').objectStore('backups').openCursor();
+            cur.onsuccess = () => {
+                const c = cur.result;
+                if (c) {
+                    const v = c.value || {};
+                    out.push({
+                        ts: c.key,
+                        sessions: Array.isArray(v.sessions) ? v.sessions.length : 0,
+                        players:  Array.isArray(v.players)  ? v.players.length  : 0,
+                    });
+                    c.continue();
+                } else resolve(out.sort((a, b) => b.ts - a.ts));
+            };
+            cur.onerror = () => reject(cur.error);
+        });
+    }
+
+    buildBackupPayload() {
+        const payload = {
+            format:      'geithus-bingo-backup-v1',
+            exported:    new Date().toISOString(),
+            sessions:    this.getSessions(),
+            players:     this.getPlayers(),
+            manualWins:  this.getManualWins(),
+            callHistory: this.getCallHistory(),
+        };
+        ['bingoSettings', 'bingoThemeColors', 'bingoColorPresets', 'bingoFlareSettings'].forEach(k => {
+            const v = localStorage.getItem(k);
+            if (v !== null) try { payload[k] = JSON.parse(v); } catch(e) {}
+        });
+        const theme = localStorage.getItem('bingoTheme');
+        if (theme) payload.bingoTheme = theme;
+        return payload;
+    }
+
+    async performAutoBackup(opts = {}) {
+        const download = opts.download ?? (this.settings.autoBackupDownload ?? true);
+        const payload  = this.buildBackupPayload();
+        const ts       = Date.now();
+        try {
+            await this._idbBackupTx('readwrite', store => store.put(payload, ts));
+            // Prune to the 10 newest snapshots
+            const list = await this._idbListBackups();
+            for (const old of list.slice(10)) {
+                await this._idbBackupTx('readwrite', store => store.delete(old.ts));
+            }
+            try { localStorage.setItem('bingoLastBackupTs', String(ts)); } catch(e) {}
+        } catch(e) { /* IndexedDB unavailable — file download below still works */ }
+        if (download) this._downloadBackupFile(payload);
+        this.updateBackupStatus();
+    }
+
+    _downloadBackupFile(payload) {
+        try {
+            const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+            const url  = URL.createObjectURL(blob);
+            const a    = document.createElement('a');
+            a.href     = url;
+            a.download = `geithus-bingo-backup-${new Date().toISOString().slice(0,10)}.json`;
+            a.click();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        } catch(e) {}
+    }
+
+    updateBackupStatus() {
+        const el = this.el.viewerBackupStatus;
+        if (!el) return;
+        let ts = 0;
+        try { ts = parseInt(localStorage.getItem('bingoLastBackupTs') || '0', 10); } catch(e) {}
+        if (!ts) {
+            el.textContent = 'Backup: aldri';
+            el.style.color = 'var(--danger-color, #ff4444)';
+            return;
+        }
+        const days = Math.floor((Date.now() - ts) / 86_400_000);
+        el.textContent = days === 0 ? 'Backup: i dag' : `Backup: ${days} d siden`;
+        el.style.color = days > 21 ? 'var(--danger-color, #ff4444)' : '';
+    }
+
+    async openBackupsModal() {
+        const list = this.el.backupsList;
+        list.innerHTML = '<div class="error-log-empty">Laster…</div>';
+        this.el.backupsModal.style.display = 'flex';
+
+        // One-time delegated handler for download buttons
+        if (!list._bound) {
+            list._bound = true;
+            list.addEventListener('click', async e => {
+                const btn = e.target.closest('.backup-dl-btn');
+                if (!btn) return;
+                this.playSound('confirm');
+                const ts = Number(btn.dataset.ts);
+                try {
+                    const payload = await this._idbBackupTx('readonly', store => store.get(ts));
+                    if (payload) this._downloadBackupFile(payload);
+                } catch(err) {}
+            });
+        }
+
+        let items = [];
+        try { items = await this._idbListBackups(); } catch(e) {}
+        if (!items.length) {
+            list.innerHTML = '<div class="error-log-empty">Ingen interne backuper ennå — de tas automatisk når en sesjon lagres.</div>';
+            return;
+        }
+        list.innerHTML = '';
+        items.forEach(it => {
+            const row = document.createElement('div');
+            row.className = 'backup-row';
+            const label = document.createElement('span');
+            label.className = 'backup-row-label';
+            label.textContent = new Date(it.ts).toLocaleString('no-NO') +
+                ` · ${it.sessions} sesjon${it.sessions === 1 ? '' : 'er'}`;
+            const dl = document.createElement('button');
+            dl.className = 'modal-btn session-action-btn session-edit-btn backup-dl-btn';
+            dl.dataset.ts = it.ts;
+            dl.textContent = 'Last ned';
+            row.appendChild(label);
+            row.appendChild(dl);
+            list.appendChild(row);
+        });
+    }
+
+    closeBackupsModal() {
+        this.playSound('cancel');
+        this.el.backupsModal.style.display = 'none';
+    }
+
+    // ── Statistics modal ──────────────────────────────
+    openStatsModal() {
+        this.playSound('select');
+        this.renderStats();
+        this.el.statsModal.style.display = 'flex';
+    }
+
+    closeStatsModal() {
+        this.playSound('cancel');
+        this.el.statsModal.style.display = 'none';
+    }
+
+    renderStats() {
+        const sessions = this.getSessions();
+        const wrap = this.el.statsContent;
+        wrap.innerHTML = '';
+        this.el.statsSubtitle.textContent = sessions.length === 1
+            ? 'Basert på 1 lagret sesjon'
+            : `Basert på ${sessions.length} lagrede sesjoner`;
+        if (!sessions.length) {
+            wrap.innerHTML = '<div class="error-log-empty">Ingen sesjoner lagret enda.</div>';
+            return;
+        }
+
+        const rekkeKeys  = ['rekke1', 'rekke2', 'rekke3'];
+        const rekkeNames = ['Rekke 1', 'Rekke 2', 'Rekke 3'];
+        const fmtDate = d => new Date(d).toLocaleDateString('no-NO', { day:'numeric', month:'short', year:'numeric' });
+
+        // Collect every logged rekke value with its date and game index
+        const vals = [[], [], []];
+        sessions.forEach(s => {
+            (s.games || []).forEach((g, gi) => {
+                if (!g) return;
+                rekkeKeys.forEach((k, i) => {
+                    const v = g[k];
+                    if (v !== null && v !== undefined && v !== '') {
+                        vals[i].push({ v: Number(v), date: s.date, gameIdx: gi });
+                    }
+                });
+            });
+        });
+
+        const median = nums => {
+            const a = [...nums].sort((x, y) => x - y);
+            const m = Math.floor(a.length / 2);
+            return a.length % 2 ? a[m] : Math.round((a[m-1] + a[m]) / 2);
+        };
+
+        // ── Per-rekke sections: records + histogram ──
+        rekkeNames.forEach((name, i) => {
+            const list = vals[i];
+            if (!list.length) return;
+            const nums = list.map(e => e.v);
+            const min = Math.min(...nums), max = Math.max(...nums);
+            const avg = Math.round(nums.reduce((a, b) => a + b, 0) / nums.length * 10) / 10;
+            const fastest = list.find(e => e.v === min);
+            const slowest = list.find(e => e.v === max);
+
+            const sec = document.createElement('div');
+            sec.className = 'stats-section';
+            const h = document.createElement('div');
+            h.className = 'stats-section-title';
+            h.textContent = name;
+            sec.appendChild(h);
+
+            const rec = document.createElement('div');
+            rec.className = 'stats-records';
+            rec.innerHTML =
+                `<span>⚡ Raskest: <strong>${min}</strong> (${fmtDate(fastest.date)})</span>` +
+                `<span>🐢 Tregest: <strong>${max}</strong> (${fmtDate(slowest.date)})</span>` +
+                `<span>Median: <strong>${median(nums)}</strong></span>` +
+                `<span>Snitt: <strong>${avg}</strong></span>`;
+            sec.appendChild(rec);
+
+            // Histogram — bucket so we get at most ~12 bars
+            const bw = Math.max(1, Math.ceil((max - min + 1) / 12));
+            const buckets = [];
+            for (let b = min; b <= max; b += bw) {
+                buckets.push({ from: b, to: Math.min(b + bw - 1, max), count: 0 });
+            }
+            nums.forEach(v => { buckets[Math.floor((v - min) / bw)].count++; });
+            const bmax = Math.max(...buckets.map(b => b.count));
+            buckets.forEach(b => {
+                const row = document.createElement('div');
+                row.className = 'freq-bar-row';
+                const pct = bmax > 0 ? Math.round((b.count / bmax) * 100) : 0;
+                const label = b.from === b.to ? `${b.from}` : `${b.from}–${b.to}`;
+                row.innerHTML =
+                    `<span class="freq-bar-num stats-bucket-label">${label}</span>` +
+                    `<div class="freq-bar-track"><div class="freq-bar-fill" style="width:${pct}%"></div></div>` +
+                    `<span class="freq-bar-count">${b.count}</span>`;
+                sec.appendChild(row);
+            });
+            wrap.appendChild(sec);
+        });
+
+        // ── Per-spill comparison table ──
+        const sec = document.createElement('div');
+        sec.className = 'stats-section';
+        const h = document.createElement('div');
+        h.className = 'stats-section-title';
+        h.textContent = 'Snitt per spill';
+        sec.appendChild(h);
+        const table = document.createElement('div');
+        table.className = 'stats-game-table';
+        table.innerHTML = '<div class="stats-game-cell stats-game-head"></div>' +
+            rekkeNames.map(n => `<div class="stats-game-cell stats-game-head">${n.replace('Rekke ', 'R')}</div>`).join('');
+        GAME_THEMES.forEach((theme, gi) => {
+            const nameCell = document.createElement('div');
+            nameCell.className = 'stats-game-cell stats-game-name';
+            nameCell.textContent = GAME_NAMES[theme];
+            nameCell.style.color = this.themeColors[theme]?.accent || THEME_COLORS[theme];
+            table.appendChild(nameCell);
+            rekkeKeys.forEach((k, ri) => {
+                const entries = vals[ri].filter(e => e.gameIdx === gi);
+                const cell = document.createElement('div');
+                cell.className = 'stats-game-cell';
+                cell.textContent = entries.length
+                    ? Math.round(entries.reduce((a, e) => a + e.v, 0) / entries.length * 10) / 10
+                    : '–';
+                table.appendChild(cell);
+            });
+        });
+        sec.appendChild(table);
+        wrap.appendChild(sec);
+    }
+
+    // Sessions since a player's last win (0 = won in the latest session).
+    // Based on saved sessions only — manual wins have no session index.
+    getDrySpell(name) {
+        const sessions = this.getSessions();
+        for (let i = sessions.length - 1; i >= 0; i--) {
+            if ((sessions[i].winners || []).some(w => w.name === name)) {
+                return { sessionsAgo: sessions.length - 1 - i, date: sessions[i].date };
+            }
+        }
+        return null;
+    }
+
+    _drySpellText(name) {
+        const ds = this.getDrySpell(name);
+        if (!ds) return null;
+        return ds.sessionsAgo === 0 ? 'siste sesjon'
+             : `${ds.sessionsAgo} sesjon${ds.sessionsAgo === 1 ? '' : 'er'} siden`;
     }
 
     // Portal the .dropdown-content to <body> so it escapes the nav's
@@ -3203,6 +3565,33 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         let max = 0;
         for (let i = 1; i <= 90; i++) if (counts[i] > max) max = counts[i];
         return { counts, callsTotal, sessionsTotal, max };
+    }
+    // Call-order lists for the chosen scope. Each entry is one game's numbers
+    // in the order they were called, tagged with its session index (oldest=0).
+    // Used by the order-aware displays: overdue / opening / avg position.
+    getScopedCallLists(scope) {
+        const lists = [];
+        if (scope === 'current') {
+            COLOR_THEMES.forEach(t => {
+                const s = this.slots[t];
+                if (s && Array.isArray(s.selectedNumbers) && s.selectedNumbers.length) {
+                    lists.push({ numbers: s.selectedNumbers.map(Number), sessionIdx: 0 });
+                }
+            });
+            return { lists, sessionCount: 1 };
+        }
+        let hist = this.getCallHistory();
+        if (scope === 'last10') hist = hist.slice(-10);
+        else if (scope === 'lastSession') hist = hist.slice(-1);
+        hist.forEach((entry, idx) => {
+            if (!entry || !entry.games) return;
+            Object.values(entry.games).forEach(nums => {
+                if (Array.isArray(nums) && nums.length) {
+                    lists.push({ numbers: nums.map(Number), sessionIdx: idx });
+                }
+            });
+        });
+        return { lists, sessionCount: hist.length };
     }
     _freqColor(value, max) {
         if (max <= 0 || value <= 0) return '#2a3340';
@@ -3343,6 +3732,89 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                     `<span class="freq-bar-num">${n}</span>` +
                     `<div class="freq-bar-track"><div class="freq-bar-fill" style="width:${pct}%"></div></div>` +
                     `<span class="freq-bar-count">${c}</span>`;
+                wrap.appendChild(row);
+            });
+        } else if (display === 'overdue') {
+            // Sessions since each number was last called (never-called first)
+            const { lists, sessionCount } = this.getScopedCallLists(scope);
+            const lastSeen = new Array(91).fill(-1);
+            lists.forEach(({ numbers, sessionIdx }) => {
+                numbers.forEach(n => {
+                    if (n >= 1 && n <= 90 && sessionIdx > lastSeen[n]) lastSeen[n] = sessionIdx;
+                });
+            });
+            const rows = [];
+            for (let n = 1; n <= 90; n++) {
+                rows.push({ n, overdue: lastSeen[n] === -1 ? Infinity : (sessionCount - 1 - lastSeen[n]) });
+            }
+            rows.sort((a, b) => (b.overdue - a.overdue) || (a.n - b.n));
+            const finite = rows.map(r => r.overdue).filter(Number.isFinite);
+            const oMax = Math.max(1, ...finite);
+            rows.forEach(({ n, overdue }) => {
+                const never = !Number.isFinite(overdue);
+                const pct = never ? 100 : Math.round((overdue / oMax) * 100);
+                const label = never ? 'aldri kalt'
+                            : overdue === 0 ? 'i siste sesjon'
+                            : `${overdue} sesjon${overdue === 1 ? '' : 'er'} siden`;
+                const row = document.createElement('div');
+                row.className = 'freq-bar-row';
+                row.innerHTML =
+                    `<span class="freq-bar-num">${n}</span>` +
+                    `<div class="freq-bar-track"><div class="freq-bar-fill" style="width:${pct}%"></div></div>` +
+                    `<span class="freq-bar-count freq-wide-label">${label}</span>`;
+                wrap.appendChild(row);
+            });
+        } else if (display === 'opening') {
+            // Numbers that most often appear in a game's first 5 calls
+            const { lists } = this.getScopedCallLists(scope);
+            const counts5 = new Array(91).fill(0);
+            lists.forEach(({ numbers }) => {
+                numbers.slice(0, 5).forEach(n => { if (n >= 1 && n <= 90) counts5[n]++; });
+            });
+            const rows = [];
+            for (let n = 1; n <= 90; n++) if (counts5[n] > 0) rows.push({ n, c: counts5[n] });
+            rows.sort((a, b) => b.c - a.c || a.n - b.n);
+            const top = rows.slice(0, 15);
+            if (!top.length) {
+                wrap.innerHTML = '<div class="error-log-empty">Ingen åpningsdata i dette omfanget.</div>';
+                return;
+            }
+            const m = top[0].c;
+            top.forEach(({ n, c }, i) => {
+                const row = document.createElement('div');
+                row.className = 'freq-bar-row freq-bar-row-ranked';
+                row.innerHTML =
+                    `<span class="freq-bar-rank">#${i + 1}</span>` +
+                    `<span class="freq-bar-num">${n}</span>` +
+                    `<div class="freq-bar-track"><div class="freq-bar-fill" style="width:${Math.round((c / m) * 100)}%"></div></div>` +
+                    `<span class="freq-bar-count">${c}×</span>`;
+                wrap.appendChild(row);
+            });
+        } else if (display === 'avgpos') {
+            // Average draw position per number (earliest first). Position 1 =
+            // first number called in a game.
+            const { lists } = this.getScopedCallLists(scope);
+            const sums = new Array(91).fill(0), cnts = new Array(91).fill(0);
+            lists.forEach(({ numbers }) => {
+                numbers.forEach((n, i) => {
+                    if (n >= 1 && n <= 90) { sums[n] += i + 1; cnts[n]++; }
+                });
+            });
+            const rows = [];
+            for (let n = 1; n <= 90; n++) if (cnts[n]) rows.push({ n, avg: sums[n] / cnts[n] });
+            rows.sort((a, b) => a.avg - b.avg || a.n - b.n);
+            if (!rows.length) {
+                wrap.innerHTML = '<div class="error-log-empty">Ingen posisjonsdata i dette omfanget.</div>';
+                return;
+            }
+            const aMax = rows[rows.length - 1].avg;
+            rows.forEach(({ n, avg }) => {
+                const row = document.createElement('div');
+                row.className = 'freq-bar-row';
+                row.innerHTML =
+                    `<span class="freq-bar-num">${n}</span>` +
+                    `<div class="freq-bar-track"><div class="freq-bar-fill" style="width:${Math.round((avg / aMax) * 100)}%"></div></div>` +
+                    `<span class="freq-bar-count freq-wide-label">~${avg.toFixed(1)}. trekk</span>`;
                 wrap.appendChild(row);
             });
         }
@@ -4043,6 +4515,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         // Parse once and pass to all consumers
         const sessions = this.getSessions();
         this.updateViewerCounts(sessions);
+        this.updateBackupStatus();
         this.syncFilterUI();
         this.updateViewerAverages(sessions);
         this.renderSessionList(sessions);
@@ -4784,7 +5257,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
 
     // Decode a WAV into the AudioBuffer cache so the first play is instant.
     // Silently no-ops if AudioContext isn't available yet.
-    _decodeAndCacheWav(key, src) {
+    _decodeAndCacheWav(key, src, isRetry = false) {
         if (!this._wavBuffers) this._wavBuffers = {};
         if (this._wavBuffers[key]) return;
         try {
@@ -4793,7 +5266,15 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                 .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); })
                 .then(ab => ctx.decodeAudioData(ab))
                 .then(buf => { this._wavBuffers[key] = buf; })
-                .catch(err => this._reportSoundLoadFailure(key, src, err));
+                .catch(err => {
+                    if (!isRetry) {
+                        // 19 preloads racing a just-started server can drop one —
+                        // retry once before reporting it as a real failure.
+                        setTimeout(() => this._decodeAndCacheWav(key, src, true), 3000);
+                    } else {
+                        this._reportSoundLoadFailure(key, src, err);
+                    }
+                });
         } catch (e) { /* AudioContext not ready */ }
     }
 

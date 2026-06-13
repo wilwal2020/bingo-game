@@ -26,7 +26,13 @@
       "Bash(node -c script.js)",
       "Bash(node -e \"const fs=require\\('fs'\\); const html=fs.readFileSync\\('index.html','utf8'\\); const m=html.match\\(/<script>\\([\\\\s\\\\S]*\\)<\\\\/script>/\\); if\\(m\\) { try { new Function\\(m[1]\\); console.log\\('JS OK'\\); } catch\\(e\\) { console.error\\(e.message\\); } }\")",
       "Bash(grep -n \"visibilitychange\\\\|visibility.*event\\\\|pagehide\\\\|pageshow\" \"C:\\\\BILDER 2\\\\bilder bra\\\\index.html\\\\BingoView\\\\index.html\" 2>&1 | head -20)",
-      "Bash(node --check script.js)"
+      "Bash(node --check script.js)",
+      "Bash(cd \"/c/BILDER 2/bilder bra/index.html/bingo modernise - with sounds - bug fix 2\" && grep -n \"freq-bar-row {\" style.css | head -2 && tail -5 style.css)",
+      "Bash(stat -c %s \"/c/BILDER 2/bilder bra/index.html/bingo modernise - with sounds - bug fix 2/Sounds/when_you_enter_overtime__should_play_after_the_number_click_sound_is_done.wav\")",
+      "Bash(xxd -l 48 \"when_you_enter_overtime__should_play_after_the_number_click_sound_is_done.wav\")",
+      "Bash(xxd -l 16 re4-select.wav)",
+      "Bash(python -c \"import sys; print\\(sys.version\\)\")",
+      "Bash(python -)"
     ]
   }
 }

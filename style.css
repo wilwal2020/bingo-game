@@ -4245,3 +4245,98 @@ body.flare-no-pulse-ring .balls.clicked::after { display: none; }
     .bv-win-rekke   { font-size: 0.9rem; padding-bottom: 14px; }
     .bv-win-cell    { font-size: 1.6rem; padding: 6px 0; }
 }
+
+/* ── Statistics modal ─────────────────────────────── */
+.stats-content {
+    overflow-y: auto;
+    max-height: 60vh;
+    padding-right: 6px;
+}
+.stats-section {
+    margin-bottom: 22px;
+}
+.stats-section-title {
+    font-size: 1rem;
+    font-weight: bold;
+    color: var(--accent-color);
+    margin-bottom: 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.stats-records {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+    font-size: .82rem;
+    color: rgba(255,255,255,.6);
+    margin-bottom: 10px;
+}
+.stats-records strong {
+    color: #fff;
+}
+.stats-bucket-label {
+    min-width: 52px;
+}
+.stats-game-table {
+    display: grid;
+    grid-template-columns: minmax(70px, auto) repeat(3, 1fr);
+    gap: 4px 8px;
+    font-size: .9rem;
+}
+.stats-game-cell {
+    padding: 4px 6px;
+    text-align: center;
+    color: rgba(255,255,255,.85);
+}
+.stats-game-head {
+    font-size: .75rem;
+    color: rgba(255,255,255,.4);
+    text-transform: uppercase;
+}
+.stats-game-name {
+    text-align: left;
+    font-weight: bold;
+}
+
+/* Wider value label for overdue / avg-position frequency rows */
+.freq-wide-label {
+    min-width: 110px;
+    text-align: right;
+    font-size: .78rem;
+}
+
+/* Dry spell line in leaderboard rows */
+.leaderboard-last {
+    display: block;
+    font-size: .72rem;
+    color: rgba(255,255,255,.4);
+    font-weight: normal;
+    margin-top: 2px;
+}
+
+/* ── Backups modal ────────────────────────────────── */
+.backups-list {
+    overflow-y: auto;
+    max-height: 50vh;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.backup-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 12px;
+    background: rgba(255,255,255,.04);
+    border: 1px solid rgba(255,255,255,.07);
+    border-radius: 8px;
+}
+.backup-row-label {
+    font-size: .85rem;
+    color: rgba(255,255,255,.75);
+}
+
+/* Stats + backups open from the viewer modal — must sit above it */
+#stats-modal   { z-index: 250; }
+#backups-modal { z-index: 250; }
