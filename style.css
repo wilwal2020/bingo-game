@@ -3619,6 +3619,7 @@ body.flare-no-pulse-ring .balls.clicked::after { display: none; }
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 8px 4px;
     display: flex;
     flex-direction: column;
@@ -4298,11 +4299,42 @@ body.flare-no-pulse-ring .balls.clicked::after { display: none; }
     font-weight: bold;
 }
 
-/* Wider value label for overdue / avg-position frequency rows */
+/* Wider value label for overdue / avg-position frequency rows: give the
+   row a dedicated wide last column instead of a min-width that overflows
+   the fixed 40px column and forces horizontal scroll. */
+.freq-bar-row-wide {
+    grid-template-columns: 32px 1fr 120px;
+}
 .freq-wide-label {
-    min-width: 110px;
     text-align: right;
+    font-size: .72rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+/* Keep all frequency rows inside the modal width — no sideways scrolling */
+.freq-bar-num,
+.freq-bar-count,
+.freq-bar-rank { min-width: 0; }
+
+/* Per-display explanation under the frequency summary */
+.freq-display-desc {
+    display: block;
+    margin-top: 4px;
+    font-size: .8rem;
+    color: rgba(255,255,255,.55);
+}
+
+/* Statistics modal intro + per-section descriptions */
+.stats-intro {
+    font-size: .85rem;
+    color: rgba(255,255,255,.6);
+    margin: 0 0 16px;
+}
+.stats-section-desc {
     font-size: .78rem;
+    color: rgba(255,255,255,.45);
+    margin-bottom: 8px;
 }
 
 /* Dry spell line in leaderboard rows */

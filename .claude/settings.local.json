@@ -32,7 +32,9 @@
       "Bash(xxd -l 48 \"when_you_enter_overtime__should_play_after_the_number_click_sound_is_done.wav\")",
       "Bash(xxd -l 16 re4-select.wav)",
       "Bash(python -c \"import sys; print\\(sys.version\\)\")",
-      "Bash(python -)"
+      "Bash(python -)",
+      "Bash(node --check _check.js)",
+      "Bash(rm -f _check.js)"
     ]
   }
 }

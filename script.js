@@ -1840,6 +1840,7 @@ class BingoApp {
         this.jackpotPrevTheme = null;
         this.clearJackpotHighlight();
         this.saveSlotToStorage();
+        this.bvSendJackpot();
 
         // Switch back to previous theme if we auto-switched and a number was set
         if (!isToggleOff && prevTheme) {
@@ -1893,6 +1894,7 @@ class BingoApp {
                     ball.classList.remove('jackpot', 'jackpot-break');
                     this.slot.jackpotNumber = null;
                     this.saveSlotToStorage();
+                    this.bvSendJackpot();
                 }, 400);
             }
             const isFirstOfRekke = nums.length === (this.slot.countAtLastRekkeChange || 0);
@@ -3351,6 +3353,12 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             return;
         }
 
+        const intro = document.createElement('p');
+        intro.className = 'stats-intro';
+        intro.textContent = 'Hvor mange tall som måtte trekkes for å fullføre hver rekke, '
+            + 'samlet fra alle lagrede sesjoner.';
+        wrap.appendChild(intro);
+
         const rekkeKeys  = ['rekke1', 'rekke2', 'rekke3'];
         const rekkeNames = ['Rekke 1', 'Rekke 2', 'Rekke 3'];
         const fmtDate = d => new Date(d).toLocaleDateString('no-NO', { day:'numeric', month:'short', year:'numeric' });
@@ -3401,6 +3409,12 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                 `<span>Snitt: <strong>${avg}</strong></span>`;
             sec.appendChild(rec);
 
+            const desc = document.createElement('div');
+            desc.className = 'stats-section-desc';
+            desc.textContent = `Fordeling: venstre = antall trukne tall, høyre = hvor mange `
+                + `ganger ${name} ble fullført akkurat der.`;
+            sec.appendChild(desc);
+
             // Histogram — bucket so we get at most ~12 bars
             const bw = Math.max(1, Math.ceil((max - min + 1) / 12));
             const buckets = [];
@@ -3430,6 +3444,11 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         h.className = 'stats-section-title';
         h.textContent = 'Snitt per spill';
         sec.appendChild(h);
+        const gdesc = document.createElement('div');
+        gdesc.className = 'stats-section-desc';
+        gdesc.textContent = 'Gjennomsnittlig antall trukne tall for å fullføre hver rekke, '
+            + 'delt opp per spill.';
+        sec.appendChild(gdesc);
         const table = document.createElement('div');
         table.className = 'stats-game-table';
         table.innerHTML = '<div class="stats-game-cell stats-game-head"></div>' +
@@ -3625,8 +3644,19 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             scope === 'lastSession' ? 'siste sesjon'  :
             scope === 'last10'      ? 'siste 10 sesjoner' :
                                       'alle sesjoner';
-        this.el.frequencySummary.textContent =
-            `${callsTotal} kall fordelt på ${sessionsTotal} ${sessionsTotal === 1 ? 'sesjon' : 'sesjoner'} (${scopeLabel}).`;
+        const displayDesc = {
+            grid:     'Hvor ofte hvert tall (1–90) har blitt trukket. Varmere farge = oftere.',
+            bars:     'Hvor mange ganger hvert tall har blitt trukket, som søyler.',
+            decades:  'Snitt antall kall per tall innen hvert tiår (1–9, 10–19 …).',
+            topbottom:'De 10 mest og 10 minst trukne tallene.',
+            ranked:   'Alle tall sortert fra mest til minst trukket.',
+            overdue:  'Hvor lenge siden hvert tall sist ble trukket. Øverst = lengst på «overtid».',
+            opening:  'Tall som oftest dukker opp blant de 5 første som trekkes i et spill.',
+            avgpos:   'Gjennomsnittlig trekkrekkefølge per tall. Lavt = trekkes typisk tidlig.',
+        }[display] || '';
+        this.el.frequencySummary.innerHTML =
+            `${callsTotal} kall fordelt på ${sessionsTotal} ${sessionsTotal === 1 ? 'sesjon' : 'sesjoner'} (${scopeLabel}).`
+            + (displayDesc ? `<span class="freq-display-desc">${displayDesc}</span>` : '');
 
         const wrap = this.el.frequencyDisplayWrap;
         wrap.innerHTML = '';
@@ -3757,7 +3787,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                             : overdue === 0 ? 'i siste sesjon'
                             : `${overdue} sesjon${overdue === 1 ? '' : 'er'} siden`;
                 const row = document.createElement('div');
-                row.className = 'freq-bar-row';
+                row.className = 'freq-bar-row freq-bar-row-wide';
                 row.innerHTML =
                     `<span class="freq-bar-num">${n}</span>` +
                     `<div class="freq-bar-track"><div class="freq-bar-fill" style="width:${pct}%"></div></div>` +
@@ -3810,7 +3840,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             const aMax = rows[rows.length - 1].avg;
             rows.forEach(({ n, avg }) => {
                 const row = document.createElement('div');
-                row.className = 'freq-bar-row';
+                row.className = 'freq-bar-row freq-bar-row-wide';
                 row.innerHTML =
                     `<span class="freq-bar-num">${n}</span>` +
                     `<div class="freq-bar-track"><div class="freq-bar-fill" style="width:${Math.round((avg / aMax) * 100)}%"></div></div>` +
@@ -5908,6 +5938,9 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                     papersMetaRef.onDisconnect().remove();
                 }
                 hostRef.set({ ts: Date.now() });
+                // Re-publish the current jackpot so phones that join (or rejoin
+                // after a host reconnect) immediately see it.
+                this.bvSendJackpot();
             };
             infoRef.on('value', infoHandler);
             this._bvInfoConnectedOff = () => infoRef.off('value', infoHandler);
@@ -6272,6 +6305,17 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         this._bvUpdatePaperHighlights();
     }
 
+    // Broadcast the current jackpot number (game 4 / grey only). Phones use
+    // this to mark the jackpot cell on their game-4 paper.
+    bvSendJackpot() {
+        if (!this._bvChannelRef) return;
+        const jp = this.slots.grey ? this.slots.grey.jackpotNumber : null;
+        this._bvChannelRef.child('jackpot').set({
+            number: jp != null ? Number(jp) : null,
+            ts:     Date.now()
+        });
+    }
+
     bvSendReset(scope) {
         if (!this._bvChannelRef) return;
         const ts = Date.now();
@@ -6280,6 +6324,8 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         // Clear callState for affected games
         const games = scope === 'all' ? ['blue','yellow','pink','grey'] : [this.currentTheme];
         games.forEach(g => this._bvChannelRef.child('callState/' + g).remove());
+        // Jackpot lives on grey — push its (possibly cleared) value when grey is affected
+        if (games.includes('grey')) this.bvSendJackpot();
         this._bvUpdatePaperHighlights();
     }
 
