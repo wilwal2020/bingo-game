@@ -6839,35 +6839,16 @@ document.addEventListener('DOMContentLoaded', () => { window.bingoApp = new Bing
         { group: 'Bakgrunn', items: [
             { key: 'particles',     label: 'Svevende partikler', desc: 'Lysende prikker stiger opp',
               sliders: [{ key: 'particlesDensity',   label: 'Tetthet',   min: 5,  max: 100, step: 5  }] },
-            { key: 'numberRain',    label: 'Tallregn',            desc: 'Bingotall 1–90 faller ned',
-              sliders: [{ key: 'numberRainDensity',  label: 'Tetthet',   min: 5,  max: 60,  step: 5  }] },
-            { key: 'shootingStars', label: 'Stjerneskudd',        desc: 'Lysspor skyter over bakgrunnen',
-              sliders: [{ key: 'shootingStarsFreq',  label: 'Frekvens',  min: 3,  max: 40,  step: 1,  unit: 's' }] },
-            { key: 'aurora',        label: 'Aurora',              desc: 'Store lysende fargeflekker i bakgrunnen',
-              sliders: [{ key: 'auroraOpacity',      label: 'Styrke',    min: 10, max: 200, step: 10  }] },
             { key: 'vignette',      label: 'Vignett',             desc: 'Mørke kanter rundt skjermen',
               sliders: [{ key: 'vignetteIntensity',  label: 'Styrke',    min: 0,  max: 80,  step: 5   }] },
             { key: 'scanlines',     label: 'Skannelinjer',        desc: 'Diskret CRT-linjetekstur',
               sliders: [{ key: 'scanlinesIntensity', label: 'Styrke',    min: 5,  max: 100, step: 5   }] },
-        ]},
-        { group: 'Header', items: [
-            { key: 'headerShimmer', label: 'Glimmer-streif',      desc: 'Periodisk lysstreif over topplinjen',
-              sliders: [{ key: 'headerShimmerFreq',  label: 'Frekvens',  min: 4,  max: 60,  step: 1,  unit: 's' }] },
         ]},
         { group: 'Klikk-effekter', items: [
             { key: 'ballRipple',    label: 'Klikk-ring',          desc: 'Ekspanderende ring ved ballklikk' },
             { key: 'ballBurst',     label: 'Partikkeleksplosjon',  desc: 'Partikler spruter ut ved klikk',
               sliders: [{ key: 'ballBurstCount',     label: 'Antall',    min: 4,  max: 30,  step: 2   }] },
             { key: 'ghostNumber',   label: 'Tallspøkelse',         desc: 'Tall flyter opp ved nytt kall' },
-            { key: 'ballPulseRing', label: 'Pulserende ring',      desc: 'Klikkede baller har en pustende glødring' },
-            { key: 'rekkeFlash',    label: 'Rekke-glimmer',        desc: 'Glimt på rekke-knapper' },
-        ]},
-        { group: 'Stortall', items: [
-            { key: 'bigNumberGlow', label: 'Glødstråle',           desc: 'Lyseksplosjon rundt stortallet ved nytt kall' },
-        ]},
-        { group: 'Mus', items: [
-            { key: 'cursorTrail',   label: 'Musespor',             desc: 'Lysende prikker etter pekeren',
-              sliders: [{ key: 'cursorTrailDensity', label: 'Forsinkelse', min: 15, max: 200, step: 5, unit: 'ms' }] },
         ]},
         { group: 'Vinnere', items: [
             { key: 'confetti',      label: 'Konfetti',             desc: 'Fargeregn når vinner logges',
@@ -6877,19 +6858,11 @@ document.addEventListener('DOMContentLoaded', () => { window.bingoApp = new Bing
 
     const DEFAULTS = {
         particles: true,        particlesDensity: 65,
-        numberRain: true,       numberRainDensity: 28,
-        shootingStars: true,    shootingStarsFreq: 10,
-        aurora: true,           auroraOpacity: 70,
         vignette: true,         vignetteIntensity: 52,
         scanlines: true,        scanlinesIntensity: 35,
-        headerShimmer: true,    headerShimmerFreq: 13,
         ballRipple: true,
         ballBurst: true,        ballBurstCount: 14,
         ghostNumber: true,
-        ballPulseRing: true,
-        rekkeFlash: true,
-        bigNumberGlow: true,
-        cursorTrail: true,      cursorTrailDensity: 42,
         confetti: true,         confettiCount: 100,
     };
 
@@ -6927,25 +6900,14 @@ document.addEventListener('DOMContentLoaded', () => { window.bingoApp = new Bing
             S.vignette  ? (S.vignetteIntensity  / 100).toFixed(2)  : '0');
         root.style.setProperty('--flare-scanlines',
             S.scanlines ? (S.scanlinesIntensity  / 1000).toFixed(4) : '0');
-        root.style.setProperty('--flare-aurora-opacity',
-            S.aurora    ? (S.auroraOpacity       / 1000).toFixed(4) : '0');
-
-        document.body.classList.toggle('flare-no-pulse-ring', !S.ballPulseRing);
 
         cachedRGB = hexToRgb(getAccent());
-        const [r, g, b] = cachedRGB;
-        blobs.forEach(blob => { blob.el.style.background = `rgba(${r},${g},${b},1)`; });
 
-        scheduleNextStar();
-        scheduleNextShimmer();
-        // Toggling particles/rain/stars on must wake the rAF loop
+        // Toggling particles on must wake the rAF loop
         if (typeof ensureLoopRunning === 'function') ensureLoopRunning();
-        // Cursor-trail toggle binds/unbinds its mousemove listener
-        if (typeof syncCursorTrailBinding === 'function') syncCursorTrailBinding();
     }
 
     const MAX_PARTS = 100;
-    const MAX_RAIN  = 60;
 
     const cvs = document.createElement('canvas');
     cvs.id = 'flare-canvas';
@@ -6967,44 +6929,12 @@ document.addEventListener('DOMContentLoaded', () => { window.bingoApp = new Bing
         alpha: Math.random() * 0.28 + 0.04,
     }));
 
-    const rainDrops = Array.from({ length: MAX_RAIN }, () => ({
-        x:    Math.random() * window.innerWidth,
-        y:    Math.random() * window.innerHeight,
-        num:  Math.floor(Math.random() * 90) + 1,
-        vy:   Math.random() * 0.28 + 0.08,
-        alpha: Math.random() * 0.09 + 0.02,
-        size: Math.floor(Math.random() * 6) + 10,
-    }));
-
-    let stars      = [];
-    let starTimer  = null;
-
-    function spawnStar() {
-        stars.push({
-            x: Math.random() * W * 0.65, y: Math.random() * H * 0.55,
-            len: Math.random() * 130 + 60, speed: Math.random() * 7 + 4,
-            alpha: 1, angle: Math.PI / 5 + (Math.random() - 0.5) * 0.35,
-        });
-    }
-
-    function scheduleNextStar() {
-        clearTimeout(starTimer);
-        if (!S.shootingStars) return;
-        const delay = (S.shootingStarsFreq || 10) * 1000 * (0.5 + Math.random());
-        starTimer = setTimeout(() => {
-            spawnStar();
-            ensureLoopRunning();
-            scheduleNextStar();
-        }, delay);
-    }
-
     let rafHandle = 0;
     let canvasCleared = false;
 
     function loopActive() {
-        // Aurora blobs animate via CSS keyframes now, so they don't drive the loop.
-        // Only canvas-based effects (particles / rain / shooting stars) need rAF.
-        return S.particles || S.numberRain || S.shootingStars || stars.length > 0;
+        // Only the canvas-based particle field needs the rAF loop.
+        return S.particles;
     }
 
     function mainLoop() {
@@ -7042,45 +6972,6 @@ document.addEventListener('DOMContentLoaded', () => { window.bingoApp = new Bing
             ctx.fill();
         }
 
-        const rCount = S.numberRain
-            ? Math.round(S.numberRainDensity * MAX_RAIN / 60) : 0;
-        ctx.textAlign    = 'center';
-        ctx.textBaseline = 'middle';
-        for (let i = 0; i < rCount; i++) {
-            const d = rainDrops[i];
-            d.y += d.vy;
-            if (d.y > H + 20) {
-                d.y = -20; d.x = Math.random() * W;
-                d.num = Math.floor(Math.random() * 90) + 1;
-            }
-            ctx.font      = `bold ${d.size}px "Trebuchet MS", sans-serif`;
-            ctx.fillStyle = `rgba(${r},${g},${b},${d.alpha})`;
-            ctx.fillText(d.num, d.x, d.y);
-        }
-
-        if (S.shootingStars || stars.length) {
-            // In-place compaction — avoids allocating a fresh array every frame
-            let w = 0;
-            for (let i = 0; i < stars.length; i++) {
-                if (stars[i].alpha > 0.015) stars[w++] = stars[i];
-            }
-            stars.length = w;
-            for (const s of stars) {
-                s.x += Math.cos(s.angle) * s.speed;
-                s.y += Math.sin(s.angle) * s.speed;
-                s.alpha *= 0.962;
-                const tx = s.x - Math.cos(s.angle) * s.len;
-                const ty = s.y - Math.sin(s.angle) * s.len;
-                const g2 = ctx.createLinearGradient(s.x, s.y, tx, ty);
-                g2.addColorStop(0,   `rgba(${r},${g},${b},${s.alpha})`);
-                g2.addColorStop(0.4, `rgba(${r},${g},${b},${s.alpha * 0.35})`);
-                g2.addColorStop(1,   `rgba(${r},${g},${b},0)`);
-                ctx.strokeStyle = g2;
-                ctx.lineWidth   = 1.6;
-                ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(tx, ty); ctx.stroke();
-            }
-        }
-
         rafHandle = requestAnimationFrame(mainLoop);
     }
 
@@ -7098,42 +6989,7 @@ document.addEventListener('DOMContentLoaded', () => { window.bingoApp = new Bing
     overlay.id = 'flare-overlay';
     document.body.appendChild(overlay);
 
-    const auroraWrap = document.createElement('div');
-    auroraWrap.id = 'flare-aurora';
-    document.body.appendChild(auroraWrap);
-
-    const blobs = Array.from({ length: 3 }, (_, i) => {
-        const el = document.createElement('div');
-        el.className = 'flare-aurora-blob';
-        // Position via CSS variables; animation lives in stylesheet so the
-        // compositor handles motion without per-frame JS writes.
-        el.style.setProperty('--blob-x', `${18 + i * 28}%`);
-        el.style.setProperty('--blob-y', `80%`);
-        el.style.animationDelay = `${(i / 3) * -8}s`;
-        auroraWrap.appendChild(el);
-        return { el };
-    });
-
     ensureLoopRunning();
-
-    let shimmerTimer = null;
-
-    function doHeaderShimmer() {
-        const header = document.querySelector('.flex-container');
-        if (header) {
-            const sh = document.createElement('div');
-            sh.className = 'flare-header-shimmer';
-            header.appendChild(sh);
-            sh.addEventListener('animationend', () => sh.remove(), { once: true });
-        }
-    }
-
-    function scheduleNextShimmer() {
-        clearTimeout(shimmerTimer);
-        if (!S.headerShimmer) return;
-        const delay = (S.headerShimmerFreq || 13) * 1000 * (0.7 + Math.random() * 0.6);
-        shimmerTimer = setTimeout(() => { doHeaderShimmer(); scheduleNextShimmer(); }, delay);
-    }
 
     document.addEventListener('click', e => {
         const ball = e.target.closest?.('.balls');
@@ -7180,51 +7036,6 @@ document.addEventListener('DOMContentLoaded', () => { window.bingoApp = new Bing
         }
     });
 
-    const bigNum  = document.getElementById('big-number');
-    const bigText = document.getElementById('big-number-text');
-    if (bigNum && bigText) {
-        new MutationObserver(() => {
-            if (!S.bigNumberGlow) return;
-            const txt = bigText.textContent.replace(/\u200B/g, '').trim();
-            if (!txt) return;
-            const rect = bigNum.getBoundingClientRect();
-            const glow = document.createElement('div');
-            glow.className    = 'flare-big-glow';
-            glow.style.cssText = `left:${rect.left + rect.width/2}px;top:${rect.top + rect.height/2}px`;
-            document.body.appendChild(glow);
-            glow.addEventListener('animationend', () => glow.remove(), { once: true });
-        }).observe(bigText, { childList: true, characterData: true, subtree: true });
-    }
-
-    // Cursor trail — bind/unbind based on the setting so we don't pay the
-    // mousemove listener cost (and create+destroy DOM nodes) when the user
-    // has it switched off. Over an 8-hour iPad host session this avoids
-    // hundreds of thousands of needless allocations. syncCursorTrailBinding
-    // is also invoked from applyAllSettings whenever the toggle flips.
-    let lastTrail = 0;
-    const cursorTrailHandler = e => {
-        const now = Date.now();
-        if (now - lastTrail < S.cursorTrailDensity) return;
-        lastTrail = now;
-        const dot = document.createElement('div');
-        dot.className    = 'flare-cursor-dot';
-        dot.style.cssText = `left:${e.clientX}px;top:${e.clientY}px`;
-        document.body.appendChild(dot);
-        dot.addEventListener('animationend', () => dot.remove(), { once: true });
-    };
-
-    let cursorTrailBound = false;
-    function syncCursorTrailBinding() {
-        if (S.cursorTrail && !cursorTrailBound) {
-            document.addEventListener('mousemove', cursorTrailHandler);
-            cursorTrailBound = true;
-        } else if (!S.cursorTrail && cursorTrailBound) {
-            document.removeEventListener('mousemove', cursorTrailHandler);
-            cursorTrailBound = false;
-        }
-    }
-    syncCursorTrailBinding();
-
     const CONFETTI_COLORS = [
         '#f0c030','#ff4444','#00aeff','#ff0096',
         '#44ff88','#ffffff','#ff8800','#cc44ff',
@@ -7263,16 +7074,6 @@ document.addEventListener('DOMContentLoaded', () => { window.bingoApp = new Bing
             wasHidden = !visible;
         }).observe(winnerModal, { attributes: true, attributeFilter: ['style'] });
     }
-
-    document.addEventListener('click', e => {
-        if (!S.rekkeFlash) return;
-        const btn = e.target.closest?.('.rekke-btn, .rekke-confirm-btn');
-        if (!btn) return;
-        btn.classList.remove('flare-rekke-flash');
-        void btn.offsetWidth;
-        btn.classList.add('flare-rekke-flash');
-        btn.addEventListener('animationend', () => btn.classList.remove('flare-rekke-flash'), { once: true });
-    });
 
     const SLIDER_UNITS = new Map(
         SCHEMA.flatMap(sec => sec.items)
@@ -7392,11 +7193,22 @@ document.addEventListener('DOMContentLoaded', () => { window.bingoApp = new Bing
         content.appendChild(panel);
 
         wirePanel(panel);
+
+        // Relocate the static "Bakgrunnsblur" toggle (declared in index.html so its
+        // existing wiring resolves at init) into this effects panel, grouped under
+        // "Ytelse", just above the reset button.
+        const blurRow  = document.getElementById('blur-setting-row');
+        const resetRow = panel.querySelector('#flare-reset-btn')?.closest('.settings-row');
+        if (blurRow && resetRow) {
+            const grp = document.createElement('div');
+            grp.className   = 'flare-group-label';
+            grp.textContent = 'Ytelse';
+            panel.insertBefore(grp, resetRow);
+            panel.insertBefore(blurRow, resetRow);
+        }
     }
 
     injectSettingsPanel();
 
     applyAllSettings();
-    scheduleNextStar();
-    scheduleNextShimmer();
 })();

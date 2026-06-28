@@ -556,7 +556,7 @@
                 <!-- Left nav -->
                 <div class="settings-nav">
                     <div class="settings-nav-title">Innstillinger</div>
-                    <button class="settings-nav-item active" data-panel="sg-progress" data-label="Fremdriftslinje">Fremdriftslinje</button>
+                    <button class="settings-nav-item active" data-panel="sg-progress" data-label="Bingoball">Bingoball</button>
                     <button class="settings-nav-item" data-panel="sg-countdown" data-label="Nedtelling">Nedtelling</button>
                     <button class="settings-nav-item" data-panel="sg-themecolors" data-label="Spillfarger">Spillfarger</button>
                     <button class="settings-nav-item" data-panel="sg-gameplay" data-label="Spillinnstillinger">Spillinnstillinger</button>
@@ -578,13 +578,15 @@
                 <!-- Right panels -->
                 <div class="settings-content">
 
-                    <!-- Panel: Fremdriftslinje -->
+                    <!-- Panel: Bingoball -->
                     <div class="settings-panel active" id="sg-progress">
-                        <h3 class="settings-panel-title">Fremdriftslinje</h3>
+                        <h3 class="settings-panel-title">Bingoball</h3>
+
+                        <div class="flare-group-label">Fyllanimasjon</div>
                         <div class="settings-row">
                             <div class="settings-label">
-                                <span>Aktiver</span>
-                                <span class="settings-desc">Vis fyllanimasjon på tallballen</span>
+                                <span>Vis fyllanimasjon</span>
+                                <span class="settings-desc">Fyll tallballen gradvis etter at et tall klikkes</span>
                             </div>
                             <label class="settings-toggle">
                                 <input type="checkbox" id="setting-progress-enabled" checked>
@@ -615,6 +617,8 @@
                                 <option value="iris">Iris</option>
                             </select>
                         </div>
+
+                        <div class="flare-group-label">Når et tall trekkes</div>
                         <div class="settings-row">
                             <div class="settings-label">
                                 <span>Tall-animasjon</span>
@@ -628,11 +632,23 @@
                                 <option value="orbit">Orbit</option>
                             </select>
                         </div>
+                        <div class="settings-row">
+                            <div class="settings-label">
+                                <span>Blink rød over gjennomsnitt</span>
+                                <span class="settings-desc">Blinkende rød sirkel når antall overstiger gjennomsnittet</span>
+                            </div>
+                            <label class="settings-toggle">
+                                <input type="checkbox" id="setting-over-average-blink" checked>
+                                <span class="settings-toggle-track"></span>
+                            </label>
+                        </div>
                     </div>
 
                     <!-- Panel: Nedtelling -->
                     <div class="settings-panel" id="sg-countdown">
                         <h3 class="settings-panel-title">Nedtelling</h3>
+
+                        <div class="flare-group-label">Nedtellingsklokke</div>
                         <div class="settings-row">
                             <div class="settings-label">
                                 <span>Vis nedtelling</span>
@@ -660,16 +676,8 @@
                             </div>
                             <input type="time" id="setting-countdown-time" class="session-input settings-time-input" value="22:08">
                         </div>
-                        <div class="settings-row">
-                            <div class="settings-label">
-                                <span>Blink rød over gjennomsnitt</span>
-                                <span class="settings-desc">Blinkende rød sirkel når antall overstiger gjennomsnittet</span>
-                            </div>
-                            <label class="settings-toggle">
-                                <input type="checkbox" id="setting-over-average-blink" checked>
-                                <span class="settings-toggle-track"></span>
-                            </label>
-                        </div>
+
+                        <div class="flare-group-label">Neste spill</div>
                         <div class="settings-row">
                             <div class="settings-label">
                                 <span>Neste spill nedtelling</span>
@@ -677,16 +685,6 @@
                             </div>
                             <label class="settings-toggle">
                                 <input type="checkbox" id="setting-next-game-countdown">
-                                <span class="settings-toggle-track"></span>
-                            </label>
-                        </div>
-                        <div class="settings-row">
-                            <div class="settings-label">
-                                <span>Tilfeldig tall-knapp</span>
-                                <span class="settings-desc">Vis «?»-knapp i tallnettet for å trekke et tilfeldig tall</span>
-                            </div>
-                            <label class="settings-toggle">
-                                <input type="checkbox" id="setting-random-btn" checked>
                                 <span class="settings-toggle-track"></span>
                             </label>
                         </div>
@@ -914,6 +912,8 @@
                     <!-- Panel: Spillinnstillinger -->
                     <div class="settings-panel" id="sg-gameplay">
                         <h3 class="settings-panel-title">Spillinnstillinger</h3>
+
+                        <div class="flare-group-label">Tallnett</div>
                         <div class="settings-row">
                             <div class="settings-label">
                                 <span>Tallbane-layout</span>
@@ -936,11 +936,11 @@
                         </div>
                         <div class="settings-row">
                             <div class="settings-label">
-                                <span>«Bytt rekke!»-påminnelse</span>
-                                <span class="settings-desc">Vis påminnelse ved inaktivitet</span>
+                                <span>Tilfeldig tall-knapp</span>
+                                <span class="settings-desc">Vis «?»-knapp i tallnettet for å trekke et tilfeldig tall</span>
                             </div>
                             <label class="settings-toggle">
-                                <input type="checkbox" id="setting-tooltip" checked>
+                                <input type="checkbox" id="setting-random-btn" checked>
                                 <span class="settings-toggle-track"></span>
                             </label>
                         </div>
@@ -954,6 +954,8 @@
                                 <span class="settings-toggle-track"></span>
                             </label>
                         </div>
+
+                        <div class="flare-group-label">Tastaturinntasting</div>
                         <div class="settings-row">
                             <div class="settings-label">
                                 <span>Tastatur-forsinkelse (1/10 sek)</span>
@@ -986,6 +988,18 @@
                                 <button class="rekke-adjust-btn" id="overwrite-delay-plus">+</button>
                             </div>
                         </div>
+
+                        <div class="flare-group-label">Annet</div>
+                        <div class="settings-row">
+                            <div class="settings-label">
+                                <span>«Bytt rekke!»-påminnelse</span>
+                                <span class="settings-desc">Vis påminnelse ved inaktivitet</span>
+                            </div>
+                            <label class="settings-toggle">
+                                <input type="checkbox" id="setting-tooltip" checked>
+                                <span class="settings-toggle-track"></span>
+                            </label>
+                        </div>
                         <div class="settings-row">
                             <div class="settings-label">
                                 <span>Automatisk backup-fil</span>
@@ -996,7 +1010,11 @@
                                 <span class="settings-toggle-track"></span>
                             </label>
                         </div>
-                        <div class="settings-row">
+
+                        <!-- Bakgrunnsblur lives here in markup so its wiring resolves at
+                             init; the effects (flare) module relocates this row into the
+                             "✨ Effekter" panel under a "Ytelse" group at load. -->
+                        <div class="settings-row" id="blur-setting-row">
                             <div class="settings-label">
                                 <span>Bakgrunnsblur</span>
                                 <span class="settings-desc">Slå av for bedre ytelse på svake enheter</span>
