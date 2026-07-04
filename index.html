@@ -108,9 +108,6 @@
             <button class="save-session-btn" id="save-session-btn" style="display:none">
                 Lagre sesjon
             </button>
-            <button class="save-session-btn log-rekke3-btn" id="log-rekke3-btn" style="display:none">
-                Logg Rekke 3
-            </button>
             <!-- Winner indicator -->
             <div class="winner-indicator" id="winner-indicator" style="display:none"></div>
 
@@ -730,181 +727,8 @@
                             </div>
                         </div>
 
-                        <div class="theme-color-block" data-theme="default">
-                            <div class="theme-color-row" data-theme="default">
-                                <span class="theme-color-label">Standard</span>
-                                <div class="theme-color-pickers">
-                                    <label class="theme-color-swatch-label" title="Aksentfarge">
-                                        <input type="color" class="theme-color-input" data-theme="default" data-key="accent" value="#F1B924">
-                                        <span>Aksent</span>
-                                    </label>
-                                    <label class="theme-color-swatch-label" title="Bakgrunnsfarge">
-                                        <input type="color" class="theme-color-input" data-theme="default" data-key="primary" value="#202834">
-                                        <span>Bakgrunn</span>
-                                    </label>
-                                    <label class="theme-color-swatch-label" title="Ballerfarge">
-                                        <input type="color" class="theme-color-input" data-theme="default" data-key="balls" value="#4c586b">
-                                        <span>Baller</span>
-                                    </label>
-                                    <label class="theme-color-swatch-label" title="Fare / rød farge">
-                                        <input type="color" class="theme-color-input" data-theme="default" data-key="danger" value="#ff4444">
-                                        <span>Fare</span>
-                                    </label>
-                                    <label class="theme-color-swatch-label" title="Vinner / gull farge">
-                                        <input type="color" class="theme-color-input" data-theme="default" data-key="winner" value="#f0c030">
-                                        <span>Vinner</span>
-                                    </label>
-                                </div>
-                                <button class="theme-color-reset-btn" data-theme="default" title="Tilbakestill Standard">↩</button>
-                            </div>
-                            <div class="color-preset-section" data-theme="default">
-                                <div class="color-preset-save-row">
-                                    <input type="text" class="color-preset-name-input" data-theme="default" placeholder="Navn på fargesett…" maxlength="30">
-                                    <button class="color-preset-save-btn" data-theme="default">💾 Lagre</button>
-                                </div>
-                                <div class="color-preset-list" data-theme="default"></div>
-                            </div>
-                        </div>
-                        <div class="theme-color-block" data-theme="blue">
-                            <div class="theme-color-row" data-theme="blue">
-                                <span class="theme-color-label">Spill 1</span>
-                                <div class="theme-color-pickers">
-                                    <label class="theme-color-swatch-label" title="Aksentfarge">
-                                        <input type="color" class="theme-color-input" data-theme="blue" data-key="accent" value="#00aeff">
-                                        <span>Aksent</span>
-                                    </label>
-                                    <label class="theme-color-swatch-label" title="Bakgrunnsfarge">
-                                        <input type="color" class="theme-color-input" data-theme="blue" data-key="primary" value="#141820">
-                                        <span>Bakgrunn</span>
-                                    </label>
-                                    <label class="theme-color-swatch-label" title="Ballerfarge">
-                                        <input type="color" class="theme-color-input" data-theme="blue" data-key="balls" value="#4c586b">
-                                        <span>Baller</span>
-                                    </label>
-                                    <label class="theme-color-swatch-label" title="Fare / rød farge">
-                                        <input type="color" class="theme-color-input" data-theme="blue" data-key="danger" value="#ff4444">
-                                        <span>Fare</span>
-                                    </label>
-                                    <label class="theme-color-swatch-label" title="Vinner / gull farge">
-                                        <input type="color" class="theme-color-input" data-theme="blue" data-key="winner" value="#f0c030">
-                                        <span>Vinner</span>
-                                    </label>
-                                </div>
-                                <button class="theme-color-reset-btn" data-theme="blue" title="Tilbakestill Spill 1">↩</button>
-                            </div>
-                            <div class="color-preset-section" data-theme="blue">
-                                <div class="color-preset-save-row">
-                                    <input type="text" class="color-preset-name-input" data-theme="blue" placeholder="Navn på fargesett…" maxlength="30">
-                                    <button class="color-preset-save-btn" data-theme="blue">💾 Lagre</button>
-                                </div>
-                                <div class="color-preset-list" data-theme="blue"></div>
-                            </div>
-                        </div>
-                        <div class="theme-color-block" data-theme="yellow">
-                            <div class="theme-color-row" data-theme="yellow">
-                                <span class="theme-color-label">Spill 2</span>
-                                <div class="theme-color-pickers">
-                                    <label class="theme-color-swatch-label" title="Aksentfarge">
-                                        <input type="color" class="theme-color-input" data-theme="yellow" data-key="accent" value="#F1B924">
-                                        <span>Aksent</span>
-                                    </label>
-                                    <label class="theme-color-swatch-label" title="Bakgrunnsfarge">
-                                        <input type="color" class="theme-color-input" data-theme="yellow" data-key="primary" value="#151515">
-                                        <span>Bakgrunn</span>
-                                    </label>
-                                    <label class="theme-color-swatch-label" title="Ballerfarge">
-                                        <input type="color" class="theme-color-input" data-theme="yellow" data-key="balls" value="#5c5858">
-                                        <span>Baller</span>
-                                    </label>
-                                    <label class="theme-color-swatch-label" title="Fare / rød farge">
-                                        <input type="color" class="theme-color-input" data-theme="yellow" data-key="danger" value="#ff4444">
-                                        <span>Fare</span>
-                                    </label>
-                                    <label class="theme-color-swatch-label" title="Vinner / gull farge">
-                                        <input type="color" class="theme-color-input" data-theme="yellow" data-key="winner" value="#f0c030">
-                                        <span>Vinner</span>
-                                    </label>
-                                </div>
-                                <button class="theme-color-reset-btn" data-theme="yellow" title="Tilbakestill Spill 2">↩</button>
-                            </div>
-                            <div class="color-preset-section" data-theme="yellow">
-                                <div class="color-preset-save-row">
-                                    <input type="text" class="color-preset-name-input" data-theme="yellow" placeholder="Navn på fargesett…" maxlength="30">
-                                    <button class="color-preset-save-btn" data-theme="yellow">💾 Lagre</button>
-                                </div>
-                                <div class="color-preset-list" data-theme="yellow"></div>
-                            </div>
-                        </div>
-                        <div class="theme-color-block" data-theme="pink">
-                            <div class="theme-color-row" data-theme="pink">
-                                <span class="theme-color-label">Spill 3</span>
-                                <div class="theme-color-pickers">
-                                    <label class="theme-color-swatch-label" title="Aksentfarge">
-                                        <input type="color" class="theme-color-input" data-theme="pink" data-key="accent" value="#ff0096">
-                                        <span>Aksent</span>
-                                    </label>
-                                    <label class="theme-color-swatch-label" title="Bakgrunnsfarge">
-                                        <input type="color" class="theme-color-input" data-theme="pink" data-key="primary" value="#211220">
-                                        <span>Bakgrunn</span>
-                                    </label>
-                                    <label class="theme-color-swatch-label" title="Ballerfarge">
-                                        <input type="color" class="theme-color-input" data-theme="pink" data-key="balls" value="#604b5f">
-                                        <span>Baller</span>
-                                    </label>
-                                    <label class="theme-color-swatch-label" title="Fare / rød farge">
-                                        <input type="color" class="theme-color-input" data-theme="pink" data-key="danger" value="#ff4444">
-                                        <span>Fare</span>
-                                    </label>
-                                    <label class="theme-color-swatch-label" title="Vinner / gull farge">
-                                        <input type="color" class="theme-color-input" data-theme="pink" data-key="winner" value="#f0c030">
-                                        <span>Vinner</span>
-                                    </label>
-                                </div>
-                                <button class="theme-color-reset-btn" data-theme="pink" title="Tilbakestill Spill 3">↩</button>
-                            </div>
-                            <div class="color-preset-section" data-theme="pink">
-                                <div class="color-preset-save-row">
-                                    <input type="text" class="color-preset-name-input" data-theme="pink" placeholder="Navn på fargesett…" maxlength="30">
-                                    <button class="color-preset-save-btn" data-theme="pink">💾 Lagre</button>
-                                </div>
-                                <div class="color-preset-list" data-theme="pink"></div>
-                            </div>
-                        </div>
-                        <div class="theme-color-block" data-theme="grey">
-                            <div class="theme-color-row" data-theme="grey">
-                                <span class="theme-color-label">Spill 4</span>
-                                <div class="theme-color-pickers">
-                                    <label class="theme-color-swatch-label" title="Aksentfarge">
-                                        <input type="color" class="theme-color-input" data-theme="grey" data-key="accent" value="#ffdcbc">
-                                        <span>Aksent</span>
-                                    </label>
-                                    <label class="theme-color-swatch-label" title="Bakgrunnsfarge">
-                                        <input type="color" class="theme-color-input" data-theme="grey" data-key="primary" value="#18181c">
-                                        <span>Bakgrunn</span>
-                                    </label>
-                                    <label class="theme-color-swatch-label" title="Ballerfarge">
-                                        <input type="color" class="theme-color-input" data-theme="grey" data-key="balls" value="#525150">
-                                        <span>Baller</span>
-                                    </label>
-                                    <label class="theme-color-swatch-label" title="Fare / rød farge">
-                                        <input type="color" class="theme-color-input" data-theme="grey" data-key="danger" value="#ff4444">
-                                        <span>Fare</span>
-                                    </label>
-                                    <label class="theme-color-swatch-label" title="Vinner / gull farge">
-                                        <input type="color" class="theme-color-input" data-theme="grey" data-key="winner" value="#f0c030">
-                                        <span>Vinner</span>
-                                    </label>
-                                </div>
-                                <button class="theme-color-reset-btn" data-theme="grey" title="Tilbakestill Spill 4">↩</button>
-                            </div>
-                            <div class="color-preset-section" data-theme="grey">
-                                <div class="color-preset-save-row">
-                                    <input type="text" class="color-preset-name-input" data-theme="grey" placeholder="Navn på fargesett…" maxlength="30">
-                                    <button class="color-preset-save-btn" data-theme="grey">💾 Lagre</button>
-                                </div>
-                                <div class="color-preset-list" data-theme="grey"></div>
-                            </div>
-                        </div>
+                        <!-- Theme colour blocks are generated by renderThemeColorBlocks() in script.js -->
+                        <div id="theme-color-blocks"></div>
                         <div class="settings-row" style="margin-top:10px">
                             <button class="modal-btn session-action-btn session-edit-btn" id="theme-colors-reset-all" style="font-size:.78rem;padding:5px 12px">↩ Tilbakestill alle farger</button>
                         </div>
@@ -1010,6 +834,18 @@
                                 <input type="checkbox" id="setting-auto-backup" checked>
                                 <span class="settings-toggle-track"></span>
                             </label>
+                        </div>
+                        <!-- Only shown in browsers with the File System Access API
+                             (Chrome/Edge). On iPad/Safari the download flow is used. -->
+                        <div class="settings-row" id="backup-folder-row" style="display:none">
+                            <div class="settings-label">
+                                <span>Backupmappe</span>
+                                <span class="settings-desc" id="backup-folder-status">Ingen mappe valgt — backup lastes ned som fil</span>
+                            </div>
+                            <div style="display:flex;gap:6px;flex-shrink:0">
+                                <button class="modal-btn session-action-btn session-edit-btn" id="backup-folder-pick" style="font-size:.78rem;padding:5px 12px">Velg mappe</button>
+                                <button class="modal-btn session-action-btn session-edit-btn" id="backup-folder-clear" style="font-size:.78rem;padding:5px 10px" title="Fjern valgt mappe">✕</button>
+                            </div>
                         </div>
 
                         <!-- Bakgrunnsblur lives here in markup so its wiring resolves at
@@ -1245,25 +1081,7 @@
             <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
                 <select id="bundled-sound-select" class="session-input" style="flex:1;min-width:0">
                     <option value="">-- Velg lyd --</option>
-                    <option value="Sounds/click.wav">Click</option>
-                    <option value="Sounds/click_2.wav">Click 2</option>
-                    <option value="Sounds/click_and_hover.wav">Click + Hover</option>
-                    <option value="Sounds/click_and_hover_2.wav">Click + Hover 2</option>
-                    <option value="Sounds/click_and_hover_3.wav">Click + Hover 3</option>
-                    <option value="Sounds/click__and_for_clicking_on_a_number_with_jackpot_active.wav">Click (jackpot)</option>
-                    <option value="Sounds/close.wav">Close</option>
-                    <option value="Sounds/re4-hover.wav">RE4 Hover</option>
-                    <option value="Sounds/re4-hover-loud.wav">RE4 Hover Loud</option>
-                    <option value="Sounds/re4-select.wav">RE4 Select</option>
-                    <option value="Sounds/re4-select-number.wav">RE4 Select Number</option>
-                    <option value="Sounds/re4-switch.wav">RE4 Switch</option>
-                    <option value="Sounds/re4-switch-2.wav">RE4 Switch 2</option>
-                    <option value="Sounds/re4-cancel.wav">RE4 Cancel</option>
-                    <option value="Sounds/re4-cancel-big.wav">RE4 Cancel Big</option>
-                    <option value="Sounds/save_and_confirm_2.wav">Save / Confirm 2</option>
-                    <option value="Sounds/when_you_enter_overtime__should_play_after_the_number_click_sound_is_done.wav">Overtid</option>
-                    <option value="Sounds/62274159.wav">62274159</option>
-                    <option value="Sounds/fxprosound-metal-plate-gong-4-248610.wav">Metal Plate Gong</option>
+                    <!-- Options generated from BUNDLED_SOUNDS in script.js -->
                 </select>
                 <button class="modal-btn session-action-btn" id="bundled-sound-preview-btn" title="Forhåndsvis">▶</button>
                 <button class="modal-btn modal-btn-yes" id="bundled-sound-use-btn">Bruk</button>

@@ -171,10 +171,14 @@ class BingoApp {
         // Average filter (null = all sessions)
         this.avgFilter = null;
 
-        // BingoView Gun.js connection
-        this._bvGun     = null;
-        this._bvChannel = null;
-        this._bvConnTimeout = null;
+        // BingoView Firebase channel — listeners are registered on child
+        // paths; their detach functions live here so a reconnect can remove
+        // them (parent ref.off() does NOT detach child-path listeners).
+        this._bvChannelDetachFns = [];
+
+        // Pending-winner entry being edited via the game indicator
+        // (null = the winner modal is in normal log mode)
+        this._pendingEditIdx = null;
 
         // Settings
         this.settings = {
@@ -255,11 +259,14 @@ class BingoApp {
         if (location.protocol === 'file:') {
             console.warn('[Lyd] Siden kjører fra file:// — nettleseren blokkerer lasting av lydfilene i Sounds/. Kjør via en lokal server (f.eks. "npx http-server") for å få lyd.');
         }
+        this.renderThemeColorBlocks();
         this.cacheElements();
+        this.populateBundledSoundSelect();
         this.setupDropdownPortal();
         this.bindEvents();
         this.loadFromStorage();
         this.preloadSounds();
+        this.initBackupFolder();
         // Inject user-sound <option>s BEFORE applySettings — otherwise dropdowns
         // whose saved style is a user sound can't sync (no matching option yet).
         this.loadUserSoundsIntoPool();
@@ -303,6 +310,56 @@ class BingoApp {
         this._pendingWrites.clear();
     }
 
+    // Build the five per-theme colour editors in the settings panel from
+    // COLOR_THEMES/DEFAULT_THEME_COLORS. Must run before cacheElements/
+    // bindEvents so the generated inputs get their listeners.
+    renderThemeColorBlocks() {
+        const wrap = document.getElementById('theme-color-blocks');
+        if (!wrap) return;
+        const SWATCHES = [
+            ['accent',  'Aksent',   'Aksentfarge'],
+            ['primary', 'Bakgrunn', 'Bakgrunnsfarge'],
+            ['balls',   'Baller',   'Ballerfarge'],
+            ['danger',  'Fare',     'Fare / rød farge'],
+            ['winner',  'Vinner',   'Vinner / gull farge'],
+        ];
+        wrap.innerHTML = COLOR_THEMES.map(theme => {
+            const label = GAME_NAMES[theme];
+            const c = DEFAULT_THEME_COLORS[theme];
+            const pickers = SWATCHES.map(([key, name, title]) =>
+                `<label class="theme-color-swatch-label" title="${title}">` +
+                `<input type="color" class="theme-color-input" data-theme="${theme}" data-key="${key}" value="${c[key]}">` +
+                `<span>${name}</span>` +
+                `</label>`).join('');
+            return `<div class="theme-color-block" data-theme="${theme}">` +
+                `<div class="theme-color-row" data-theme="${theme}">` +
+                `<span class="theme-color-label">${label}</span>` +
+                `<div class="theme-color-pickers">${pickers}</div>` +
+                `<button class="theme-color-reset-btn" data-theme="${theme}" title="Tilbakestill ${label}">↩</button>` +
+                `</div>` +
+                `<div class="color-preset-section" data-theme="${theme}">` +
+                `<div class="color-preset-save-row">` +
+                `<input type="text" class="color-preset-name-input" data-theme="${theme}" placeholder="Navn på fargesett…" maxlength="30">` +
+                `<button class="color-preset-save-btn" data-theme="${theme}">💾 Lagre</button>` +
+                `</div>` +
+                `<div class="color-preset-list" data-theme="${theme}"></div>` +
+                `</div></div>`;
+        }).join('');
+    }
+
+    // Fill the upload-modal's bundled-sound <select> from BUNDLED_SOUNDS so
+    // the list can't drift from the sound files the app actually knows about.
+    populateBundledSoundSelect() {
+        const sel = this.el.bundledSoundSelect;
+        if (!sel) return;
+        BUNDLED_SOUNDS.forEach(s => {
+            const opt = document.createElement('option');
+            opt.value = s.src;
+            opt.textContent = s.name;
+            sel.appendChild(opt);
+        });
+    }
+
     cacheElements() {
         this.el = {
             balls:           document.querySelectorAll('.balls:not(.spacer)'),
@@ -330,7 +387,6 @@ class BingoApp {
             avgBox3:         document.getElementById('avg-box-3'),
             gameIndicator:   document.getElementById('game-indicator'),
             saveSessionBtn:  document.getElementById('save-session-btn'),
-            logRekke3Btn:    document.getElementById('log-rekke3-btn'),
             // Rekke confirm modal
             rekkeModal:      document.getElementById('rekke-modal'),
             rekkeConfirm:    document.getElementById('rekke-confirm'),
@@ -712,6 +768,36 @@ class BingoApp {
 
         // Winner logging
         this.el.logWinnerBtn.addEventListener('click',  () => this.openWinnerModal());
+
+        // Pending-winner edit/remove buttons in the game indicator (delegated;
+        // the indicator is re-rendered on every update)
+        this.el.gameIndicator.addEventListener('click', e => {
+            const btn = e.target.closest('.gi-win-btn');
+            if (!btn) return;
+            const idx = Number(btn.closest('.gi-win-line')?.dataset.pidx);
+            if (!Number.isInteger(idx)) return;
+            if (btn.classList.contains('gi-win-del')) {
+                if (btn.dataset.confirming === '1') {
+                    this.playSound('confirm');
+                    const pending = this.getPendingWinners();
+                    pending.splice(idx, 1);
+                    localStorage.setItem('bingoPendingWinners', JSON.stringify(pending));
+                    this.updateGameIndicator();
+                } else {
+                    this.playSound('select');
+                    btn.dataset.confirming = '1';
+                    btn.textContent = 'Sikker?';
+                    setTimeout(() => {
+                        if (!btn.isConnected) return;
+                        btn.dataset.confirming = '';
+                        btn.textContent = '✕';
+                    }, 2500);
+                }
+            } else if (btn.classList.contains('gi-win-edit')) {
+                this.openWinnerModal(idx);
+            }
+        });
+
         this.el.winnerSave.addEventListener('click',    () => this.saveWinner());
         this.el.winnerCancel.addEventListener('click',  () => this.closeWinnerModal());
         const updateSplitCount = (n) => {
@@ -804,6 +890,26 @@ class BingoApp {
             this.el.settingAutoBackup.addEventListener('change', () => {
                 this.settings.autoBackupDownload = this.el.settingAutoBackup.checked;
                 this.saveSettings();
+            });
+        }
+
+        // Backup folder (File System Access API — row hidden when unsupported)
+        const backupFolderPick = document.getElementById('backup-folder-pick');
+        if (backupFolderPick) {
+            backupFolderPick.addEventListener('click', async () => {
+                this.playSound('select');
+                try {
+                    const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
+                    this._backupDirHandle = handle;
+                    await this._idbMetaTx('readwrite', s => s.put(handle, 'backupDir'));
+                } catch(e) { /* user cancelled the picker */ }
+                this._updateBackupFolderStatus();
+            });
+            document.getElementById('backup-folder-clear').addEventListener('click', async () => {
+                this.playSound('cancel');
+                this._backupDirHandle = null;
+                try { await this._idbMetaTx('readwrite', s => s.delete('backupDir')); } catch(e) {}
+                this._updateBackupFolderStatus();
             });
         }
 
@@ -920,7 +1026,6 @@ class BingoApp {
 
         // Session modal
         this.el.saveSessionBtn.addEventListener('click', () => this.openSessionModal());
-        this.el.logRekke3Btn.addEventListener('click',   () => this.handleLogRekke3());
         this.el.sessionSave.addEventListener('click',    () => this.saveSession());
         this.el.sessionCancel.addEventListener('click',  () => this.promptUnsavedClose(() => this.closeSessionModal()));
 
@@ -2380,12 +2485,20 @@ class BingoApp {
         const name    = GAME_NAMES[theme];
         let html      = parts.length ? `${name} — ${parts.join(' · ')}` : name;
 
-        // Append winner info for current game
+        // Append winner info for current game. Each line carries its index
+        // into the FULL pending array plus edit/remove buttons so a
+        // mis-logged winner can be fixed before the session is saved.
         const pending     = this.getPendingWinners();
-        const gameWinners = pending.filter(w => w.game === theme);
+        const gameWinners = [];
+        pending.forEach((w, i) => { if (w.game === theme) gameWinners.push({ w, i }); });
         if (gameWinners.length > 0) {
             const winnerLines = gameWinners
-                .map(w => `🏆 ${this._escapeHtml(w.name)} · ${w.rekke.replace('Rekke','R')} · ${w.prize} kr${w.split > 1 ? ` (1/${w.split})` : ''}`)
+                .map(({ w, i }) =>
+                    `<span class="gi-win-line" data-pidx="${i}">` +
+                    `🏆 ${this._escapeHtml(w.name)} · ${w.rekke.replace('Rekke','R')} · ${w.prize} kr${w.split > 1 ? ` (1/${w.split})` : ''}` +
+                    `<button class="gi-win-btn gi-win-edit" title="Rediger vinner">✎</button>` +
+                    `<button class="gi-win-btn gi-win-del" title="Fjern vinner">✕</button>` +
+                    `</span>`)
                 .join('<br>');
             html += `<br><span style="font-size:.8rem;opacity:.85">${winnerLines}</span>`;
         }
@@ -2413,9 +2526,6 @@ class BingoApp {
         }
 
         const isGame       = this.currentTheme !== 'default';
-
-        // Rekke3 is now logged via the rekke button itself - hide old button
-        this.el.logRekke3Btn.style.display = 'none';
 
         // Winner button: always visible in active game
         this.el.logWinnerBtn.style.display = isGame ? 'inline-flex' : 'none';
@@ -2446,6 +2556,7 @@ class BingoApp {
         });
 
         // One row per game theme
+        const pending = this.getPendingWinners();
         GAME_THEMES.forEach(theme => {
             const label = document.createElement('div');
             label.className   = 'session-game-label';
@@ -2454,7 +2565,6 @@ class BingoApp {
             grid.appendChild(label);
 
             const logged = this.slots[theme].loggedRekkes;
-            const pending = this.getPendingWinners();
             ['Rekke1','Rekke2','Rekke3'].forEach(rk => {
                 const cell = document.createElement('div');
                 cell.style.position = 'relative';
@@ -2597,22 +2707,42 @@ class BingoApp {
 
     // ── Winner System ────────────────────────────────
 
-    openWinnerModal() {
+    // No arg: log a new winner for the current game/rekke.
+    // With editIdx: edit the NAME of pending winner #editIdx (game indicator ✎) —
+    // game/rekke/prize stay as logged, so this works even after the rekke advanced.
+    openWinnerModal(editIdx = null) {
         this.playSound('select');
-        if (this.currentTheme === 'default') return;
-        const game  = GAME_NAMES[this.currentTheme];
-        const rekke = this.slot.currentRekke.replace('Rekke', 'Rekke ');
-        const prize = PRIZES[this.currentTheme][this.slot.currentRekke];
+        this._pendingEditIdx = null;
+        let game, rekke, prize;
 
-        this.el.winnerModalTitle.textContent    = `🏆 Vinner — ${game}`;
+        if (editIdx !== null) {
+            const entry = this.getPendingWinners()[editIdx];
+            if (!entry) return;
+            this._pendingEditIdx = editIdx;
+            game  = entry.gameName;
+            rekke = entry.rekke.replace('Rekke', 'Rekke ');
+            prize = entry.fullPrize ?? entry.prize;
+            this.el.winnerModalTitle.textContent = `✏ Rediger vinner — ${game}`;
+            this.winnerSelectedPlayers = [entry.name];
+        } else {
+            if (this.currentTheme === 'default') return;
+            game  = GAME_NAMES[this.currentTheme];
+            rekke = this.slot.currentRekke.replace('Rekke', 'Rekke ');
+            prize = PRIZES[this.currentTheme][this.slot.currentRekke];
+            this.el.winnerModalTitle.textContent = `🏆 Vinner — ${game}`;
+            this.winnerSelectedPlayers = [];
+        }
         this.el.winnerModalSubtitle.textContent = `${rekke} · ${prize} kr`;
 
         // Reset state
         this.winnerSplitCount      = 1;
-        this.winnerSelectedPlayers = [];
         this.el.winnerNameInput.value  = '';
         this.el.winnerSplitInput.value = 1;
         if (this.el.winnerSplitDisplay) this.el.winnerSplitDisplay.textContent = 1;
+
+        // Split makes no sense while editing a single entry's name — hide it
+        const splitRow = document.querySelector('.winner-split-row');
+        if (splitRow) splitRow.style.display = editIdx !== null ? 'none' : '';
 
         this.renderPlayerQuickselect();
         this.renderWinnerSelectedList();
@@ -2624,6 +2754,9 @@ class BingoApp {
 
     closeWinnerModal() {
         this.playSound('cancel');
+        this._pendingEditIdx = null;
+        const splitRow = document.querySelector('.winner-split-row');
+        if (splitRow) splitRow.style.display = '';
         this.el.winnerModal.style.display = 'none';
         this.restoreBodyScroll();
     }
@@ -2701,7 +2834,7 @@ class BingoApp {
                 const pre   = name.slice(0, idx);
                 const match = name.slice(idx, idx + query.length);
                 const post  = name.slice(idx + query.length);
-                text.innerHTML = `${pre}<span class="chip-match">${match}</span>${post}`;
+                text.innerHTML = `${this._escapeHtml(pre)}<span class="chip-match">${this._escapeHtml(match)}</span>${this._escapeHtml(post)}`;
             } else if (text.textContent !== name) {
                 text.textContent = name;
             }
@@ -2746,6 +2879,24 @@ class BingoApp {
 
     saveWinner() {
         this.playSound('confirm');
+
+        // Edit mode: only replace the pending entry's name — everything else
+        // (game, rekke, prize, split, ballCount) stays as originally logged.
+        if (this._pendingEditIdx !== null) {
+            const typedName = this.el.winnerNameInput.value.trim();
+            const newName   = this.winnerSelectedPlayers[0] || typedName;
+            if (!newName) { this.el.winnerNameInput.focus(); return; }
+            this.addPlayerIfNew(newName);
+            const pending = this.getPendingWinners();
+            if (pending[this._pendingEditIdx]) {
+                pending[this._pendingEditIdx].name = newName;
+                localStorage.setItem('bingoPendingWinners', JSON.stringify(pending));
+            }
+            this.closeWinnerModal();
+            this.updateGameIndicator();
+            return;
+        }
+
         this.winnerSplitCount = Math.max(1, parseInt(this.el.winnerSplitInput.value) || 1);
         const typedName = this.el.winnerNameInput.value.trim();
 
@@ -2797,7 +2948,7 @@ class BingoApp {
         this.showWinnerFlash();
     }
 
-    showWinnerFlash(name, game, rekke, prize, split) {
+    showWinnerFlash() {
         const ind = this.el.gameIndicator;
         ind.style.animation = 'none';
         void ind.offsetWidth;
@@ -3179,12 +3330,68 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
     _backupDB() {
         if (this._backupDBPromise) return this._backupDBPromise;
         this._backupDBPromise = new Promise((resolve, reject) => {
-            const req = indexedDB.open('bingoBackups', 1);
-            req.onupgradeneeded = () => req.result.createObjectStore('backups');
+            // v2 adds the 'meta' store (holds the backup-folder handle)
+            const req = indexedDB.open('bingoBackups', 2);
+            req.onupgradeneeded = () => {
+                const db = req.result;
+                if (!db.objectStoreNames.contains('backups')) db.createObjectStore('backups');
+                if (!db.objectStoreNames.contains('meta'))    db.createObjectStore('meta');
+            };
             req.onsuccess = () => resolve(req.result);
             req.onerror   = () => reject(req.error);
         });
         return this._backupDBPromise;
+    }
+
+    async _idbMetaTx(mode, fn) {
+        const db = await this._backupDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('meta', mode);
+            const result = fn(tx.objectStore('meta'));
+            tx.oncomplete = () => resolve(result && 'result' in result ? result.result : undefined);
+            tx.onerror    = () => reject(tx.error);
+        });
+    }
+
+    // ── Silent backups via the File System Access API ─
+    // Chrome/Edge only; the directory handle survives restarts in IndexedDB.
+    // On unsupported browsers (iPad Safari) the row stays hidden and the
+    // download flow is used as before.
+    async initBackupFolder() {
+        if (!('showDirectoryPicker' in window)) return;
+        const row = document.getElementById('backup-folder-row');
+        if (row) row.style.display = '';
+        try {
+            this._backupDirHandle = await this._idbMetaTx('readonly', s => s.get('backupDir'));
+        } catch(e) {}
+        this._updateBackupFolderStatus();
+    }
+
+    _updateBackupFolderStatus() {
+        const el = document.getElementById('backup-folder-status');
+        if (!el) return;
+        el.textContent = this._backupDirHandle
+            ? `Backuper skrives stille til mappen «${this._backupDirHandle.name}»`
+            : 'Ingen mappe valgt — backup lastes ned som fil';
+    }
+
+    // Write the payload into the chosen folder. Returns false when no folder
+    // is set, permission is denied, or the write fails — caller falls back
+    // to the classic download.
+    async _writeBackupToFolder(payload) {
+        const dir = this._backupDirHandle;
+        if (!dir) return false;
+        try {
+            let perm = await dir.queryPermission({ mode: 'readwrite' });
+            if (perm === 'prompt') perm = await dir.requestPermission({ mode: 'readwrite' });
+            if (perm !== 'granted') return false;
+            const name = `geithus-bingo-backup-${new Date().toISOString().slice(0, 10)}.json`;
+            const fh = await dir.getFileHandle(name, { create: true });
+            const w  = await fh.createWritable();
+            await w.write(JSON.stringify(payload, null, 2));
+            await w.close();
+            return true;
+        } catch(e) { return false; }
     }
 
     async _idbBackupTx(mode, fn) {
@@ -3249,7 +3456,12 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             }
             try { localStorage.setItem('bingoLastBackupTs', String(ts)); } catch(e) {}
         } catch(e) { /* IndexedDB unavailable — file download below still works */ }
-        if (download) this._downloadBackupFile(payload);
+        if (download) {
+            // Prefer the silent folder write; fall back to a download when no
+            // folder is configured or the write fails.
+            const wrote = await this._writeBackupToFolder(payload);
+            if (!wrote) this._downloadBackupFile(payload);
+        }
         this.updateBackupStatus();
     }
 
@@ -3921,36 +4133,67 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
     }
 
     // ── Keyboard Input ───────────────────────────────
+
+    // One table drives Enter (confirm), Backspace/Escape (close) and +/-
+    // (adjust) for every modal. Order = stacking priority: overlays that
+    // appear on top of other modals must come first so keys hit the topmost.
+    _getModalKeyTable() {
+        if (this._modalKeyTable) return this._modalKeyTable;
+        const t = [];
+        const add = (el, opts) => { if (el) t.push({ el, ...opts }); };
+        add(this.el.unsavedModal,       { close: () => this.closeUnsavedModal() });
+        add(this.el.playerDeleteModal,  { confirm: () => { this.playSound('confirm'); this.confirmPlayerDelete(); },
+                                          close:   () => this.closePlayerDeleteModal() });
+        add(this.el.addWinModal,        { confirm: () => { this.playSound('confirm'); this.saveManualWin(); },
+                                          close:   () => this.closeAddWinModal() });
+        add(this.el.winnerModal,        { confirm: () => this.saveWinner(),        close: () => this.closeWinnerModal() });
+        add(this.el.sessionModal,       { confirm: () => this.saveSession(),
+                                          close:   () => this.promptUnsavedClose(() => this.closeSessionModal()) });
+        add(this.el.editSessionModal,   { confirm: () => this.saveEditedSession(),
+                                          close:   () => this.promptUnsavedClose(() => this.closeEditSessionModal()) });
+        add(this.el.deleteModal,        { confirm: () => this.confirmDelete(),     close: () => this.closeDeleteModal() });
+        add(this.el.resetAllModal,      { confirm: () => this.performResetAll(),   close: () => this.closeResetAllModal() });
+        add(this.el.suggestSaveModal,   { confirm: () => { this.el.suggestSaveModal.style.display = 'none'; this.openSessionModal(); },
+                                          close:   () => { this.playSound('cancel'); this.el.suggestSaveModal.style.display = 'none'; } });
+        add(this.el.uploadSoundModal,   { close: () => this.closeUploadSoundModal() });
+        add(this.el.playerHistoryModal, { close: () => this.closePlayerHistory() });
+        add(this.el.playersModal,       { close: () => this.closePlayersModal() });
+        add(this.el.leaderboardModal,   { close: () => this.closeLeaderboard() });
+        add(this.el.graphModal,         { close: () => this.closeGraph() });
+        add(this.el.statsModal,         { close: () => this.closeStatsModal() });
+        add(this.el.frequencyModal,     { close: () => this.closeFrequencyModal() });
+        add(this.el.backupsModal,       { close: () => this.closeBackupsModal() });
+        add(this.el.errorLogModal,      { close: () => this.closeErrorLogModal() });
+        add(document.getElementById('bingoview-modal'), { close: () => this.closeBingoViewModal() });
+        add(this.el.settingsModal,      { close: () => this.closeSettingsModal() });
+        add(this.el.viewerModal,        { close: () => this.closeViewerModal(), adjust: d => this.stepAvgFilter(d) });
+        this._modalKeyTable = t;
+        return t;
+    }
+
+    // Topmost open modal's key actions, or null when no modal is open.
+    _openModalEntry() {
+        // The rekke confirm is an inline panel (display:block), not a modal overlay
+        if (this.el.rekkeConfirm.style.display !== 'none') {
+            return {
+                confirm: () => this.confirmRekkeChange(),
+                close:   () => this.cancelRekkeChange(),
+                adjust:  d  => this.adjustRekkeCount(d),
+            };
+        }
+        return this._getModalKeyTable().find(e => e.el.style.display === 'flex') || null;
+    }
+
     handleKeyInput(e) {
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
 
-        // ── Detect open modal context ──────────────────
-        // All references are cached this.el.* — no DOM traversal on every keypress
-        const rekkeConfirmOpen = this.el.rekkeConfirm.style.display !== 'none';
-        const winnerOpen       = this.el.winnerModal?.style.display === 'flex';
-        const sessionOpen      = this.el.sessionModal?.style.display === 'flex';
-        const editSessionOpen  = this.el.editSessionModal?.style.display === 'flex';
-        const deleteOpen       = this.el.deleteModal?.style.display === 'flex';
-        const resetAllOpen     = this.el.resetAllModal?.style.display === 'flex';
-        const viewerOpen       = this.el.viewerModal?.style.display === 'flex';
-        const settingsOpen     = this.el.settingsModal?.style.display === 'flex';
-        const leaderboardOpen  = this.el.leaderboardModal?.style.display === 'flex';
-        const graphOpen        = this.el.graphModal?.style.display === 'flex';
-        const suggestSaveOpen  = this.el.suggestSaveModal?.style.display === 'flex';
-        const anyModal = rekkeConfirmOpen || winnerOpen || sessionOpen || editSessionOpen ||
-                         deleteOpen || resetAllOpen || viewerOpen || settingsOpen ||
-                         leaderboardOpen || graphOpen || suggestSaveOpen;
+        // Topmost open modal (or null) — drives every key branch below
+        const modal = this._openModalEntry();
 
         // ── ENTER: confirm / commit ────────────────────
         if (e.key === 'Enter') {
             e.preventDefault();
-            if (rekkeConfirmOpen)  { this.confirmRekkeChange(); return; }
-            if (winnerOpen)        { this.saveWinner(); return; }
-            if (sessionOpen)       { this.saveSession(); return; }
-            if (editSessionOpen)   { this.saveEditedSession(); return; }
-            if (deleteOpen)        { this.confirmDelete(); return; }
-            if (resetAllOpen)      { this.performResetAll(); return; }
-            if (suggestSaveOpen)   { this.el.suggestSaveModal.style.display = 'none'; this.openSessionModal(); return; }
+            if (modal) { if (modal.confirm) modal.confirm(); return; }
             // Default: commit typed number
             clearTimeout(this.typingTimer);
             this.commitTypedNumber();
@@ -3960,17 +4203,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         // ── BACKSPACE: cancel / close / undo ──────────
         if (e.key === 'Backspace') {
             e.preventDefault();
-            if (rekkeConfirmOpen)  { this.cancelRekkeChange(); return; }
-            if (winnerOpen)        { this.closeWinnerModal(); return; }
-            if (sessionOpen)       { this.closeSessionModal(); return; }
-            if (editSessionOpen)   { this.closeEditSessionModal(); return; }
-            if (deleteOpen)        { this.closeDeleteModal(); return; }
-            if (resetAllOpen)      { this.closeResetAllModal(); return; }
-            if (suggestSaveOpen)   { this.playSound('cancel'); this.el.suggestSaveModal.style.display = 'none'; return; }
-            if (viewerOpen)        { this.closeViewerModal(); return; }
-            if (settingsOpen)      { this.closeSettingsModal(); return; }
-            if (leaderboardOpen)   { this.closeLeaderboard(); return; }
-            if (graphOpen)         { this.closeGraph(); return; }
+            if (modal) { if (modal.close) modal.close(); return; }
             // Default: clear typing buffer or undo last number
             if (this.typingBuffer !== '') {
                 clearTimeout(this.typingTimer);
@@ -3992,17 +4225,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
 
         // ── ESCAPE: always clear/close ─────────────────
         if (e.key === 'Escape') {
-            if (rekkeConfirmOpen)  { this.cancelRekkeChange(); return; }
-            if (winnerOpen)        { this.closeWinnerModal(); return; }
-            if (sessionOpen)       { this.closeSessionModal(); return; }
-            if (editSessionOpen)   { this.closeEditSessionModal(); return; }
-            if (deleteOpen)        { this.closeDeleteModal(); return; }
-            if (resetAllOpen)      { this.closeResetAllModal(); return; }
-            if (suggestSaveOpen)   { this.playSound('cancel'); this.el.suggestSaveModal.style.display = 'none'; return; }
-            if (viewerOpen)        { this.closeViewerModal(); return; }
-            if (settingsOpen)      { this.closeSettingsModal(); return; }
-            if (leaderboardOpen)   { this.closeLeaderboard(); return; }
-            if (graphOpen)         { this.closeGraph(); return; }
+            if (modal) { if (modal.close) modal.close(); return; }
             clearTimeout(this.typingTimer);
             this.clearTypingBuffer();
             return;
@@ -4012,25 +4235,19 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         if (e.key === '+' || e.key === '-') {
             e.preventDefault();
             const delta = e.key === '+' ? 1 : -1;
-            if (rekkeConfirmOpen) { this.adjustRekkeCount(delta); return; }
-            if (viewerOpen)       { this.stepAvgFilter(delta); return; }
+            if (modal && modal.adjust) modal.adjust(delta);
             return;
         }
 
         // ── *: confirm / save (works inside modals too) ─
         if (e.key === '*') {
             e.preventDefault();
-            if (rekkeConfirmOpen)  { this.confirmRekkeChange(); return; }
-            if (winnerOpen)        { this.saveWinner(); return; }
-            if (sessionOpen)       { this.saveSession(); return; }
-            if (editSessionOpen)   { this.saveEditedSession(); return; }
-            if (deleteOpen)        { this.confirmDelete(); return; }
-            if (resetAllOpen)      { this.performResetAll(); return; }
+            if (modal && modal.confirm) modal.confirm();
             return;
         }
 
         // ── Remaining keys: ignore if any modal open ───
-        if (anyModal) return;
+        if (modal) return;
 
         // ── /: advance rekke (or log Rekke3 if already on it) ─
         if (e.key === '/') {
@@ -4080,10 +4297,14 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                 this.typingBuffer += e.key;           // e.g. '56'
                 this.updateTypingPreview();
 
-                // Undo the first digit directly (bypass oneWay restriction)
+                // Undo the first digit directly (bypass oneWay restriction).
+                // Only if WE just committed it via the overwrite path — a
+                // number called earlier in the game must not be un-called
+                // just because a two-digit entry starts with its digit.
                 const firstNum = parseInt(firstDigit, 10);
                 const firstStr = String(firstNum);
-                if (this.slot.selectedNumbers.includes(firstStr)) {
+                if (this._lastOverwriteNum === firstNum &&
+                    this.slot.selectedNumbers.includes(firstStr)) {
                     this.slot.selectedNumbers = this.slot.selectedNumbers.filter(n => n !== firstStr);
                     const prevBall = this.el.ballMap.get(firstStr);
                     if (prevBall) prevBall.classList.remove('clicked', 'recently-selected', 'last-clicked');
@@ -4834,7 +5055,14 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
     renderEditSessionWinners(winners) {
         const container = document.getElementById('edit-session-winners');
         container.innerHTML = '';
-        (winners || []).forEach((w, i) => container.appendChild(this.createWinnerRow(w, i)));
+        // Keep the originals so fields the editor has no input for
+        // (split, fullPrize, date, ballCount details) survive a save.
+        this._editWinnersOrig = (winners || []).map(w => ({ ...w }));
+        this._editWinnersOrig.forEach((w, i) => {
+            const row = this.createWinnerRow(w, i);
+            row.dataset.origIdx = i;
+            container.appendChild(row);
+        });
     }
 
     createWinnerRow(w, idx) {
@@ -4852,6 +5080,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                 <option value="Rekke3" ${w.rekke === 'Rekke3' ? 'selected' : ''}>Rekke 3</option>
             </select>
             <input type="number" placeholder="Tall" min="1" max="90" value="${w.ballCount || ''}" data-field="ballCount" title="Antall tall trukket">
+            <input type="number" placeholder="kr" min="0" step="0.01" value="${w.prize ?? ''}" data-field="prize" title="Premie (kr)">
             <button type="button" class="winner-remove-btn" title="Fjern">&times;</button>
         `;
         // Set via property, not attribute interpolation — names can contain quotes
@@ -4875,7 +5104,10 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
 
         sessions[this.editingSessionIdx].games = GAME_THEMES.map(t => games[t]);
 
-        // Collect winners from the editor rows
+        // Collect winners from the editor rows. Rows created from existing
+        // winners carry data-orig-idx — start from the original object so
+        // prize/split/fullPrize aren't wiped by a round-trip through the
+        // editor (they used to be, zeroing leaderboard money).
         const winnerRows = document.querySelectorAll('#edit-session-winners .winner-edit-row');
         const winners = [];
         winnerRows.forEach(row => {
@@ -4883,14 +5115,23 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             const game = row.querySelector('[data-field="game"]').value;
             const rekke = row.querySelector('[data-field="rekke"]').value;
             const ballCount = Number(row.querySelector('[data-field="ballCount"]').value) || null;
+            const prizeRaw = row.querySelector('[data-field="prize"]').value.trim();
             if (name || ballCount) {
+                const origIdx = row.dataset.origIdx;
+                const base = (origIdx !== undefined && this._editWinnersOrig?.[origIdx])
+                    ? { ...this._editWinnersOrig[origIdx] } : {};
+                const prize = prizeRaw !== ''
+                    ? Number(prizeRaw)
+                    : (base.prize ?? (PRIZES[game] ? PRIZES[game][rekke] : null));
                 winners.push({
+                    ...base,
                     name: name || 'Ukjent',
                     game,
                     gameName: GAME_NAMES[game],
                     rekke,
                     ballCount,
-                    date: sessions[this.editingSessionIdx].date
+                    prize,
+                    date: base.date || sessions[this.editingSessionIdx].date,
                 });
             }
         });
@@ -4901,6 +5142,10 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         if (rawDt) {
             sessions[this.editingSessionIdx].date = new Date(rawDt).toISOString();
         }
+
+        // Keep history chronological — the "siste N" filter, the graph and
+        // dry-spell calculations all assume it (the importer sorts too).
+        sessions.sort((a, b) => new Date(a.date) - new Date(b.date));
 
         this.saveSessions(sessions);
 
@@ -5105,7 +5350,8 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                 `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
         };
         tick();
-        this._countdownInterval = setInterval(tick, 1000);
+        // Display is HH:MM only — a 30s tick is plenty and saves wakeups
+        this._countdownInterval = setInterval(tick, 30000);
     }
 
     // ── Sound Engine ─────────────────────────────────
@@ -5352,31 +5598,74 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         ].forEach(([el, val]) => { if (el && val != null) el.value = val; });
     }
 
+    // Decode only the WAVs the CURRENT settings can actually play, instead
+    // of all 19 bundled files (~2 MB) up front. Anything not preloaded is
+    // still fetched+decoded lazily by playWav on first use (e.g. after the
+    // user switches a sound style or previews one in the upload modal).
     preloadSounds() {
-        const wavs = {
-            re4_hover:         RE4_HOVER_WAV,
-            re4_hover_loud:    RE4_HOVER_LOUD_WAV,
-            re4_cancel:        RE4_CANCEL_WAV,
-            re4_cancel_big:    RE4_CANCEL_BIG_WAV,
-            re4_select:        RE4_SELECT_WAV,
-            re4_select_number: RE4_SELECT_NUMBER_WAV,
-            re4_switch:        RE4_SWITCH_WAV,
-            re4_switch_2:      RE4_SWITCH_2_WAV,
-            click:             CLICK_WAV,
-            click_2:           CLICK_2_WAV,
-            click_and_hover:   CLICK_AND_HOVER_WAV,
-            click_and_hover_2: CLICK_AND_HOVER_2_WAV,
-            click_and_hover_3: CLICK_AND_HOVER_3_WAV,
-            click_jackpot:     CLICK_JACKPOT_WAV,
-            close:             CLOSE_WAV,
-            save_confirm_2:    SAVE_CONFIRM_2_WAV,
-            overtime:          OVERTIME_WAV,
-            sound_62274159:    'Sounds/62274159.wav',
-            firstnumber_gong:  FIRSTNUMBER_WAV,
+        const s = this.settings;
+        const wanted = new Map();
+        const add = ([key, src]) => wanted.set(key, src);
+
+        // Deselect/undo always plays 'close' regardless of style settings
+        add(['close', CLOSE_WAV]);
+
+        // settings key → { style value → [cacheKey, src] }
+        const table = {
+            hoverStyle: {
+                're4':                 ['re4_hover',         RE4_HOVER_WAV],
+                're4-loud':            ['re4_hover_loud',    RE4_HOVER_LOUD_WAV],
+                'custom-click-hover':  ['click_and_hover',   CLICK_AND_HOVER_WAV],
+                'custom-click-hover-2':['click_and_hover_2', CLICK_AND_HOVER_2_WAV],
+                'custom-click-hover-3':['click_and_hover_3', CLICK_AND_HOVER_3_WAV],
+            },
+            callStyle: {
+                're4-select-number':   ['re4_select_number', RE4_SELECT_NUMBER_WAV],
+                're4-select':          ['re4_select',        RE4_SELECT_WAV],
+                'custom-click':        ['click',             CLICK_WAV],
+                'custom-click-2':      ['click_2',           CLICK_2_WAV],
+            },
+            selectStyle: {
+                're4-select':          ['re4_select',        RE4_SELECT_WAV],
+                're4-select-number':   ['re4_select_number', RE4_SELECT_NUMBER_WAV],
+                'custom-click-jackpot':['click_jackpot',     CLICK_JACKPOT_WAV],
+            },
+            switchStyle: {
+                're4-switch':          ['re4_switch',        RE4_SWITCH_WAV],
+                're4-switch-2':        ['re4_switch_2',      RE4_SWITCH_2_WAV],
+            },
+            confirmStyle: {
+                're4-select':          ['re4_select',        RE4_SELECT_WAV],
+                're4-switch':          ['re4_switch',        RE4_SWITCH_WAV],
+                'custom-save-confirm-2':['save_confirm_2',   SAVE_CONFIRM_2_WAV],
+            },
+            cancelStyle: {
+                're4-cancel':          ['re4_cancel',        RE4_CANCEL_WAV],
+                're4-cancel-big':      ['re4_cancel_big',    RE4_CANCEL_BIG_WAV],
+                'custom-close':        ['close',             CLOSE_WAV],
+            },
+            resetStyle: {
+                're4-cancel-big':      ['re4_cancel_big',    RE4_CANCEL_BIG_WAV],
+                're4-cancel':          ['re4_cancel',        RE4_CANCEL_WAV],
+            },
+            resetHardStyle: {
+                're4-cancel-big':      ['re4_cancel_big',    RE4_CANCEL_BIG_WAV],
+                're4-cancel':          ['re4_cancel',        RE4_CANCEL_WAV],
+            },
+            overtimeStyle: {
+                'custom':              ['overtime',          OVERTIME_WAV],
+                'custom-62274159':     ['sound_62274159',    'Sounds/62274159.wav'],
+            },
+            firstRekkeStyle: {
+                'gong':                ['firstnumber_gong',  FIRSTNUMBER_WAV],
+            },
         };
-        Object.entries(wavs).forEach(([key, src]) => {
-            this._decodeAndCacheWav(key, src);
+        Object.entries(table).forEach(([settingKey, styles]) => {
+            const entry = styles[s[settingKey]];
+            if (entry) add(entry);
         });
+
+        wanted.forEach((src, key) => this._decodeAndCacheWav(key, src));
     }
 
     // Play a WAV via the Web Audio API. Decodes the file once into an
@@ -5743,9 +6032,8 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                 if (!val) {
                     // Clear custom code → next refresh uses random
                     this.bvClearCustomCode();
-                    // Force reconnect with random code
+                    // Force reconnect with random code (bvConnect detaches the old channel)
                     this._bvCode = null;
-                    if (this._bvChannelRef) { try { this._bvChannelRef.off(); } catch(e) {} this._bvChannelRef = null; }
                     this.bvConnect();
                     const el = document.getElementById('bv-code-display');
                     if (el) el.textContent = this._bvCode;
@@ -5862,12 +6150,8 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         const clean = (code || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
         if (clean.length < 4) return false;
         try { localStorage.setItem('bv_customCode', clean); } catch(e) {}
-        // Force reconnect with new code
+        // Force reconnect with new code (bvConnect detaches the old channel)
         this._bvCode = null;
-        if (this._bvChannelRef) {
-            try { this._bvChannelRef.off(); } catch(e) {}
-            this._bvChannelRef = null;
-        }
         this.bvConnect();
         // Update display
         const el = document.getElementById('bv-code-display');
@@ -5891,18 +6175,29 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         this.restoreBodyScroll();
     }
 
-    bvConnect() {
-        const code = this.bvGenerateCode();
-        this.bvSetStatus('connecting', 'Venter p\u00e5 telefon\u2026');
-
-        if (this._bvChannelRef) {
-            try { this._bvChannelRef.off(); } catch(e) {}
-        }
-        // Remove any previous .info/connected listener so we don't stack them on reconnect
+    // Detach every listener belonging to the current BingoView channel.
+    // Firebase's ref.off() only removes callbacks registered at that exact
+    // path \u2014 the phones/papers/papers_meta listeners live on CHILD paths,
+    // so without the stored detach fns a code change left the old channel's
+    // listeners running (phantom phones, doubled state).
+    _bvDetachChannel() {
+        (this._bvChannelDetachFns || []).forEach(fn => { try { fn(); } catch(e) {} });
+        this._bvChannelDetachFns = [];
         if (this._bvInfoConnectedOff) {
             try { this._bvInfoConnectedOff(); } catch(e) {}
             this._bvInfoConnectedOff = null;
         }
+        if (this._bvChannelRef) {
+            try { this._bvChannelRef.off(); } catch(e) {}
+            this._bvChannelRef = null;
+        }
+    }
+
+    bvConnect() {
+        const code = this.bvGenerateCode();
+        this.bvSetStatus('connecting', 'Venter p\u00e5 telefon\u2026');
+
+        this._bvDetachChannel();
 
         const tryConnect = () => {
             this._bvChannelRef = firebase.database().ref('bingoview/' + code);
@@ -6036,7 +6331,10 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                 this._bvUpdatePaperHighlights();
             };
 
-            this._bvChannelRef.child('phones').on('value', (snap) => {
+            // Attach child-path listeners via named refs/handlers and stash
+            // detach fns — see _bvDetachChannel for why parent off() isn't enough.
+            const phonesChildRef = this._bvChannelRef.child('phones');
+            const phonesHandler = (snap) => {
                 const phones = snap.val() || {};
                 this._bvLivePhones = {};
                 Object.entries(phones).forEach(([id, data]) => {
@@ -6048,17 +6346,23 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                     };
                 });
                 recompute();
-            });
+            };
+            phonesChildRef.on('value', phonesHandler);
+            this._bvChannelDetachFns.push(() => phonesChildRef.off('value', phonesHandler));
 
-            this._bvChannelRef.child('papers').on('value', (snap) => {
+            const papersHandler = (snap) => {
                 this._bvPersistedPapers = snap.val() || {};
                 recompute();
-            });
+            };
+            papersRef.on('value', papersHandler);
+            this._bvChannelDetachFns.push(() => papersRef.off('value', papersHandler));
 
-            this._bvChannelRef.child('papers_meta').on('value', (snap) => {
+            const papersMetaHandler = (snap) => {
                 this._bvPapersMeta = snap.val() || {};
                 recompute();
-            });
+            };
+            papersMetaRef.on('value', papersMetaHandler);
+            this._bvChannelDetachFns.push(() => papersMetaRef.off('value', papersMetaHandler));
 
         };
 
@@ -6321,6 +6625,11 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         const ts = Date.now();
         this._bvChannelRef.child('reset').set({ scope, game: this.currentTheme, ts });
         this._bvChannelRef.child('resetTs').set(ts);
+        // Prune the legacy replay log — with a persistent custom code it
+        // would otherwise grow forever in Firebase. Old BV builds that still
+        // read it ignore entries with ts <= resetTs anyway, and current
+        // builds reconcile from callState.
+        this._bvChannelRef.child('callLog').remove();
         // Clear callState for affected games
         const games = scope === 'all' ? ['blue','yellow','pink','grey'] : [this.currentTheme];
         games.forEach(g => this._bvChannelRef.child('callState/' + g).remove());

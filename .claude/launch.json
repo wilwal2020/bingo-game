@@ -4,26 +4,62 @@
     {
       "name": "npx serve (static)",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["serve", ".", "--listen", "3000", "--no-clipboard"],
+      "runtimeArgs": [
+        "serve",
+        ".",
+        "--listen",
+        "3000",
+        "--no-clipboard"
+      ],
       "port": 3000
     },
     {
       "name": "npx http-server (static)",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["http-server", ".", "-p", "8080", "--cors", "-c-1"],
+      "runtimeArgs": [
+        "http-server",
+        ".",
+        "-p",
+        "8080",
+        "--cors",
+        "-c-1"
+      ],
       "port": 8080
     },
     {
       "name": "Python http.server",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "8000"],
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8000"
+      ],
       "port": 8000
     },
     {
       "name": "BingoView server",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "8766", "--directory", "../BingoView"],
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8766",
+        "--directory",
+        "../BingoView"
+      ],
       "port": 8766
+    },
+    {
+      "name": "BingoView (npx)",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "http-server",
+        "../BingoView",
+        "-p",
+        "8767",
+        "--cors",
+        "-c-1"
+      ],
+      "port": 8767
     }
   ]
 }

@@ -4243,3 +4243,24 @@ option.user-sound {
 /* Stats + backups open from the viewer modal — must sit above it */
 #stats-modal   { z-index: 250; }
 #backups-modal { z-index: 250; }
+
+/* ── Pending-winner edit/remove buttons (game indicator) ── */
+.gi-win-line { white-space: nowrap; }
+.gi-win-btn {
+    background: none;
+    border: 1px solid rgba(255, 255, 255, .22);
+    border-radius: 4px;
+    color: rgba(255, 255, 255, .6);
+    font-size: .68rem;
+    line-height: 1;
+    padding: 2px 5px;
+    margin-left: 6px;
+    cursor: pointer;
+    vertical-align: middle;
+}
+.gi-win-btn:hover { color: #fff; border-color: rgba(255, 255, 255, .5); }
+.gi-win-del[data-confirming="1"] {
+    color: var(--danger-color, #ff4444);
+    border-color: var(--danger-color, #ff4444);
+    font-weight: bold;
+}
