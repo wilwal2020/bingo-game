@@ -231,6 +231,9 @@ class BingoApp {
             bvWinNotifyEnabled:    true,
             bvWinAutoOpenWinModal: false,
             autoBackupDownload:    true,
+            // Bottom block-bar: when true, chips are ordered by how many
+            // numbers each block is missing (fewest = leftmost).
+            bvBlockBarSort:        false,
         };
 
         // Init all slots
@@ -6712,6 +6715,88 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         return [{ total: bestTotal, numbers: [...winning], level }];
     }
 
+    // Fewest numbers a block is still missing to complete the current rekke
+    // for one game — used by the bottom block-bar. Unlike _bvStripCloseInfos
+    // this is unbounded (no threshold): it always returns a distance, so a
+    // block far from winning still shows a real count. 0 means it's a winner.
+    _bvBlockMissingForGame(strips, calledSet, rekke) {
+        if (!Array.isArray(strips)) return Infinity;
+        const N = rekke === 'Rekke3' ? 3 : rekke === 'Rekke2' ? 2 : 1;
+        let best = Infinity;
+        strips.forEach(strip => {
+            if (!strip || !Array.isArray(strip.rows)) return;
+            const rowMiss = strip.rows.map(nums =>
+                (nums || []).filter(n => Number.isFinite(n) && !calledSet.has(n)).length
+            );
+            if (rowMiss.length < N) return;
+            const sorted = rowMiss.slice().sort((a, b) => a - b);
+            let total = 0;
+            for (let i = 0; i < N; i++) total += sorted[i];
+            if (total < best) best = total;
+        });
+        return best;
+    }
+
+    // Render the fixed bottom bar of connected blocks (name + numbers missing).
+    // Optionally ordered by fewest-missing first when the sort toggle is on.
+    _bvRenderBlockBar(items) {
+        const bar  = document.getElementById('bv-block-bar');
+        const list = document.getElementById('bv-block-bar-list');
+        const sortBtn = document.getElementById('bv-block-bar-sort');
+        if (!bar || !list) return;
+
+        // Only blocks that are online AND have a paper for the current game.
+        let online = (items || []).filter(it => it.online && it.hasPaper);
+
+        if (!online.length) { bar.style.display = 'none'; return; }
+        bar.style.display = 'flex';
+
+        const sortOn = !!this.settings.bvBlockBarSort;
+        if (sortBtn) {
+            sortBtn.classList.toggle('active', sortOn);
+            // Bind once — toggles the setting and re-renders from cached items.
+            if (!sortBtn._bvBound) {
+                sortBtn._bvBound = true;
+                sortBtn.addEventListener('click', () => {
+                    this.settings.bvBlockBarSort = !this.settings.bvBlockBarSort;
+                    this.saveSettings();
+                    this._bvRenderBlockBar(this._bvBlockBarItems || []);
+                });
+            }
+        }
+
+        if (sortOn) {
+            online = online.slice().sort((a, b) => a.missing - b.missing);
+        }
+
+        list.innerHTML = '';
+        online.forEach(it => {
+            const chip = document.createElement('div');
+            chip.className = 'bv-block-chip';
+            if (it.missing === 0) chip.classList.add('is-win');
+            else if (it.missing === 1) chip.classList.add('is-close');
+
+            const dot = document.createElement('span');
+            dot.className = 'bv-block-dot';
+            dot.style.backgroundColor = it.color;
+
+            const name = document.createElement('span');
+            name.className = 'bv-block-name';
+            name.textContent = it.name;
+
+            const miss = document.createElement('span');
+            miss.className = 'bv-block-miss';
+            miss.textContent = it.missing === 0
+                ? 'BINGO'
+                : (Number.isFinite(it.missing) ? `mangler ${it.missing}` : '');
+
+            chip.appendChild(dot);
+            chip.appendChild(name);
+            if (miss.textContent) chip.appendChild(miss);
+            list.appendChild(chip);
+        });
+    }
+
     // Recompute ball highlights and modal phones list. Called from phones-listener,
     // bvSend, bvSendUncall, bvSendState, bvSendReset.
     _bvUpdatePaperHighlights() {
@@ -6738,6 +6823,8 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         const byBall = {};
         // For modal rendering, also collect close strips per phone
         const phoneRows = [];
+        // For the fixed bottom bar: name + numbers-missing per block.
+        const blockBarItems = [];
 
         phones.forEach((phone, idx) => {
             const color = BingoApp.BV_PHONE_COLORS[idx % BingoApp.BV_PHONE_COLORS.length];
@@ -6767,6 +6854,16 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                 idx, color, ts: phone.ts, online: !!phone.online, lastSeen: phone.lastSeen,
                 phoneId: phone.id, hasPaper: Array.isArray(strips), closeStrips,
                 userName: phone.userName || '',
+            });
+
+            blockBarItems.push({
+                name: displayName,
+                color,
+                online: !!phone.online,
+                hasPaper: Array.isArray(strips),
+                missing: Array.isArray(strips)
+                    ? this._bvBlockMissingForGame(strips, calledSet, rekke)
+                    : Infinity,
             });
         });
 
@@ -6819,6 +6916,11 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         // strip) combo as it transitions to a winning state. Only online phones
         // generate alerts.
         this._bvProcessWinNotifications(phones, calledSet, rekke, game);
+
+        // Cache items so the sort toggle can re-render without a new snapshot,
+        // then paint the always-visible bottom block-bar.
+        this._bvBlockBarItems = blockBarItems;
+        this._bvRenderBlockBar(blockBarItems);
 
         this._bvRenderPhonesSection(phoneRows);
     }

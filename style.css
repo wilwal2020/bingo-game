@@ -1642,6 +1642,118 @@ select.session-input option {
     background-color: rgba(255,255,255,.12);
 }
 
+/* ===================================================
+   CONNECTED-BLOCKS BAR (bottom, next to fullscreen)
+   =================================================== */
+.bv-block-bar {
+    position:         fixed;
+    bottom:           18px;
+    left:             12px;
+    /* Leave room on the right for the 44px fullscreen button + margins */
+    max-width:        calc(100vw - 92px);
+    height:           44px;
+    display:          flex;
+    align-items:      center;
+    gap:              8px;
+    padding:          0 10px;
+    border-radius:    12px;
+    background-color: rgba(255,255,255,.08);
+    backdrop-filter:  blur(12px);
+    border:           1px solid rgba(255,255,255,.12);
+    box-shadow:       0 4px 16px rgba(0,0,0,.4);
+    z-index:          50;
+}
+
+/* Hide the block bar in fullscreen, like the header/footer */
+body.fullscreen .bv-block-bar {
+    display: none !important;
+}
+
+.bv-block-bar-sort {
+    flex:             0 0 auto;
+    width:            30px;
+    height:           30px;
+    border-radius:    8px;
+    background-color: rgba(255,255,255,.06);
+    border:           1px solid rgba(255,255,255,.14);
+    color:            rgba(255,255,255,.6);
+    font-size:        1rem;
+    line-height:      1;
+    cursor:           pointer;
+    display:          flex;
+    align-items:      center;
+    justify-content:  center;
+    transition:       all .15s ease;
+}
+
+.bv-block-bar-sort:hover {
+    color:        var(--accent-color);
+    border-color: var(--accent-color);
+}
+
+.bv-block-bar-sort.active {
+    color:            var(--primary-color);
+    background-color: var(--accent-color);
+    border-color:     var(--accent-color);
+}
+
+.bv-block-bar-list {
+    display:          flex;
+    align-items:      center;
+    gap:              6px;
+    overflow-x:       auto;
+    overflow-y:       hidden;
+    height:           100%;
+    scrollbar-width:  thin;
+}
+.bv-block-bar-list::-webkit-scrollbar { height: 4px; }
+.bv-block-bar-list::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,.2); border-radius: 4px;
+}
+
+.bv-block-chip {
+    flex:            0 0 auto;
+    display:         flex;
+    align-items:     center;
+    gap:             6px;
+    height:          30px;
+    padding:         0 10px;
+    border-radius:   8px;
+    background-color: rgba(0,0,0,.25);
+    border:          1px solid rgba(255,255,255,.1);
+    font-size:       .8rem;
+    color:           rgba(255,255,255,.9);
+    white-space:     nowrap;
+}
+
+.bv-block-chip .bv-block-dot {
+    width:         9px;
+    height:        9px;
+    border-radius: 50%;
+    flex:          0 0 auto;
+}
+
+.bv-block-chip .bv-block-name {
+    font-weight:   600;
+    max-width:     140px;
+    overflow:      hidden;
+    text-overflow: ellipsis;
+}
+
+.bv-block-chip .bv-block-miss {
+    font-variant-numeric: tabular-nums;
+    color:                rgba(255,255,255,.6);
+    font-size:            .72rem;
+}
+
+/* Highlight blocks that are one number away or already have a win */
+.bv-block-chip.is-close .bv-block-miss { color: var(--accent-color); font-weight: 700; }
+.bv-block-chip.is-win {
+    border-color: var(--accent-color);
+    box-shadow:   0 0 0 1px var(--accent-color) inset;
+}
+.bv-block-chip.is-win .bv-block-miss { color: var(--accent-color); font-weight: 700; }
+
 /* Hide header/footer in fullscreen */
 body.fullscreen header,
 body.fullscreen .flex-container-bot,
@@ -2157,23 +2269,40 @@ body.layout-vertical #random-button {
 }
 
 #reset-button,
+/* Jackpot button — gold ring + ★ + glow, echoing BingoView's jackpot marker. */
 #jackpot-button {
     width:            100%;
     font-size:        1.3rem;
     font-weight:      bold;
     padding:          12px 4px;
-    color:            var(--primary-color);
-    background-color: var(--accent-color);
-    border:           2.5px solid var(--accent-color);
+    color:            #f5c518;
+    background-color: transparent;
+    border:           2.5px solid #f5c518;
     border-radius:    var(--btn-radius);
     cursor:           pointer;
     transition:       transform .12s ease, box-shadow .12s ease, background-color .12s, color .12s, border-color .12s;
     white-space:      nowrap;
-    box-shadow:       4px 4px 0 rgba(0,0,0,.5);
+    text-shadow:      0 0 6px rgba(245,197,24,.5);
+    box-shadow:       4px 4px 0 rgba(0,0,0,.5), 0 0 12px rgba(245,197,24,.5);
 }
 
-#reset-button:hover,
+#jackpot-button::before {
+    content: '\2605 ';   /* ★ */
+    color:   #f5c518;
+}
+
+/* Hover / cancel states swap to a solid gold fill with dark text. */
 #jackpot-button:hover {
+    background-color: #f5c518;
+    color:            #1a1a1a;
+    border-color:     #f5c518;
+    transform:        translate(-2px, -2px);
+    text-shadow:      none;
+    box-shadow:       6px 6px 0 rgba(0,0,0,.5), 0 0 20px rgba(245,197,24,.8);
+}
+#jackpot-button:hover::before { color: #1a1a1a; }
+
+#reset-button:hover {
     background-color: transparent;
     color:            var(--accent-color);
     border-color:     var(--accent-color);
@@ -2195,12 +2324,15 @@ body.layout-vertical #random-button {
     box-shadow:       6px 6px 0 rgba(var(--danger-rgb), .4);
 }
 
+/* Active = "Avbryt" (cancel jackpot pick): red, no star, no gold glow. */
 #jackpot-button.active {
     background-color: var(--danger-color);
     border-color:     var(--danger-color);
     color:            white;
+    text-shadow:      none;
     box-shadow:       4px 4px 0 rgba(var(--danger-rgb), .45);
 }
+#jackpot-button.active::before { content: none; }
 
 #jackpot-button.active:hover {
     background-color: transparent;
