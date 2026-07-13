@@ -1721,6 +1721,12 @@ select.session-input option {
     white-space:     nowrap;
 }
 
+/* Offline blocks stay listed but dimmed so it's clear they've dropped. */
+.bv-block-chip.is-offline {
+    opacity:      .5;
+    border-style: dashed;
+}
+
 .bv-block-chip .bv-block-dot {
     width:         9px;
     height:        9px;

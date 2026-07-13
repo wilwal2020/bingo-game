@@ -6757,10 +6757,12 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         const sortBtn = document.getElementById('bv-block-bar-sort');
         if (!bar || !list) return;
 
-        // Only blocks that are online AND have a paper for the current game.
-        let online = (items || []).filter(it => it.online && it.hasPaper);
+        // Any block with a paper for the current game — online or offline.
+        // Offline blocks are still shown (dimmed) so they don't vanish when a
+        // phone briefly drops connection.
+        let shown = (items || []).filter(it => it.hasPaper);
 
-        if (!online.length) { bar.style.display = 'none'; return; }
+        if (!shown.length) { bar.style.display = 'none'; return; }
         bar.style.display = 'flex';
 
         const sortOn = !!this.settings.bvBlockBarSort;
@@ -6778,13 +6780,13 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         }
 
         if (sortOn) {
-            online = online.slice().sort((a, b) => a.missing - b.missing);
+            shown = shown.slice().sort((a, b) => a.missing - b.missing);
         }
 
         list.innerHTML = '';
-        online.forEach(it => {
+        shown.forEach(it => {
             const chip = document.createElement('div');
-            chip.className = 'bv-block-chip';
+            chip.className = 'bv-block-chip' + (it.online ? '' : ' is-offline');
 
             const dot = document.createElement('span');
             dot.className = 'bv-block-dot';
