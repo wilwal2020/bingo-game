@@ -6141,11 +6141,25 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         try { custom = (localStorage.getItem('bv_customCode') || '').trim().toUpperCase(); } catch(e) {}
         if (custom && custom.length >= 4) {
             this._bvCode = custom;
-        } else {
-            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-            this._bvCode = Array.from({length: 6}, () =>
-                chars[Math.floor(Math.random() * chars.length)]).join('');
+            this._bvCodeIsFresh = false;
+            return this._bvCode;
         }
+        // Reuse the last auto-generated code across refreshes. Without this a
+        // page reload spawns a new code and hosts a different channel, which
+        // orphans (disconnects) every phone that joined the old code — bad if
+        // the host accidentally refreshes mid-game.
+        let auto = '';
+        try { auto = (localStorage.getItem('bv_autoCode') || '').trim().toUpperCase(); } catch(e) {}
+        if (auto && auto.length >= 4) {
+            this._bvCode = auto;
+            this._bvCodeIsFresh = false;
+            return this._bvCode;
+        }
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        this._bvCode = Array.from({length: 6}, () =>
+            chars[Math.floor(Math.random() * chars.length)]).join('');
+        try { localStorage.setItem('bv_autoCode', this._bvCode); } catch(e) {}
+        this._bvCodeIsFresh = true;
         return this._bvCode;
     }
 
@@ -6209,21 +6223,16 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             // Host presence marker — re-register on every Firebase reconnect so phones
             // can always find the host even after a brief network interruption.
             //
-            // Papers lifetime depends on the code type:
-            //  - RANDOM code: a fresh page-load gets a fresh code, so stale
-            //    papers are worthless — wipe on connect and on host disconnect.
-            //  - CUSTOM code: the code survives host refreshes, so wiping here
-            //    would delete offline phones' persisted papers every time the
-            //    host reloads. Keep them; the per-phone "Slett" button and the
-            //    offline-duplicate cleanup handle stale entries.
-            const isCustomCode = (() => {
-                try { return !!(localStorage.getItem('bv_customCode') || '').trim(); }
-                catch (e) { return false; }
-            })();
+            // Papers are only wiped for a genuinely NEW session code (the first
+            // time this device generates one). A reused code — custom OR the
+            // persisted auto code — keeps papers, so an accidental host refresh
+            // doesn't drop connected phones' blocks. Stale entries are handled
+            // by the per-phone "Slett" button and offline-duplicate cleanup.
+            const freshSession = !!this._bvCodeIsFresh;
             const hostRef       = this._bvChannelRef.child('host');
             const papersRef     = this._bvChannelRef.child('papers');
             const papersMetaRef = this._bvChannelRef.child('papers_meta');
-            if (!isCustomCode) {
+            if (freshSession) {
                 papersRef.remove();
                 papersMetaRef.remove();
             }
@@ -6231,10 +6240,8 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             const infoHandler = (snap) => {
                 if (!snap.val()) return;
                 hostRef.onDisconnect().remove();
-                if (!isCustomCode) {
-                    papersRef.onDisconnect().remove();
-                    papersMetaRef.onDisconnect().remove();
-                }
+                // Deliberately do NOT remove papers on host disconnect — a
+                // refresh must not wipe connected phones' blocks.
                 hostRef.set({ ts: Date.now() });
                 // Re-publish the current jackpot so phones that join (or rejoin
                 // after a host reconnect) immediately see it.
@@ -6786,7 +6793,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         list.innerHTML = '';
         shown.forEach(it => {
             const chip = document.createElement('div');
-            chip.className = 'bv-block-chip' + (it.online ? '' : ' is-offline');
+            chip.className = 'bv-block-chip';
 
             const dot = document.createElement('span');
             dot.className = 'bv-block-dot';
