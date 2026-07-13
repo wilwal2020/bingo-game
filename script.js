@@ -6737,7 +6737,19 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         return best;
     }
 
-    // Render the fixed bottom bar of connected blocks (name + numbers missing).
+    // Badge background/text colours by how close a block is to winning —
+    // mirrors BingoView's "x igjen" block-tab gradient (warmer = closer).
+    _bvProximityColors(min) {
+        if (min === null || !Number.isFinite(min)) return { bg: '#1a1a1a', fg: '#777' };
+        if (min === 0) return { bg: '#2d1a3a', fg: '#c4a8ff' };  // BINGO!
+        if (min === 1) return { bg: '#3a1a1a', fg: '#ff4444' };  // 1 away
+        if (min === 2) return { bg: '#3a2218', fg: '#ff6b2b' };
+        if (min === 3) return { bg: '#2e2518', fg: '#f0a030' };
+        if (min <= 5) return { bg: '#26261a', fg: '#c8b040' };
+        return { bg: '#1a2220', fg: '#5a8a6a' };                 // far away
+    }
+
+    // Render the fixed bottom bar of connected blocks (name + "x igjen").
     // Optionally ordered by fewest-missing first when the sort toggle is on.
     _bvRenderBlockBar(items) {
         const bar  = document.getElementById('bv-block-bar');
@@ -6773,8 +6785,6 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         online.forEach(it => {
             const chip = document.createElement('div');
             chip.className = 'bv-block-chip';
-            if (it.missing === 0) chip.classList.add('is-win');
-            else if (it.missing === 1) chip.classList.add('is-close');
 
             const dot = document.createElement('span');
             dot.className = 'bv-block-dot';
@@ -6784,15 +6794,17 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             name.className = 'bv-block-name';
             name.textContent = it.name;
 
-            const miss = document.createElement('span');
-            miss.className = 'bv-block-miss';
-            miss.textContent = it.missing === 0
-                ? 'BINGO'
-                : (Number.isFinite(it.missing) ? `mangler ${it.missing}` : '');
+            const m = it.missing;
+            const badge = document.createElement('span');
+            badge.className = 'bv-block-badge';
+            badge.textContent = !Number.isFinite(m) ? '—' : (m === 0 ? 'BINGO!' : m + ' igjen');
+            const col = this._bvProximityColors(m);
+            badge.style.backgroundColor = col.bg;
+            badge.style.color = col.fg;
 
             chip.appendChild(dot);
             chip.appendChild(name);
-            if (miss.textContent) chip.appendChild(miss);
+            chip.appendChild(badge);
             list.appendChild(chip);
         });
     }

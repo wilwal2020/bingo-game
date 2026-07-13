@@ -1740,19 +1740,16 @@ body.fullscreen .bv-block-bar {
     text-overflow: ellipsis;
 }
 
-.bv-block-chip .bv-block-miss {
-    font-variant-numeric: tabular-nums;
-    color:                rgba(255,255,255,.6);
+/* "x igjen" badge — colour set inline per proximity (see _bvProximityColors),
+   mirroring BingoView's block-tab badge. */
+.bv-block-chip .bv-block-badge {
     font-size:            .72rem;
+    font-weight:          700;
+    padding:              2px 7px;
+    border-radius:        6px;
+    font-variant-numeric: tabular-nums;
+    white-space:          nowrap;
 }
-
-/* Highlight blocks that are one number away or already have a win */
-.bv-block-chip.is-close .bv-block-miss { color: var(--accent-color); font-weight: 700; }
-.bv-block-chip.is-win {
-    border-color: var(--accent-color);
-    box-shadow:   0 0 0 1px var(--accent-color) inset;
-}
-.bv-block-chip.is-win .bv-block-miss { color: var(--accent-color); font-weight: 700; }
 
 /* Hide header/footer in fullscreen */
 body.fullscreen header,
