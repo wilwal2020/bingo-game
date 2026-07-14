@@ -370,9 +370,25 @@ body.layout-vertical #jackpot-btn-cell {
     width:          1.6em;
     height:         1.6em;
     border:         4px solid var(--jackpot-color);
-    border-radius:  50%;
+    border-radius:  6px;              /* square (softly rounded) instead of a circle */
     animation:      jackpotPulse 5s infinite;
     pointer-events: none;
+}
+
+/* ★ badge on the jackpot square's top-right corner. */
+.balls.jackpot::before {
+    content:        '★';
+    position:       absolute;
+    top:            calc(50% - 0.78em);
+    left:           calc(50% + 0.78em);
+    transform:      translate(-50%, -50%);
+    font-size:      0.85em;
+    line-height:    1;
+    color:          var(--jackpot-color);
+    text-shadow:    0 0 4px rgba(0,0,0,.7);
+    animation:      jackpotPulse 5s infinite;
+    pointer-events: none;
+    z-index:        2;
 }
 
 /* Statistics row */
@@ -1889,7 +1905,8 @@ body.fullscreen .page-layout {
     100% { transform: translate(-50%,-50%) scale(2.4); opacity: 0;  border-width: 1px; }
 }
 
-.balls.jackpot-break::after {
+.balls.jackpot-break::after,
+.balls.jackpot-break::before {
     animation: jackpotBreak .4s ease-out forwards !important;
 }
 
@@ -2302,40 +2319,23 @@ body.layout-vertical #random-button {
 }
 
 #reset-button,
-/* Jackpot button — gold ring + ★ + glow, echoing BingoView's jackpot marker. */
 #jackpot-button {
     width:            100%;
     font-size:        1.3rem;
     font-weight:      bold;
     padding:          12px 4px;
-    color:            #f5c518;
-    background-color: transparent;
-    border:           2.5px solid #f5c518;
+    color:            var(--primary-color);
+    background-color: var(--accent-color);
+    border:           2.5px solid var(--accent-color);
     border-radius:    var(--btn-radius);
     cursor:           pointer;
     transition:       transform .12s ease, box-shadow .12s ease, background-color .12s, color .12s, border-color .12s;
     white-space:      nowrap;
-    text-shadow:      0 0 6px rgba(245,197,24,.5);
-    box-shadow:       4px 4px 0 rgba(0,0,0,.5), 0 0 12px rgba(245,197,24,.5);
+    box-shadow:       4px 4px 0 rgba(0,0,0,.5);
 }
 
-#jackpot-button::before {
-    content: '\2605 ';   /* ★ */
-    color:   #f5c518;
-}
-
-/* Hover / cancel states swap to a solid gold fill with dark text. */
+#reset-button:hover,
 #jackpot-button:hover {
-    background-color: #f5c518;
-    color:            #1a1a1a;
-    border-color:     #f5c518;
-    transform:        translate(-2px, -2px);
-    text-shadow:      none;
-    box-shadow:       6px 6px 0 rgba(0,0,0,.5), 0 0 20px rgba(245,197,24,.8);
-}
-#jackpot-button:hover::before { color: #1a1a1a; }
-
-#reset-button:hover {
     background-color: transparent;
     color:            var(--accent-color);
     border-color:     var(--accent-color);
@@ -2357,15 +2357,12 @@ body.layout-vertical #random-button {
     box-shadow:       6px 6px 0 rgba(var(--danger-rgb), .4);
 }
 
-/* Active = "Avbryt" (cancel jackpot pick): red, no star, no gold glow. */
 #jackpot-button.active {
     background-color: var(--danger-color);
     border-color:     var(--danger-color);
     color:            white;
-    text-shadow:      none;
     box-shadow:       4px 4px 0 rgba(var(--danger-rgb), .45);
 }
-#jackpot-button.active::before { content: none; }
 
 #jackpot-button.active:hover {
     background-color: transparent;
