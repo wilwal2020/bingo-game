@@ -6744,6 +6744,35 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         return best;
     }
 
+    // Like _bvBlockMissingForGame but returns the ACTUAL missing numbers of the
+    // closest path (the strip + N rows with fewest misses), sorted ascending.
+    // Used by the block-bar tooltip. Returns [] when the rekke is already
+    // complete, or null when the block has no usable paper.
+    _bvBlockMissingNumbers(strips, calledSet, rekke) {
+        if (!Array.isArray(strips)) return null;
+        const N = rekke === 'Rekke3' ? 3 : rekke === 'Rekke2' ? 2 : 1;
+        let best = Infinity, bestNums = null;
+        strips.forEach(strip => {
+            if (!strip || !Array.isArray(strip.rows)) return;
+            const rowMiss = strip.rows.map(nums =>
+                (nums || []).filter(n => Number.isFinite(n) && !calledSet.has(n))
+            );
+            if (rowMiss.length < N) return;
+            const order = rowMiss
+                .map((arr, idx) => ({ idx, c: arr.length }))
+                .sort((a, b) => a.c - b.c)
+                .slice(0, N);
+            const total = order.reduce((s, o) => s + o.c, 0);
+            if (total < best) {
+                best = total;
+                const set = new Set();
+                order.forEach(o => rowMiss[o.idx].forEach(n => set.add(n)));
+                bestNums = [...set].sort((a, b) => a - b);
+            }
+        });
+        return bestNums;
+    }
+
     // Badge background/text colours by how close a block is to winning —
     // mirrors BingoView's "x igjen" block-tab gradient (warmer = closer).
     _bvProximityColors(min) {
@@ -6764,12 +6793,19 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         const sortBtn = document.getElementById('bv-block-bar-sort');
         if (!bar || !list) return;
 
+        this._bvEnsureBlockTip(list);
+
         // Any block with a paper for the current game — online or offline.
-        // Offline blocks are still shown (dimmed) so they don't vanish when a
-        // phone briefly drops connection.
+        // Offline blocks are still shown so they don't vanish when a phone
+        // briefly drops connection.
         let shown = (items || []).filter(it => it.hasPaper);
 
-        if (!shown.length) { bar.style.display = 'none'; return; }
+        if (!shown.length) {
+            bar.style.display = 'none';
+            if (this._bvTipEl) this._bvTipEl.style.display = 'none';
+            this._bvTipPinned = null;
+            return;
+        }
         bar.style.display = 'flex';
 
         const sortOn = !!this.settings.bvBlockBarSort;
@@ -6791,9 +6827,18 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         }
 
         list.innerHTML = '';
-        shown.forEach(it => {
+        shown.forEach((it, i) => {
             const chip = document.createElement('div');
             chip.className = 'bv-block-chip';
+            // Identity + tooltip data (read by the delegated hover/tap handler).
+            chip.setAttribute('data-key', it.name + '#' + i);
+            chip.setAttribute('data-name', it.name);
+            chip.setAttribute('data-rekke', it.rekkeNum || 1);
+            chip.setAttribute('data-missnow', (it.missNow || []).join(','));
+            if (it.rekkeNextNum) {
+                chip.setAttribute('data-rekkenext', it.rekkeNextNum);
+                chip.setAttribute('data-missnext', (it.missNext || []).join(','));
+            }
 
             const dot = document.createElement('span');
             dot.className = 'bv-block-dot';
@@ -6816,6 +6861,119 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             chip.appendChild(badge);
             list.appendChild(chip);
         });
+
+        // Keep a shown tooltip in sync across the frequent re-renders: re-fill
+        // and re-position it against the matching chip, or hide it if gone.
+        const activeKey = this._bvTipPinned || this._bvTipHoverKey;
+        if (activeKey && this._bvTipEl && this._bvTipEl.style.display !== 'none') {
+            const chip = [...list.children].find(c => c.getAttribute('data-key') === activeKey);
+            if (chip) { this._bvFillTip(chip); this._bvPositionTip(chip); }
+            else { this._bvTipEl.style.display = 'none'; this._bvTipPinned = null; this._bvTipHoverKey = null; }
+        }
+    }
+
+    // Create the shared tooltip element and wire delegated hover/tap handlers
+    // on the (persistent) list container — once. The list's children are
+    // rebuilt on every render, so per-chip listeners would leak; delegation
+    // survives rebuilds.
+    _bvEnsureBlockTip(list) {
+        if (!this._bvTipEl) {
+            const tip = document.createElement('div');
+            tip.className = 'bv-block-tip';
+            tip.style.display = 'none';
+            document.body.appendChild(tip);
+            this._bvTipEl = tip;
+            this._bvTipPinned = null;   // data-key of a tap-pinned chip
+            this._bvTipHoverKey = null; // data-key of the hovered chip
+        }
+        if (list._bvTipBound) return;
+        list._bvTipBound = true;
+
+        const showFor = (chip) => {
+            this._bvFillTip(chip);
+            this._bvPositionTip(chip);
+            this._bvTipEl.style.display = 'block';
+        };
+
+        list.addEventListener('mouseover', (e) => {
+            if (this._bvTipPinned) return; // tap-pinned wins over hover
+            const chip = e.target.closest('.bv-block-chip');
+            if (!chip) return;
+            this._bvTipHoverKey = chip.getAttribute('data-key');
+            showFor(chip);
+        });
+        list.addEventListener('mouseleave', () => {
+            this._bvTipHoverKey = null;
+            if (!this._bvTipPinned) this._bvTipEl.style.display = 'none';
+        });
+
+        // Tap / click toggles a pinned tooltip (touch has no hover).
+        list.addEventListener('click', (e) => {
+            const chip = e.target.closest('.bv-block-chip');
+            if (!chip) return;
+            const key = chip.getAttribute('data-key');
+            if (this._bvTipPinned === key) {
+                this._bvTipPinned = null;
+                this._bvTipEl.style.display = 'none';
+            } else {
+                this._bvTipPinned = key;
+                showFor(chip);
+            }
+        });
+
+        // Tapping/clicking anywhere outside the bar closes a pinned tooltip.
+        document.addEventListener('click', (e) => {
+            if (!this._bvTipPinned) return;
+            if (e.target.closest('#bv-block-bar')) return;
+            this._bvTipPinned = null;
+            this._bvTipEl.style.display = 'none';
+        });
+    }
+
+    // Fill the tooltip with a block's name and its missing numbers for the
+    // current rekke plus the next one up.
+    _bvFillTip(chip) {
+        const tip = this._bvTipEl;
+        tip.innerHTML = '';
+        const title = document.createElement('div');
+        title.className = 'bv-tip-title';
+        title.textContent = chip.getAttribute('data-name') || '';
+        tip.appendChild(title);
+
+        const addRow = (rekkeNum, numsStr) => {
+            if (!rekkeNum) return;
+            const nums = (numsStr || '').split(',').filter(Boolean);
+            const row = document.createElement('div');
+            row.className = 'bv-tip-row';
+            const r = document.createElement('span');
+            r.className = 'bv-tip-rekke';
+            r.textContent = 'Rekke ' + rekkeNum;
+            const v = document.createElement('span');
+            v.className = 'bv-tip-nums';
+            v.textContent = nums.length ? nums.join('  ·  ') : 'Bingo!';
+            if (!nums.length) v.classList.add('bv-tip-bingo');
+            row.appendChild(r);
+            row.appendChild(v);
+            tip.appendChild(row);
+        };
+        addRow(chip.getAttribute('data-rekke'), chip.getAttribute('data-missnow'));
+        addRow(chip.getAttribute('data-rekkenext'), chip.getAttribute('data-missnext'));
+    }
+
+    // Position the tooltip centered above the chip, flipping below and clamping
+    // horizontally if it would run off-screen.
+    _bvPositionTip(chip) {
+        const tip = this._bvTipEl;
+        const r = chip.getBoundingClientRect();
+        tip.style.left = '0px';
+        tip.style.top = '0px';
+        const tw = tip.offsetWidth, th = tip.offsetHeight;
+        let left = r.left + r.width / 2 - tw / 2;
+        left = Math.max(8, Math.min(left, window.innerWidth - tw - 8));
+        let top = r.top - th - 8;
+        if (top < 8) top = r.bottom + 8;
+        tip.style.left = Math.round(left) + 'px';
+        tip.style.top = Math.round(top) + 'px';
     }
 
     // Recompute ball highlights and modal phones list. Called from phones-listener,
@@ -6877,6 +7035,17 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                 userName: phone.userName || '',
             });
 
+            // Tooltip data: the actual missing numbers for the current rekke
+            // and (if not already the top rekke) the next one up.
+            const rekkeNum = rekke === 'Rekke3' ? 3 : rekke === 'Rekke2' ? 2 : 1;
+            const missNow = Array.isArray(strips)
+                ? this._bvBlockMissingNumbers(strips, calledSet, rekke) : null;
+            let rekkeNextNum = null, missNext = null;
+            if (Array.isArray(strips) && rekkeNum < 3) {
+                rekkeNextNum = rekkeNum + 1;
+                missNext = this._bvBlockMissingNumbers(strips, calledSet, 'Rekke' + rekkeNextNum);
+            }
+
             blockBarItems.push({
                 name: displayName,
                 color,
@@ -6885,6 +7054,10 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                 missing: Array.isArray(strips)
                     ? this._bvBlockMissingForGame(strips, calledSet, rekke)
                     : Infinity,
+                rekkeNum,
+                missNow,
+                rekkeNextNum,
+                missNext,
             });
         });
 

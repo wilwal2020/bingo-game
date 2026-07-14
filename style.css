@@ -1737,6 +1737,9 @@ select.session-input option {
 
 /* "x igjen" badge — colour set inline per proximity (see _bvProximityColors),
    mirroring BingoView's block-tab badge. */
+.bv-block-chip {
+    cursor: pointer;   /* hover/tap reveals the missing-numbers tooltip */
+}
 .bv-block-chip .bv-block-badge {
     font-size:            .72rem;
     font-weight:          700;
@@ -1745,6 +1748,44 @@ select.session-input option {
     font-variant-numeric: tabular-nums;
     white-space:          nowrap;
 }
+
+/* Missing-numbers tooltip (hover on desktop, tap on touch). */
+.bv-block-tip {
+    position:         fixed;
+    z-index:          60;
+    max-width:        min(90vw, 340px);
+    padding:          8px 10px;
+    border-radius:    var(--btn-radius-sm);
+    background-color: var(--primary-color);
+    border:           2px solid rgba(var(--accent-rgb), .5);
+    box-shadow:       var(--btn-shadow);
+    color:            #fff;
+    font-size:        .8rem;
+    line-height:      1.35;
+    pointer-events:   none;   /* never eats the hover/tap it describes */
+}
+.bv-tip-title {
+    font-weight:   700;
+    color:         var(--accent-color);
+    margin-bottom: 4px;
+    font-size:     .82rem;
+}
+.bv-tip-row { display: flex; gap: 8px; align-items: baseline; }
+.bv-tip-row + .bv-tip-row { margin-top: 3px; }
+.bv-tip-rekke {
+    flex:           0 0 auto;
+    min-width:      54px;
+    font-size:      .68rem;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color:          rgba(255,255,255,.55);
+}
+.bv-tip-nums {
+    font-weight:          700;
+    font-variant-numeric: tabular-nums;
+    color:                #fff;
+}
+.bv-tip-nums.bv-tip-bingo { color: #c4a8ff; }
 
 /* Hide header/footer in fullscreen */
 body.fullscreen header,
