@@ -176,9 +176,9 @@ class BingoApp {
         // them (parent ref.off() does NOT detach child-path listeners).
         this._bvChannelDetachFns = [];
 
-        // Pending-winner entry being edited via the game indicator
-        // (null = the winner modal is in normal log mode)
-        this._pendingEditIdx = null;
+        // Win being edited in the edit-win modal:
+        // { source: 'pending'|'session'|'manual', sessionIdx?, winIdx }
+        this._editWinCtx = null;
 
         // Settings
         this.settings = {
@@ -560,6 +560,22 @@ class BingoApp {
             addWinMonth:         document.getElementById('add-win-month'),
             addWinSave:          document.getElementById('add-win-save'),
             addWinCancel:        document.getElementById('add-win-cancel'),
+
+            // Edit-win modal (edits a single win from pending/session/manual)
+            editWinModal:        document.getElementById('edit-win-modal'),
+            editWinSubtitle:     document.getElementById('edit-win-subtitle'),
+            editWinName:         document.getElementById('edit-win-name'),
+            editWinPlayers:      document.getElementById('edit-win-players'),
+            editWinGameRows:     document.getElementById('edit-win-game-rows'),
+            editWinGame:         document.getElementById('edit-win-game'),
+            editWinRekke:        document.getElementById('edit-win-rekke'),
+            editWinBalls:        document.getElementById('edit-win-balls'),
+            editWinPrize:        document.getElementById('edit-win-prize'),
+            editWinDateRow:      document.getElementById('edit-win-date-row'),
+            editWinYear:         document.getElementById('edit-win-year'),
+            editWinMonth:        document.getElementById('edit-win-month'),
+            editWinSave:         document.getElementById('edit-win-save'),
+            editWinCancel:       document.getElementById('edit-win-cancel'),
             // Recent numbers expand
             recentExpandBtn:     document.getElementById('recent-expand-btn'),
             recentNumbersAll:    document.getElementById('recent-numbers-all'),
@@ -727,6 +743,7 @@ class BingoApp {
             ['player-history-modal', () => this.closePlayerHistory()],
             ['player-delete-modal',  () => this.closePlayerDeleteModal()],
             ['add-win-modal',        () => this.closeAddWinModal()],
+            ['edit-win-modal',       () => this.closeEditWinModal()],
             ['graph-modal',          () => this.closeGraph()],
             ['unsaved-modal',        () => this.closeUnsavedModal()],
             ['upload-sound-modal',   () => this.closeUploadSoundModal()],
@@ -797,8 +814,25 @@ class BingoApp {
                     }, 2500);
                 }
             } else if (btn.classList.contains('gi-win-edit')) {
-                this.openWinnerModal(idx);
+                this.openEditWinModal({ source: 'pending', winIdx: idx });
             }
+        });
+
+        // Edit-win modal
+        this.el.editWinSave.addEventListener('click',   () => this.saveEditWin());
+        this.el.editWinCancel.addEventListener('click', () => this.closeEditWinModal());
+        this.el.editWinName.addEventListener('keydown', e => {
+            if (e.key === 'Enter') this.saveEditWin();
+        });
+
+        // Edit buttons on win rows inside the player-history modal (delegated;
+        // the list is re-rendered on every open)
+        this.el.playerHistoryList.addEventListener('click', e => {
+            const btn = e.target.closest('.win-edit-btn');
+            if (!btn) return;
+            const ctx = { source: btn.dataset.src, winIdx: Number(btn.dataset.widx) };
+            if (btn.dataset.sidx !== undefined) ctx.sessionIdx = Number(btn.dataset.sidx);
+            this.openEditWinModal(ctx);
         });
 
         this.el.winnerSave.addEventListener('click',    () => this.saveWinner());
@@ -2677,6 +2711,7 @@ class BingoApp {
         const modals = ['winner-modal','viewer-modal','session-modal','reset-all-modal',
                         'edit-session-modal','delete-modal','leaderboard-modal',
                         'players-modal','player-history-modal','player-delete-modal','add-win-modal',
+                        'edit-win-modal',
                         'settings-modal','upload-sound-modal','bingoview-modal'];
         const anyOpen = modals.some(id => document.getElementById(id).style.display === 'flex');
         if (!anyOpen) document.body.style.overflow = '';
@@ -2710,31 +2745,16 @@ class BingoApp {
 
     // ── Winner System ────────────────────────────────
 
-    // No arg: log a new winner for the current game/rekke.
-    // With editIdx: edit the NAME of pending winner #editIdx (game indicator ✎) —
-    // game/rekke/prize stay as logged, so this works even after the rekke advanced.
-    openWinnerModal(editIdx = null) {
+    // Log a new winner for the current game/rekke.
+    // (Editing an already-logged win happens in the edit-win modal.)
+    openWinnerModal() {
+        if (this.currentTheme === 'default') return;
         this.playSound('select');
-        this._pendingEditIdx = null;
-        let game, rekke, prize;
-
-        if (editIdx !== null) {
-            const entry = this.getPendingWinners()[editIdx];
-            if (!entry) return;
-            this._pendingEditIdx = editIdx;
-            game  = entry.gameName;
-            rekke = entry.rekke.replace('Rekke', 'Rekke ');
-            prize = entry.fullPrize ?? entry.prize;
-            this.el.winnerModalTitle.textContent = `✏ Rediger vinner — ${game}`;
-            this.winnerSelectedPlayers = [entry.name];
-        } else {
-            if (this.currentTheme === 'default') return;
-            game  = GAME_NAMES[this.currentTheme];
-            rekke = this.slot.currentRekke.replace('Rekke', 'Rekke ');
-            prize = PRIZES[this.currentTheme][this.slot.currentRekke];
-            this.el.winnerModalTitle.textContent = `🏆 Vinner — ${game}`;
-            this.winnerSelectedPlayers = [];
-        }
+        const game  = GAME_NAMES[this.currentTheme];
+        const rekke = this.slot.currentRekke.replace('Rekke', 'Rekke ');
+        const prize = PRIZES[this.currentTheme][this.slot.currentRekke];
+        this.el.winnerModalTitle.textContent = `🏆 Vinner — ${game}`;
+        this.winnerSelectedPlayers = [];
         this.el.winnerModalSubtitle.textContent = `${rekke} · ${prize} kr`;
 
         // Reset state
@@ -2742,10 +2762,6 @@ class BingoApp {
         this.el.winnerNameInput.value  = '';
         this.el.winnerSplitInput.value = 1;
         if (this.el.winnerSplitDisplay) this.el.winnerSplitDisplay.textContent = 1;
-
-        // Split makes no sense while editing a single entry's name — hide it
-        const splitRow = document.querySelector('.winner-split-row');
-        if (splitRow) splitRow.style.display = editIdx !== null ? 'none' : '';
 
         this.renderPlayerQuickselect();
         this.renderWinnerSelectedList();
@@ -2757,9 +2773,6 @@ class BingoApp {
 
     closeWinnerModal() {
         this.playSound('cancel');
-        this._pendingEditIdx = null;
-        const splitRow = document.querySelector('.winner-split-row');
-        if (splitRow) splitRow.style.display = '';
         this.el.winnerModal.style.display = 'none';
         this.restoreBodyScroll();
     }
@@ -2883,23 +2896,6 @@ class BingoApp {
     saveWinner() {
         this.playSound('confirm');
 
-        // Edit mode: only replace the pending entry's name — everything else
-        // (game, rekke, prize, split, ballCount) stays as originally logged.
-        if (this._pendingEditIdx !== null) {
-            const typedName = this.el.winnerNameInput.value.trim();
-            const newName   = this.winnerSelectedPlayers[0] || typedName;
-            if (!newName) { this.el.winnerNameInput.focus(); return; }
-            this.addPlayerIfNew(newName);
-            const pending = this.getPendingWinners();
-            if (pending[this._pendingEditIdx]) {
-                pending[this._pendingEditIdx].name = newName;
-                localStorage.setItem('bingoPendingWinners', JSON.stringify(pending));
-            }
-            this.closeWinnerModal();
-            this.updateGameIndicator();
-            return;
-        }
-
         this.winnerSplitCount = Math.max(1, parseInt(this.el.winnerSplitInput.value) || 1);
         const typedName = this.el.winnerNameInput.value.trim();
 
@@ -2996,6 +2992,128 @@ class BingoApp {
     getPendingWinners() {
         try { return JSON.parse(localStorage.getItem('bingoPendingWinners') || '[]'); }
         catch(e) { return []; }
+    }
+
+    // ── Edit Win ─────────────────────────────────────
+    // One modal edits a single win regardless of where it lives:
+    //   pending — logged this session, not yet saved (game indicator)
+    //   session — inside a saved session's winners array
+    //   manual  — 'bingoManualWins' (added via "+ Legg til seier")
+    _getEditWinTarget(ctx) {
+        if (!ctx) return null;
+        if (ctx.source === 'pending') return this.getPendingWinners()[ctx.winIdx];
+        if (ctx.source === 'session') return (this.getSessions()[ctx.sessionIdx]?.winners || [])[ctx.winIdx];
+        if (ctx.source === 'manual')  return this.getManualWins()[ctx.winIdx];
+        return null;
+    }
+
+    openEditWinModal(ctx) {
+        const w = this._getEditWinTarget(ctx);
+        if (!w) return;
+        this.playSound('select');
+        this._editWinCtx = ctx;
+        const isManual = ctx.source === 'manual';
+
+        // Context line under the title
+        if (ctx.source === 'pending') {
+            this.el.editWinSubtitle.textContent = 'Denne økten (ikke lagret enda)';
+        } else if (ctx.source === 'session') {
+            const s = this.getSessions()[ctx.sessionIdx];
+            this.el.editWinSubtitle.textContent = new Date(s.date).toLocaleDateString('no-NO',
+                { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+        } else {
+            this.el.editWinSubtitle.textContent = 'Manuelt lagt til seier';
+        }
+
+        // Player suggestions for the name field
+        this.el.editWinPlayers.innerHTML = this.getPlayers()
+            .map(p => `<option value="${this._escapeHtml(p)}">`).join('');
+
+        this.el.editWinName.value  = w.name || '';
+        this.el.editWinPrize.value = w.prize ?? '';
+
+        this.el.editWinGameRows.style.display = isManual ? 'none' : '';
+        this.el.editWinDateRow.style.display  = isManual ? '' : 'none';
+        if (isManual) {
+            const d = new Date(w.date);
+            this.el.editWinYear.value  = w.year  || d.getFullYear();
+            this.el.editWinMonth.value = w.month || (d.getMonth() + 1);
+        } else {
+            this.el.editWinGame.innerHTML = GAME_THEMES
+                .map(t => `<option value="${t}">${GAME_NAMES[t]}</option>`).join('');
+            this.el.editWinGame.value  = GAME_THEMES.includes(w.game) ? w.game : GAME_THEMES[0];
+            this.el.editWinRekke.value = ['Rekke1','Rekke2','Rekke3'].includes(w.rekke) ? w.rekke : 'Rekke1';
+            this.el.editWinBalls.value = w.ballCount ?? '';
+        }
+
+        document.body.style.overflow = 'hidden';
+        this.el.editWinModal.style.display = 'flex';
+        setTimeout(() => this.el.editWinName.focus(), 100);
+    }
+
+    closeEditWinModal() {
+        this.playSound('cancel');
+        this._editWinCtx = null;
+        this.el.editWinModal.style.display = 'none';
+        this.restoreBodyScroll();
+    }
+
+    saveEditWin() {
+        const ctx = this._editWinCtx;
+        const w   = this._getEditWinTarget(ctx);
+        if (!w) { this.closeEditWinModal(); return; }
+
+        const name = this.el.editWinName.value.trim();
+        if (!name) { this.el.editWinName.focus(); return; }
+        this.playSound('confirm');
+        this.addPlayerIfNew(name);
+
+        w.name = name;
+        // Empty prize field keeps the stored prize — never zero out
+        // leaderboard money by accident.
+        const prizeRaw = this.el.editWinPrize.value.trim();
+        if (prizeRaw !== '' && !isNaN(Number(prizeRaw))) w.prize = Number(prizeRaw);
+
+        if (ctx.source === 'manual') {
+            const year  = parseInt(this.el.editWinYear.value);
+            const month = parseInt(this.el.editWinMonth.value);
+            if (year && month) {
+                w.year  = year;
+                w.month = month;
+                w.date  = new Date(year, month - 1, 15).toISOString();
+            }
+            const manuals = this.getManualWins();
+            manuals[ctx.winIdx] = w;
+            localStorage.setItem('bingoManualWins', JSON.stringify(manuals));
+        } else {
+            const game = this.el.editWinGame.value;
+            w.game     = game;
+            w.gameName = GAME_NAMES[game];
+            w.rekke    = this.el.editWinRekke.value;
+            const balls = parseInt(this.el.editWinBalls.value);
+            w.ballCount = balls > 0 ? balls : w.ballCount;
+
+            if (ctx.source === 'pending') {
+                const pending = this.getPendingWinners();
+                pending[ctx.winIdx] = w;
+                localStorage.setItem('bingoPendingWinners', JSON.stringify(pending));
+                this.updateGameIndicator();
+            } else {
+                // 'session': w is a reference into the cached sessions array
+                this.saveSessions(this.getSessions());
+                this.renderSessionList();
+            }
+        }
+
+        this._editWinCtx = null;
+        this.el.editWinModal.style.display = 'none';
+        this.restoreBodyScroll();
+
+        // Refresh whatever win-derived views are open behind the modal
+        this.renderLeaderboard();
+        if (this.el.playerHistoryModal.style.display === 'flex' && this.currentHistoryPlayer) {
+            this.openPlayerHistory(this.currentHistoryPlayer);
+        }
     }
 
     // ── Player Management ─────────────────────────────
@@ -3240,15 +3358,22 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         const sessions  = this.getSessions();
         const playerWins = [];
 
-        sessions.forEach(s => {
-            const wins = (s.winners || []).filter(w => w.name === name);
+        sessions.forEach((s, si) => {
+            const wins = [];
+            (s.winners || []).forEach((w, wi) => {
+                if (w.name === name) wins.push({ ...w, _src: { source: 'session', sessionIdx: si, winIdx: wi } });
+            });
             if (wins.length > 0) playerWins.push({ date: s.date, wins, games: s.games });
         });
 
         // Include manual wins
-        const manualWins = this.getManualWins().filter(w => w.name === name);
-        manualWins.forEach(w => {
-            playerWins.push({ date: w.date, wins: [{ ...w, rekke: '–', gameName: '–', manual: true }], manual: true });
+        this.getManualWins().forEach((w, mi) => {
+            if (w.name !== name) return;
+            playerWins.push({
+                date: w.date,
+                wins: [{ ...w, rekke: '–', gameName: '–', manual: true, _src: { source: 'manual', winIdx: mi } }],
+                manual: true,
+            });
         });
 
         // Sort by date descending
@@ -3281,7 +3406,16 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                 const winsHtml = session.wins.map(w => {
                     const splitText = w.split > 1 ? ` (delt på ${w.split})` : '';
                     const rc = w.rekke.replace('Rekke','Rekke ');
-                    return `${this._escapeHtml(w.gameName)} · ${rc} · ${w.ballCount} tall · ${w.prize} kr${splitText}`;
+                    const line = w.manual
+                        ? `Manuell seier · ${w.prize} kr`
+                        : `${this._escapeHtml(w.gameName)} · ${rc} · ${w.ballCount} tall · ${w.prize} kr${splitText}`;
+                    const src = w._src;
+                    const editBtn = src
+                        ? ` <button class="win-edit-btn" title="Rediger seier" data-src="${src.source}"` +
+                          `${src.sessionIdx !== undefined ? ` data-sidx="${src.sessionIdx}"` : ''}` +
+                          ` data-widx="${src.winIdx}">✎</button>`
+                        : '';
+                    return line + editBtn;
                 }).join('<br>');
 
                 item.innerHTML = `
@@ -4149,6 +4283,8 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                                           close:   () => this.closePlayerDeleteModal() });
         add(this.el.addWinModal,        { confirm: () => { this.playSound('confirm'); this.saveManualWin(); },
                                           close:   () => this.closeAddWinModal() });
+        add(this.el.editWinModal,       { confirm: () => this.saveEditWin(),
+                                          close:   () => this.closeEditWinModal() });
         add(this.el.winnerModal,        { confirm: () => this.saveWinner(),        close: () => this.closeWinnerModal() });
         add(this.el.sessionModal,       { confirm: () => this.saveSession(),
                                           close:   () => this.promptUnsavedClose(() => this.closeSessionModal()) });
@@ -4987,11 +5123,18 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             if (hasWinners) {
                 const details = document.createElement('div');
                 details.className = 'session-winner-details';
-                const winnerLines = session.winners.map(w => {
+                const winnerLines = session.winners.map((w, wi) => {
                     const splitText = w.split > 1 ? ` (1/${w.split})` : '';
-                    return `🏆 <strong>${this._escapeHtml(w.name)}</strong> · ${this._escapeHtml(w.gameName)} · ${w.rekke.replace('Rekke','Rekke ')} · ${w.prize} kr${splitText}`;
+                    return `🏆 <strong>${this._escapeHtml(w.name)}</strong> · ${this._escapeHtml(w.gameName)} · ${w.rekke.replace('Rekke','Rekke ')} · ${w.prize} kr${splitText}` +
+                           ` <button class="win-edit-btn" title="Rediger seier" data-widx="${wi}">✎</button>`;
                 }).join('<br>');
                 details.innerHTML = winnerLines;
+                details.querySelectorAll('.win-edit-btn').forEach(btn => {
+                    btn.addEventListener('click', e => {
+                        e.stopPropagation();  // don't collapse the expanded row
+                        this.openEditWinModal({ source: 'session', sessionIdx: realIdx, winIdx: Number(btn.dataset.widx) });
+                    });
+                });
                 item.appendChild(details);
             }
 
@@ -7322,7 +7465,8 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             // already open so we don't fight the user.
             const winnerOpen   = this.el.winnerModal?.style.display === 'flex';
             const addWinOpen   = this.el.addWinModal?.style.display === 'flex';
-            if (!winnerOpen && !addWinOpen) {
+            const editWinOpen  = this.el.editWinModal?.style.display === 'flex';
+            if (!winnerOpen && !addWinOpen && !editWinOpen) {
                 try { this.openWinnerModal(); } catch (e) {}
             }
         }

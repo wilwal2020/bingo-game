@@ -2456,6 +2456,61 @@ body.layout-vertical #random-button {
 /* Player delete modal z-index */
 #player-delete-modal { z-index: 300; }
 
+/* Edit-win modal opens above leaderboard/player-history/viewer modals */
+#edit-win-modal { z-index: 300; }
+
+#edit-win-modal .modal {
+    width:     440px;
+    max-width: 92vw;
+    min-width: unset;
+}
+
+.edit-win-form {
+    display:        flex;
+    flex-direction: column;
+    gap:            12px;
+    width:          100%;
+    text-align:     left;
+}
+.edit-win-row {
+    display:   flex;
+    flex-wrap: wrap;
+    gap:       10px;
+}
+.edit-win-label {
+    display:        flex;
+    flex-direction: column;
+    gap:            4px;
+    font-size:      .72rem;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    color:          rgba(255,255,255,.45);
+}
+.edit-win-label .session-input {
+    width:      auto;
+    min-width:  90px;
+    text-align: left;
+}
+#edit-win-name  { min-width: 200px; }
+#edit-win-balls { width: 90px; }
+#edit-win-prize { width: 110px; }
+#edit-win-year  { width: 90px; }
+
+/* Small ✎ button on win rows (session details + player history) */
+.win-edit-btn {
+    background:     none;
+    border:         1px solid rgba(255, 255, 255, .22);
+    border-radius:  4px;
+    color:          rgba(255, 255, 255, .6);
+    font-size:      .68rem;
+    line-height:    1;
+    padding:        2px 5px;
+    margin-left:    6px;
+    cursor:         pointer;
+    vertical-align: middle;
+}
+.win-edit-btn:hover { color: #fff; border-color: rgba(255, 255, 255, .5); }
+
 /* Rekke3 ready-to-log state: checkmark only */
 .rekke-btn.rekke3-ready {
     background-color: var(--accent-color);

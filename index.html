@@ -383,6 +383,70 @@
         </div>
     </div>
 
+    <!-- EDIT WIN MODAL -->
+    <div class="modal-overlay" id="edit-win-modal" style="display:none">
+        <div class="modal modal-wide">
+            <h2 class="modal-title">✏ Rediger seier</h2>
+            <p class="modal-subtitle" id="edit-win-subtitle"></p>
+
+            <div class="edit-win-form">
+                <label class="edit-win-label">Navn
+                    <input type="text" id="edit-win-name" class="session-input" list="edit-win-players"
+                           placeholder="Navn" autocomplete="off">
+                </label>
+                <datalist id="edit-win-players"></datalist>
+
+                <div class="edit-win-row" id="edit-win-game-rows">
+                    <label class="edit-win-label">Spill
+                        <select id="edit-win-game" class="session-input"></select>
+                    </label>
+                    <label class="edit-win-label">Rekke
+                        <select id="edit-win-rekke" class="session-input">
+                            <option value="Rekke1">Rekke 1</option>
+                            <option value="Rekke2">Rekke 2</option>
+                            <option value="Rekke3">Rekke 3</option>
+                        </select>
+                    </label>
+                    <label class="edit-win-label">Antall tall
+                        <input type="number" id="edit-win-balls" class="session-input" min="1" max="90" placeholder="–">
+                    </label>
+                </div>
+
+                <div class="edit-win-row">
+                    <label class="edit-win-label">Premie (kr)
+                        <input type="number" id="edit-win-prize" class="session-input" min="0" step="0.01" placeholder="kr">
+                    </label>
+                    <div class="edit-win-row" id="edit-win-date-row" style="display:none">
+                        <label class="edit-win-label">År
+                            <input type="number" id="edit-win-year" class="session-input" min="2000" max="2100">
+                        </label>
+                        <label class="edit-win-label">Måned
+                            <select id="edit-win-month" class="session-input">
+                                <option value="1">Januar</option>
+                                <option value="2">Februar</option>
+                                <option value="3">Mars</option>
+                                <option value="4">April</option>
+                                <option value="5">Mai</option>
+                                <option value="6">Juni</option>
+                                <option value="7">Juli</option>
+                                <option value="8">August</option>
+                                <option value="9">September</option>
+                                <option value="10">Oktober</option>
+                                <option value="11">November</option>
+                                <option value="12">Desember</option>
+                            </select>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-buttons" style="margin-top:20px">
+                <button class="modal-btn modal-btn-yes" id="edit-win-save">Lagre</button>
+                <button class="modal-btn modal-btn-no" id="edit-win-cancel">Avbryt</button>
+            </div>
+        </div>
+    </div>
+
     <!-- UNSAVED CHANGES CONFIRM -->
     <div class="modal-overlay" id="unsaved-modal" style="display:none">
         <div class="modal">
