@@ -1765,12 +1765,8 @@ select.session-input option {
     white-space:          nowrap;
 }
 
-/* FLIP: chips ease from their previous slot into the new one when the bar
-   reorders. The transform is set to the old offset, then cleared next frame. */
-.bv-block-chip.bv-block-flip {
-    transition: transform .38s cubic-bezier(.22, 1, .36, 1);
-    z-index:    1;
-}
+/* Reorder movement is animated in JS via the Web Animations API (FLIP);
+   see _bvRenderBlockBar. Below is only the leader-pop celebration. */
 
 /* Celebratory pop when a block becomes the new closest-to-winning leader. */
 .bv-block-chip.bv-block-leader-pop {
@@ -1783,7 +1779,6 @@ select.session-input option {
     100% { transform: scale(1);   box-shadow: 0 0 0 0 rgba(var(--accent-rgb), .0); }
 }
 @media (prefers-reduced-motion: reduce) {
-    .bv-block-chip.bv-block-flip { transition: none; }
     .bv-block-chip.bv-block-leader-pop { animation: none; }
 }
 

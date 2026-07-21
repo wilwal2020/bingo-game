@@ -7108,23 +7108,29 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             list.appendChild(chip);
         });
 
-        // FLIP playback: for every chip that existed before, translate it from
-        // its old position to the new one, then release the transform so it
-        // eases into place. Chips that didn't move get a zero delta (no-op).
-        [...list.children].forEach(chip => {
-            const prev = firstRects.get(chip.getAttribute('data-key'));
-            if (!prev) return;
-            const now = chip.getBoundingClientRect();
-            const dx = prev.left - now.left, dy = prev.top - now.top;
-            if (!dx && !dy) return;
-            chip.classList.add('bv-block-flip');
-            chip.style.transform = `translate(${dx}px, ${dy}px)`;
-            requestAnimationFrame(() => {
-                chip.style.transform = '';
-                const done = () => { chip.classList.remove('bv-block-flip'); chip.removeEventListener('transitionend', done); };
-                chip.addEventListener('transitionend', done);
+        // FLIP playback via the Web Animations API. For each chip that moved,
+        // animate FROM its old position TO the new one. Declaring both
+        // keyframes explicitly avoids the CSS-transition trap where the browser
+        // coalesces the invert+release into a no-op and the chips just snap.
+        // Transforms don't reflow siblings, so chips slide through each other.
+        const reduceMotion = window.matchMedia &&
+            window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (!reduceMotion) {
+            [...list.children].forEach(chip => {
+                const prev = firstRects.get(chip.getAttribute('data-key'));
+                if (!prev) return;
+                const now = chip.getBoundingClientRect();
+                const dx = prev.left - now.left, dy = prev.top - now.top;
+                if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
+                if (typeof chip.animate !== 'function') return;
+                chip.style.zIndex = '2';   // ride above the settled chips in transit
+                const anim = chip.animate(
+                    [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'translate(0px, 0px)' }],
+                    { duration: 450, easing: 'cubic-bezier(.22, 1, .36, 1)' }
+                );
+                anim.onfinish = anim.oncancel = () => { chip.style.zIndex = ''; };
             });
-        });
+        }
 
         // Keep a shown tooltip in sync across the frequent re-renders: re-fill
         // and re-position it against the matching chip, or hide it if gone.
