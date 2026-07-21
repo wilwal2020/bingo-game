@@ -6204,6 +6204,31 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             if (e.target === modal) this.closeBingoViewModal();
         });
 
+        // "Nytt spill" — fresh random code + fresh channel. Two-tap confirm
+        // because it disconnects every phone joined on the current code.
+        const newGameBtn = document.getElementById('bv-new-game');
+        if (newGameBtn) {
+            const idleLabel = newGameBtn.textContent;
+            newGameBtn.addEventListener('click', () => {
+                if (newGameBtn.dataset.confirming === '1') {
+                    newGameBtn.dataset.confirming = '';
+                    newGameBtn.textContent = idleLabel;
+                    this.playSound('confirm');
+                    this.bvStartNewGame();
+                } else {
+                    this.playSound('select');
+                    newGameBtn.dataset.confirming = '1';
+                    newGameBtn.textContent = 'Sikker? Telefoner mister tilkoblingen';
+                    setTimeout(() => {
+                        if (newGameBtn.dataset.confirming === '1') {
+                            newGameBtn.dataset.confirming = '';
+                            newGameBtn.textContent = idleLabel;
+                        }
+                    }, 3000);
+                }
+            });
+        }
+
         // Custom code input — load saved code and wire up apply button
         const customInput = document.getElementById('bv-custom-code');
         const applyBtn = document.getElementById('bv-apply-code');
@@ -6364,6 +6389,23 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
 
     bvClearCustomCode() {
         try { localStorage.removeItem('bv_customCode'); } catch(e) {}
+    }
+
+    // Start a brand-new BingoView session: drop both persisted codes so
+    // bvGenerateCode() mints a fresh random one, and reconnect. The fresh
+    // code marks the session as new, so bvConnect wipes the old papers.
+    bvStartNewGame() {
+        this.bvClearCustomCode();
+        try { localStorage.removeItem('bv_autoCode'); } catch(e) {}
+        const customInput = document.getElementById('bv-custom-code');
+        if (customInput) customInput.value = '';
+        this._bvCode = null;
+        this.bvConnect();
+        const el = document.getElementById('bv-code-display');
+        if (el) el.textContent = this._bvCode;
+        const qrEl = document.getElementById('bv-qr-code');
+        if (qrEl) { qrEl.innerHTML = ''; qrEl._qrDone = false; }
+        this.openBingoViewModal();  // re-renders the QR with the new code
     }
 
     closeBingoViewModal() {

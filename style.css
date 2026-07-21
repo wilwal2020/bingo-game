@@ -3824,6 +3824,34 @@ option.user-sound {
     text-align: left;
 }
 
+/* "Nytt spill" — new random code + fresh channel */
+.bv-new-game-btn {
+    display:       block;
+    margin:        4px auto 16px;
+    padding:       8px 20px;
+    background:    transparent;
+    border:        1px solid var(--accent-color);
+    border-radius: 8px;
+    color:         var(--accent-color);
+    font-family:   inherit;
+    font-weight:   600;
+    font-size:     .85rem;
+    cursor:        pointer;
+    transition:    background-color .15s, color .15s, border-color .15s;
+}
+.bv-new-game-btn:hover {
+    background: var(--accent-color);
+    color:      var(--primary-color);
+}
+.bv-new-game-btn[data-confirming="1"] {
+    border-color: var(--danger-color, #ff4444);
+    color:        var(--danger-color, #ff4444);
+}
+.bv-new-game-btn[data-confirming="1"]:hover {
+    background: var(--danger-color, #ff4444);
+    color:      #fff;
+}
+
 .bv-code-qr-row {
     display:     flex;
     align-items: center;
