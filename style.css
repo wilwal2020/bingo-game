@@ -3824,11 +3824,10 @@ option.user-sound {
     text-align: left;
 }
 
-/* "Nytt spill" — new random code + fresh channel */
+/* "Nytt spill" — new random code + fresh channel; sits above the code */
 .bv-new-game-btn {
-    display:       block;
-    margin:        4px auto 16px;
-    padding:       8px 20px;
+    align-self:    center;
+    padding:       6px 18px;
     background:    transparent;
     border:        1px solid var(--accent-color);
     border-radius: 8px;
@@ -3905,50 +3904,6 @@ option.user-sound {
     user-select:    all;
 }
 
-.bv-phone-count {
-    font-family:  'Barlow Condensed', sans-serif;
-    font-size:    0.85rem;
-    letter-spacing: 0.08em;
-    color:        rgba(255,255,255,.45);
-    text-align:   center;
-    margin-top:   6px;
-}
-
-.bv-status-row {
-    display:     flex;
-    align-items: center;
-    gap:         10px;
-    min-height:  26px;
-    margin-bottom: 20px;
-    text-align:  left;
-}
-
-.bv-dot {
-    width:       10px;
-    height:      10px;
-    border-radius: 50%;
-    background:  rgba(255,255,255,.15);
-    flex-shrink: 0;
-    transition:  background .3s, box-shadow .3s;
-}
-
-.bv-dot.connected  { background: #2ecc71; box-shadow: 0 0 8px #2ecc71; }
-.bv-dot.connecting { background: var(--accent-color); box-shadow: 0 0 8px var(--accent-color); animation: bv-blink 1s ease-in-out infinite; }
-.bv-dot.error      { background: #e74c3c; box-shadow: 0 0 8px #e74c3c; }
-
-@keyframes bv-blink {
-    0%, 100% { opacity: 1; }
-    50%       { opacity: 0.25; }
-}
-
-.bv-status-text {
-    font-family:    'Barlow Condensed', sans-serif;
-    font-size:      0.9rem;
-    font-weight:    600;
-    letter-spacing: 0.06em;
-    color:          rgba(255,255,255,.45);
-}
-
 /* ── Connected phones list inside the BingoView modal ─────────── */
 .bv-phones-section {
     margin-top:    14px;
@@ -3957,15 +3912,6 @@ option.user-sound {
     text-align:    left;
     max-height:    260px;
     overflow-y:    auto;
-}
-.bv-phones-title {
-    font-family:    'Barlow Condensed', sans-serif;
-    font-size:      0.78rem;
-    font-weight:    700;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color:          rgba(255,255,255,.55);
-    margin-bottom:  8px;
 }
 .bv-phones-list {
     display:        flex;

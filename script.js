@@ -6433,8 +6433,6 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
 
     bvConnect() {
         const code = this.bvGenerateCode();
-        this.bvSetStatus('connecting', 'Venter p\u00e5 telefon\u2026');
-
         this._bvDetachChannel();
 
         const tryConnect = () => {
@@ -6607,24 +6605,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         }
     }
 
-    bvSetStatus(state, text) {
-        const dot   = document.getElementById('bingoview-dot');
-        const label = document.getElementById('bingoview-status-text');
-        if (!dot || !label) return;
-        dot.className     = 'bv-dot ' + state;
-        label.textContent = text;
-    }
-
     _bvUpdatePresenceUI(count) {
-        const countEl = document.getElementById('bv-phone-count');
-        if (countEl) countEl.textContent =
-            count === 0 ? 'Ingen telefon tilkoblet' :
-            count === 1 ? '1 telefon tilkoblet ✓' :
-                          `${count} telefoner tilkoblet ✓`;
-        const label = count === 0 ? 'Venter på telefon…' :
-                      count === 1 ? 'Telefon tilkoblet ✓' :
-                                   `${count} telefoner tilkoblet ✓`;
-        this.bvSetStatus(count > 0 ? 'connected' : 'connecting', label);
         const btn = document.getElementById('bingoview-btn');
         if (btn) {
             btn.style.opacity = count > 0 ? '1' : '0.6';

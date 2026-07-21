@@ -1182,15 +1182,13 @@
             <div class="modal-title">BingoView</div>
             <div class="modal-subtitle">Koble iPad til telefon</div>
 
-            <button id="bv-new-game" class="bv-new-game-btn">🔄 Nytt spill — ny kode</button>
-
             <div class="bv-field-group">
                 <label class="bv-label">Skann QR-koden eller skriv inn koden på telefonen</label>
                 <div class="bv-code-qr-row">
                     <div id="bv-qr-code" class="bv-qr-box"></div>
                     <div class="bv-code-right">
+                        <button id="bv-new-game" class="bv-new-game-btn">Nytt spill</button>
                         <div class="bv-code-display" id="bv-code-display">——————</div>
-                        <div class="bv-phone-count" id="bv-phone-count">Ingen telefon tilkoblet</div>
                     </div>
                 </div>
             </div>
@@ -1200,11 +1198,6 @@
                 <input id="bv-custom-code" type="text" maxlength="6" placeholder="La stå tom for tilfeldig"
                        autocomplete="off" spellcheck="false" style="flex:1;background:#1a1a1a;border:1px solid #333;border-radius:6px;padding:6px 10px;color:#fff;font-family:'IBM Plex Mono',monospace;font-size:0.85rem;letter-spacing:0.12em;text-transform:uppercase;">
                 <button id="bv-apply-code" style="background:#2e6db4;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:0.8rem;cursor:pointer;white-space:nowrap;">Bruk</button>
-            </div>
-
-            <div class="bv-status-row">
-                <div class="bv-dot" id="bingoview-dot"></div>
-                <span class="bv-status-text" id="bingoview-status-text">Ikke tilkoblet</span>
             </div>
 
             <!-- Highlight settings -->
@@ -1251,7 +1244,6 @@
 
             <!-- Connected phones with their close-to-winning strips -->
             <div class="bv-phones-section" id="bv-phones-section" style="display:none">
-                <div class="bv-phones-title">Tilkoblede ark</div>
                 <div class="bv-phones-list" id="bv-phones-list"></div>
             </div>
 
