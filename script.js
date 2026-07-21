@@ -7162,8 +7162,9 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         addRow(chip.getAttribute('data-rekkenext'), chip.getAttribute('data-missnext'));
     }
 
-    // Position the tooltip centered above the chip, flipping below and clamping
-    // horizontally if it would run off-screen.
+    // Position the tooltip centered above the chip, clamping to the viewport.
+    // Never flips below — the bar sits at the bottom of the screen, so a
+    // below-the-cursor tooltip would cover the bar (and the cursor).
     _bvPositionTip(chip) {
         const tip = this._bvTipEl;
         const r = chip.getBoundingClientRect();
@@ -7172,8 +7173,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         const tw = tip.offsetWidth, th = tip.offsetHeight;
         let left = r.left + r.width / 2 - tw / 2;
         left = Math.max(8, Math.min(left, window.innerWidth - tw - 8));
-        let top = r.top - th - 8;
-        if (top < 8) top = r.bottom + 8;
+        const top = Math.max(8, r.top - th - 8);
         tip.style.left = Math.round(left) + 'px';
         tip.style.top = Math.round(top) + 'px';
     }
