@@ -1765,6 +1765,28 @@ select.session-input option {
     white-space:          nowrap;
 }
 
+/* FLIP: chips ease from their previous slot into the new one when the bar
+   reorders. The transform is set to the old offset, then cleared next frame. */
+.bv-block-chip.bv-block-flip {
+    transition: transform .38s cubic-bezier(.22, 1, .36, 1);
+    z-index:    1;
+}
+
+/* Celebratory pop when a block becomes the new closest-to-winning leader. */
+.bv-block-chip.bv-block-leader-pop {
+    animation: bvBlockLeaderPop .7s ease-out;
+}
+@keyframes bvBlockLeaderPop {
+    0%   { transform: scale(1);   box-shadow: 0 0 0 0 rgba(var(--accent-rgb), .0); }
+    30%  { transform: scale(1.16); box-shadow: 0 0 14px 3px rgba(var(--accent-rgb), .65); }
+    60%  { transform: scale(.98); }
+    100% { transform: scale(1);   box-shadow: 0 0 0 0 rgba(var(--accent-rgb), .0); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .bv-block-chip.bv-block-flip { transition: none; }
+    .bv-block-chip.bv-block-leader-pop { animation: none; }
+}
+
 /* Missing-numbers tooltip (hover on desktop, tap on touch). */
 .bv-block-tip {
     position:         fixed;

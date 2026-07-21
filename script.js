@@ -1552,6 +1552,11 @@ class BingoApp {
         const rgb = hexToRgb(c.accent);
         if (rgb) body.style.setProperty('--accent-rgb', rgb);
 
+        // The background particle field caches the accent as an RGB triple and
+        // only refreshes on flare-setting edits — tell it the accent moved so
+        // the particles don't keep the previous theme's colour.
+        window.dispatchEvent(new Event('accentchange'));
+
         const danger = c.danger || '#ff4444';
         body.style.setProperty('--danger-color', danger);
         const dangerRgb = hexToRgb(danger);
@@ -6987,6 +6992,19 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         return { bg: '#1a2220', fg: '#5a8a6a' };                 // far away
     }
 
+    // Return a copy of the phones array in a stable, first-seen order. Each
+    // block id is assigned an incrementing sequence the first time it appears
+    // and keeps it for the session, so reconnects (new ts) don't move blocks.
+    _bvStableOrderPhones(phones) {
+        if (!this._bvOrderMap) { this._bvOrderMap = new Map(); this._bvOrderSeq = 0; }
+        const map = this._bvOrderMap;
+        phones.forEach(p => {
+            if (p && p.id != null && !map.has(p.id)) map.set(p.id, this._bvOrderSeq++);
+        });
+        return phones.slice().sort((a, b) =>
+            (map.get(a.id) ?? 0) - (map.get(b.id) ?? 0));
+    }
+
     // Render the fixed bottom bar of connected blocks (name + "x igjen").
     // Optionally ordered by fewest-missing first when the sort toggle is on.
     _bvRenderBlockBar(items) {
@@ -7025,15 +7043,40 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         }
 
         if (sortOn) {
-            shown = shown.slice().sort((a, b) => a.missing - b.missing);
+            // Stable tiebreak by first-seen id so equal-missing blocks keep a
+            // fixed relative order instead of jittering on each snapshot.
+            const ord = this._bvOrderMap || new Map();
+            shown = shown.slice().sort((a, b) =>
+                a.missing - b.missing || (ord.get(a.id) ?? 0) - (ord.get(b.id) ?? 0));
         }
+
+        // FLIP: record each existing chip's position (by stable key) before the
+        // rebuild so we can animate any that land somewhere new.
+        const firstRects = new Map();
+        [...list.children].forEach(c => {
+            firstRects.set(c.getAttribute('data-key'), c.getBoundingClientRect());
+        });
+
+        // Which block currently has the fewest numbers left (the "leader")?
+        // A change of leader gets a celebratory pop.
+        let leaderId = null, leaderMin = Infinity;
+        shown.forEach(it => {
+            if (Number.isFinite(it.missing) && it.missing < leaderMin) {
+                leaderMin = it.missing; leaderId = it.id;
+            }
+        });
+        const leaderChanged = leaderId !== null && leaderId !== this._bvPrevLeaderId;
+        this._bvPrevLeaderId = leaderId;
 
         list.innerHTML = '';
         shown.forEach((it, i) => {
             const chip = document.createElement('div');
             chip.className = 'bv-block-chip';
             // Identity + tooltip data (read by the delegated hover/tap handler).
-            chip.setAttribute('data-key', it.name + '#' + i);
+            // Key by the block's stable id, not name+index — a reorder used to
+            // change the key, so a pinned/hovered tooltip lost its chip and
+            // stopped refreshing its missing-numbers list (count stayed right).
+            chip.setAttribute('data-key', it.id || (it.name + '#' + i));
             chip.setAttribute('data-name', it.name);
             chip.setAttribute('data-rekke', it.rekkeNum || 1);
             chip.setAttribute('data-missnow', (it.missNow || []).join(','));
@@ -7061,7 +7104,26 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             chip.appendChild(dot);
             chip.appendChild(name);
             chip.appendChild(badge);
+            if (leaderChanged && it.id === leaderId) chip.classList.add('bv-block-leader-pop');
             list.appendChild(chip);
+        });
+
+        // FLIP playback: for every chip that existed before, translate it from
+        // its old position to the new one, then release the transform so it
+        // eases into place. Chips that didn't move get a zero delta (no-op).
+        [...list.children].forEach(chip => {
+            const prev = firstRects.get(chip.getAttribute('data-key'));
+            if (!prev) return;
+            const now = chip.getBoundingClientRect();
+            const dx = prev.left - now.left, dy = prev.top - now.top;
+            if (!dx && !dy) return;
+            chip.classList.add('bv-block-flip');
+            chip.style.transform = `translate(${dx}px, ${dy}px)`;
+            requestAnimationFrame(() => {
+                chip.style.transform = '';
+                const done = () => { chip.classList.remove('bv-block-flip'); chip.removeEventListener('transitionend', done); };
+                chip.addEventListener('transitionend', done);
+            });
         });
 
         // Keep a shown tooltip in sync across the frequent re-renders: re-fill
@@ -7194,7 +7256,13 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             if (oldLabel) oldLabel.remove();
         });
 
-        const phones = this._bvPhones || [];
+        // Order phones by a STABLE first-seen sequence, not by connection ts.
+        // _bvPhones is sorted online-first / by ts, so a phone that exits and
+        // rejoins gets a fresh ts and jumps slots — reshuffling the block bar
+        // and reassigning colours "without anything happening". Pinning each
+        // block to the order it was first seen keeps positions and colours put
+        // across reconnects; genuinely new blocks append at the end.
+        const phones = this._bvStableOrderPhones(this._bvPhones || []);
         const highlightOn = this.settings.bvHighlightEnabled ?? true;
         const calledSet = new Set((this.slot ? this.slot.selectedNumbers : []).map(Number));
         const rekke = (this.settings.bvHighlightRekke === 'current' || !this.settings.bvHighlightRekke)
@@ -7252,6 +7320,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             }
 
             blockBarItems.push({
+                id: phone.id,
                 name: displayName,
                 color,
                 online: !!phone.online,
@@ -7717,6 +7786,12 @@ document.addEventListener('DOMContentLoaded', () => { window.bingoApp = new Bing
         // Toggling particles on must wake the rAF loop
         if (typeof ensureLoopRunning === 'function') ensureLoopRunning();
     }
+
+    // Theme switches / accent edits move --accent-color; re-read it so the
+    // particle colour tracks the accent instead of staying on the old theme.
+    window.addEventListener('accentchange', () => {
+        cachedRGB = hexToRgb(getAccent());
+    });
 
     const MAX_PARTS = 100;
 
