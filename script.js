@@ -6218,7 +6218,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                 } else {
                     this.playSound('select');
                     newGameBtn.dataset.confirming = '1';
-                    newGameBtn.textContent = 'Sikker? Telefoner mister tilkoblingen';
+                    newGameBtn.textContent = 'Sikker?';
                     setTimeout(() => {
                         if (newGameBtn.dataset.confirming === '1') {
                             newGameBtn.dataset.confirming = '';

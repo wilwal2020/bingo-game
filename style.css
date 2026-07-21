@@ -3824,31 +3824,33 @@ option.user-sound {
     text-align: left;
 }
 
-/* "Nytt spill" — new random code + fresh channel; sits above the code */
+/* "Nytt spill" — new random code + fresh channel; styled as a quiet
+   companion card to the code display it sits on top of */
 .bv-new-game-btn {
-    align-self:    center;
-    padding:       6px 18px;
-    background:    transparent;
-    border:        1px solid var(--accent-color);
-    border-radius: 8px;
-    color:         var(--accent-color);
-    font-family:   inherit;
-    font-weight:   600;
-    font-size:     .85rem;
-    cursor:        pointer;
-    transition:    background-color .15s, color .15s, border-color .15s;
+    align-self:     stretch;
+    padding:        7px 16px;
+    background:     rgba(255,255,255,.04);
+    border:         1px solid rgba(255,255,255,.12);
+    border-radius:  10px;
+    color:          rgba(255,255,255,.55);
+    font-family:    'Barlow Condensed', sans-serif;
+    font-size:      .82rem;
+    font-weight:    700;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    cursor:         pointer;
+    transition:     background-color .15s, color .15s, border-color .15s;
 }
 .bv-new-game-btn:hover {
-    background: var(--accent-color);
-    color:      var(--primary-color);
+    color:        var(--accent-color);
+    border-color: rgba(var(--accent-rgb), .5);
+    background:   rgba(var(--accent-rgb), .08);
 }
-.bv-new-game-btn[data-confirming="1"] {
-    border-color: var(--danger-color, #ff4444);
-    color:        var(--danger-color, #ff4444);
-}
+.bv-new-game-btn[data-confirming="1"],
 .bv-new-game-btn[data-confirming="1"]:hover {
-    background: var(--danger-color, #ff4444);
-    color:      #fff;
+    color:        #fff;
+    border-color: var(--danger-color, #ff4444);
+    background:   rgba(255,68,68,.15);
 }
 
 .bv-code-qr-row {
