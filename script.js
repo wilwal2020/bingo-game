@@ -571,6 +571,8 @@ class BingoApp {
             editWinRekke:        document.getElementById('edit-win-rekke'),
             editWinBalls:        document.getElementById('edit-win-balls'),
             editWinPrize:        document.getElementById('edit-win-prize'),
+            editWinSplit:        document.getElementById('edit-win-split'),
+            editWinSplitWrap:    document.getElementById('edit-win-split-wrap'),
             editWinDateRow:      document.getElementById('edit-win-date-row'),
             editWinYear:         document.getElementById('edit-win-year'),
             editWinMonth:        document.getElementById('edit-win-month'),
@@ -735,7 +737,7 @@ class BingoApp {
             ['session-modal',        () => this.promptUnsavedClose(() => this.closeSessionModal())],
             ['winner-modal',         () => this.closeWinnerModal()],
             ['viewer-modal',         () => this.closeViewerModal()],
-            ['edit-session-modal',   () => this.promptUnsavedClose(() => this.closeEditSessionModal())],
+            ['edit-session-modal',   () => this.maybePromptEditSessionClose()],
             ['delete-modal',         () => this.closeDeleteModal()],
             ['reset-all-modal',      () => this.closeResetAllModal()],
             ['leaderboard-modal',    () => this.closeLeaderboard()],
@@ -823,6 +825,14 @@ class BingoApp {
         this.el.editWinCancel.addEventListener('click', () => this.closeEditWinModal());
         this.el.editWinName.addEventListener('keydown', e => {
             if (e.key === 'Enter') this.saveEditWin();
+        });
+        // Changing the split recomputes this winner's share of the full prize
+        this.el.editWinSplit.addEventListener('input', () => {
+            const split = parseInt(this.el.editWinSplit.value);
+            const full  = this._editWinFullPrize;
+            if (split >= 1 && full != null) {
+                this.el.editWinPrize.value = Math.round((full / split) * 100) / 100;
+            }
         });
 
         // Edit buttons on win rows inside the player-history modal (delegated;
@@ -1077,7 +1087,7 @@ class BingoApp {
 
         // Edit session
         this.el.editSessionSave.addEventListener('click',   () => this.saveEditedSession());
-        this.el.editSessionCancel.addEventListener('click', () => this.promptUnsavedClose(() => this.closeEditSessionModal()));
+        this.el.editSessionCancel.addEventListener('click', () => this.maybePromptEditSessionClose());
         document.getElementById('edit-session-add-winner').addEventListener('click', () => {
             const container = document.getElementById('edit-session-winners');
             const idx = container.children.length;
@@ -3031,9 +3041,12 @@ class BingoApp {
 
         this.el.editWinName.value  = w.name || '';
         this.el.editWinPrize.value = w.prize ?? '';
+        this.el.editWinSplit.value = w.split || 1;
+        this._editWinFullPrize     = w.fullPrize ?? null;
 
-        this.el.editWinGameRows.style.display = isManual ? 'none' : '';
-        this.el.editWinDateRow.style.display  = isManual ? '' : 'none';
+        this.el.editWinGameRows.style.display  = isManual ? 'none' : '';
+        this.el.editWinSplitWrap.style.display = isManual ? 'none' : '';
+        this.el.editWinDateRow.style.display   = isManual ? '' : 'none';
         if (isManual) {
             const d = new Date(w.date);
             this.el.editWinYear.value  = w.year  || d.getFullYear();
@@ -3092,6 +3105,8 @@ class BingoApp {
             w.rekke    = this.el.editWinRekke.value;
             const balls = parseInt(this.el.editWinBalls.value);
             w.ballCount = balls > 0 ? balls : w.ballCount;
+            const split = parseInt(this.el.editWinSplit.value);
+            if (split >= 1) w.split = split;
 
             if (ctx.source === 'pending') {
                 const pending = this.getPendingWinners();
@@ -3411,12 +3426,12 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                         : `${this._escapeHtml(w.gameName)} · ${rc} · ${w.ballCount} tall · ${w.prize} kr${splitText}`;
                     const src = w._src;
                     const editBtn = src
-                        ? ` <button class="win-edit-btn" title="Rediger seier" data-src="${src.source}"` +
+                        ? `<button class="win-edit-btn" title="Rediger seier" data-src="${src.source}"` +
                           `${src.sessionIdx !== undefined ? ` data-sidx="${src.sessionIdx}"` : ''}` +
                           ` data-widx="${src.winIdx}">✎</button>`
                         : '';
-                    return line + editBtn;
-                }).join('<br>');
+                    return `<div class="win-line"><span>${line}</span>${editBtn}</div>`;
+                }).join('');
 
                 item.innerHTML = `
                     <div class="player-history-date">${dateStr}</div>
@@ -4289,7 +4304,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         add(this.el.sessionModal,       { confirm: () => this.saveSession(),
                                           close:   () => this.promptUnsavedClose(() => this.closeSessionModal()) });
         add(this.el.editSessionModal,   { confirm: () => this.saveEditedSession(),
-                                          close:   () => this.promptUnsavedClose(() => this.closeEditSessionModal()) });
+                                          close:   () => this.maybePromptEditSessionClose() });
         add(this.el.deleteModal,        { confirm: () => this.confirmDelete(),     close: () => this.closeDeleteModal() });
         add(this.el.resetAllModal,      { confirm: () => this.performResetAll(),   close: () => this.closeResetAllModal() });
         add(this.el.suggestSaveModal,   { confirm: () => { this.el.suggestSaveModal.style.display = 'none'; this.openSessionModal(); },
@@ -5125,9 +5140,9 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                 details.className = 'session-winner-details';
                 const winnerLines = session.winners.map((w, wi) => {
                     const splitText = w.split > 1 ? ` (1/${w.split})` : '';
-                    return `🏆 <strong>${this._escapeHtml(w.name)}</strong> · ${this._escapeHtml(w.gameName)} · ${w.rekke.replace('Rekke','Rekke ')} · ${w.prize} kr${splitText}` +
-                           ` <button class="win-edit-btn" title="Rediger seier" data-widx="${wi}">✎</button>`;
-                }).join('<br>');
+                    return `<div class="win-line"><span>🏆 <strong>${this._escapeHtml(w.name)}</strong> · ${this._escapeHtml(w.gameName)} · ${w.rekke.replace('Rekke','Rekke ')} · ${w.prize} kr${splitText}</span>` +
+                           `<button class="win-edit-btn" title="Rediger seier" data-widx="${wi}">✎</button></div>`;
+                }).join('');
                 details.innerHTML = winnerLines;
                 details.querySelectorAll('.win-edit-btn').forEach(btn => {
                     btn.addEventListener('click', e => {
@@ -5195,7 +5210,28 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         // Render winner rows
         this.renderEditSessionWinners(session.winners || []);
 
+        // Snapshot the form so closing without changes can skip the
+        // "unsaved changes" confirmation.
+        this._editSessionSnapshot = this._editSessionFormState();
+
         this.el.editSessionModal.style.display = 'flex';
+    }
+
+    // Serialized state of every editable field in the edit-session modal
+    _editSessionFormState() {
+        const grid    = [...this.el.editSessionGrid.querySelectorAll('.session-input')].map(i => i.value);
+        const winners = [...document.querySelectorAll('#edit-session-winners .winner-edit-row')].map(row =>
+            ['name','game','rekke','ballCount','prize'].map(f => row.querySelector(`[data-field="${f}"]`).value));
+        return JSON.stringify({ date: this.el.editSessionDateInput.value, grid, winners });
+    }
+
+    // Close directly when nothing changed; otherwise ask first
+    maybePromptEditSessionClose() {
+        if (this._editSessionFormState() === this._editSessionSnapshot) {
+            this.closeEditSessionModal();
+        } else {
+            this.promptUnsavedClose(() => this.closeEditSessionModal());
+        }
     }
 
     renderEditSessionWinners(winners) {

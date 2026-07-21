@@ -1916,9 +1916,9 @@ body.fullscreen .page-layout {
 }
 
 @keyframes winnerFlash {
-    0%   { transform: scale(1); background-color: rgba(var(--winner-rgb),.12); }
-    30%  { transform: scale(1.02); background-color: rgba(var(--winner-rgb),.3); }
-    100% { transform: scale(1); background-color: rgba(var(--winner-rgb),.12); }
+    0%   { transform: scale(1);    text-shadow: none; }
+    30%  { transform: scale(1.04); text-shadow: 0 0 16px rgba(var(--winner-rgb),.85); }
+    100% { transform: scale(1);    text-shadow: none; }
 }
 
 @keyframes tooltipFadeIn {
@@ -2494,7 +2494,16 @@ body.layout-vertical #random-button {
 #edit-win-name  { min-width: 200px; }
 #edit-win-balls { width: 90px; }
 #edit-win-prize { width: 110px; }
+#edit-win-split { width: 80px; }
 #edit-win-year  { width: 90px; }
+
+/* One win per row: text left, ✎ pinned to the right on the same line */
+.win-line {
+    display:     flex;
+    align-items: center;
+    gap:         8px;
+}
+.win-line > span { flex: 1; min-width: 0; text-align: left; }
 
 /* Small ✎ button on win rows (session details + player history) */
 .win-edit-btn {
