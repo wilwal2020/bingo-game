@@ -7093,8 +7093,11 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
 
         const showFor = (chip) => {
             this._bvFillTip(chip);
-            this._bvPositionTip(chip);
+            // Display must be set before positioning — a display:none element
+            // reports offsetHeight 0, which zeroed the above-the-chip offset
+            // and let the tooltip render below.
             this._bvTipEl.style.display = 'block';
+            this._bvPositionTip(chip);
         };
 
         list.addEventListener('mouseover', (e) => {

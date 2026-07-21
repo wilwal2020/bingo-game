@@ -374,12 +374,14 @@ body.layout-vertical #jackpot-btn-cell {
     pointer-events: none;
 }
 
-/* ★ badge on the jackpot square's top-right corner. */
+/* ★ badge centered on the jackpot square's top-right corner. The square's
+   half-size is 0.8em of the ball; the star's own em is 0.85× that, so
+   0.94em ≈ 0.8em of the ball lands the star exactly on the corner. */
 .balls.jackpot::before {
     content:        '★';
     position:       absolute;
-    top:            calc(50% - 0.78em);
-    left:           calc(50% + 0.78em);
+    top:            calc(50% - 0.94em);
+    left:           calc(50% + 0.94em);
     transform:      translate(-50%, -50%);
     font-size:      0.85em;
     line-height:    1;
