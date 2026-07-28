@@ -228,6 +228,11 @@ class BingoApp {
             bvHighlightEnabled:    true,
             bvHighlightRekke:      'current',
             bvHighlightThreshold:  2,
+            // Countdown ring on the phones: how long until the next number is
+            // expected. Off by default — it's a promise about pace that not
+            // every host wants to make.
+            bvCallTimerEnabled:    false,
+            bvCallTimerSeconds:    30,
             bvWinNotifyEnabled:    true,
             bvWinAutoOpenWinModal: false,
             autoBackupDownload:    true,
@@ -599,6 +604,11 @@ class BingoApp {
             bvThresholdValue:         document.getElementById('bv-threshold-value'),
             bvThresholdPlus:          document.getElementById('bv-threshold-plus'),
             bvThresholdMinus:         document.getElementById('bv-threshold-minus'),
+            bvCallTimerEnabled:       document.getElementById('bv-call-timer-enabled'),
+            bvCallTimerRow:           document.getElementById('bv-call-timer-row'),
+            bvCallTimerValue:         document.getElementById('bv-call-timer-value'),
+            bvCallTimerPlus:          document.getElementById('bv-call-timer-plus'),
+            bvCallTimerMinus:         document.getElementById('bv-call-timer-minus'),
             bvWinNotifyEnabled:       document.getElementById('bv-win-notify-enabled'),
             bvWinModal:               document.getElementById('bv-win-modal'),
             bvWinAutoOpen:            document.getElementById('bv-win-auto-open'),
@@ -1389,6 +1399,31 @@ class BingoApp {
                 try { this._bvUpdatePaperHighlights(); } catch(e) {}
             });
         }
+        // BingoView call-countdown. Every change is pushed straight out so the
+        // phones' rings retime without waiting for the next number.
+        if (this.el.bvCallTimerEnabled) {
+            this.el.bvCallTimerEnabled.addEventListener('change', () => {
+                this.settings.bvCallTimerEnabled = this.el.bvCallTimerEnabled.checked;
+                if (this.el.bvCallTimerRow) {
+                    this.el.bvCallTimerRow.style.display = this.settings.bvCallTimerEnabled ? '' : 'none';
+                }
+                this.saveSettings();
+                try { this.bvSendState(); } catch(e) {}
+            });
+        }
+        const bvBumpCallTimer = (delta) => {
+            const next = Math.min(300, Math.max(5, (this.settings.bvCallTimerSeconds ?? 30) + delta));
+            this.settings.bvCallTimerSeconds = next;
+            if (this.el.bvCallTimerValue) this.el.bvCallTimerValue.textContent = next;
+            this.saveSettings();
+            try { this.bvSendState(); } catch(e) {}
+        };
+        if (this.el.bvCallTimerPlus) {
+            this.el.bvCallTimerPlus.addEventListener('click', () => bvBumpCallTimer(5));
+        }
+        if (this.el.bvCallTimerMinus) {
+            this.el.bvCallTimerMinus.addEventListener('click', () => bvBumpCallTimer(-5));
+        }
         if (this.el.bvThresholdPlus) {
             this.el.bvThresholdPlus.addEventListener('click', () => {
                 this.settings.bvHighlightThreshold = Math.min(9, (this.settings.bvHighlightThreshold ?? 2) + 1);
@@ -1720,6 +1755,13 @@ class BingoApp {
             this.el.bvHighlightRekke.value = s.bvHighlightRekke || 'current';
         if (this.el.bvThresholdValue)
             this.el.bvThresholdValue.textContent = s.bvHighlightThreshold ?? 2;
+        if (this.el.bvCallTimerEnabled) {
+            const ctOn = s.bvCallTimerEnabled ?? false;
+            this.el.bvCallTimerEnabled.checked = ctOn;
+            if (this.el.bvCallTimerRow) this.el.bvCallTimerRow.style.display = ctOn ? '' : 'none';
+        }
+        if (this.el.bvCallTimerValue)
+            this.el.bvCallTimerValue.textContent = s.bvCallTimerSeconds ?? 30;
         if (this.el.bvWinNotifyEnabled)
             this.el.bvWinNotifyEnabled.checked = s.bvWinNotifyEnabled ?? true;
         if (this.el.bvWinAutoOpen)
@@ -6839,7 +6881,12 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         this._bvChannelRef.child('callState/' + this.currentTheme).set({
             numbers: this.slot.selectedNumbers.slice(),
             rekke:   this.slot.currentRekke,
-            ts:      Date.now()
+            ts:      Date.now(),
+            // Server-stamped copy of the same moment. ts stays on this device's
+            // clock because it is compared against resetTs, which is written the
+            // same way; sts gives the phones a clock they can actually share, so
+            // their countdown rings line up with each other and with us.
+            sts:     firebase.database.ServerValue.TIMESTAMP
         });
     }
 
@@ -6848,6 +6895,11 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         this._bvChannelRef.child('state').set({
             game:  this.currentTheme,
             rekke: this.slot.currentRekke,
+            // Seconds the phones should run their countdown ring for. 0 means
+            // "no timer" — the phones hide the ring entirely.
+            callTimer: this.settings.bvCallTimerEnabled
+                ? (this.settings.bvCallTimerSeconds ?? 30)
+                : 0,
             ts:    Date.now()
         });
         this._bvUpdatePaperHighlights();

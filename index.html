@@ -1227,6 +1227,21 @@
                     </div>
                 </div>
                 <div class="bv-settings-row">
+                    <div class="bv-settings-label">Nedtelling til neste tall</div>
+                    <label class="settings-toggle">
+                        <input type="checkbox" id="bv-call-timer-enabled">
+                        <span class="settings-toggle-track"></span>
+                    </label>
+                </div>
+                <div class="bv-settings-row" id="bv-call-timer-row" style="display:none">
+                    <div class="bv-settings-label">Sekunder per tall</div>
+                    <div class="settings-stepper">
+                        <button type="button" class="rekke-adjust-btn" id="bv-call-timer-minus">−</button>
+                        <span class="settings-stepper-value" id="bv-call-timer-value">30</span>
+                        <button type="button" class="rekke-adjust-btn" id="bv-call-timer-plus">+</button>
+                    </div>
+                </div>
+                <div class="bv-settings-row">
                     <div class="bv-settings-label">Vis varsel når telefon vinner</div>
                     <label class="settings-toggle">
                         <input type="checkbox" id="bv-win-notify-enabled" checked>
