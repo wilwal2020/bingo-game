@@ -6430,6 +6430,10 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             try { this._bvInfoConnectedOff(); } catch(e) {}
             this._bvInfoConnectedOff = null;
         }
+        if (this._bvHostWatchOff) {
+            try { this._bvHostWatchOff(); } catch(e) {}
+            this._bvHostWatchOff = null;
+        }
         if (this._bvChannelRef) {
             try { this._bvChannelRef.off(); } catch(e) {}
             this._bvChannelRef = null;
@@ -6461,8 +6465,10 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                 papersMetaRef.remove();
             }
             const infoRef = firebase.database().ref('.info/connected');
+            let bvOnline = false;
             const infoHandler = (snap) => {
-                if (!snap.val()) return;
+                bvOnline = !!snap.val();
+                if (!bvOnline) return;
                 hostRef.onDisconnect().remove();
                 // Deliberately do NOT remove papers on host disconnect — a
                 // refresh must not wipe connected phones' blocks.
@@ -6473,6 +6479,27 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             };
             infoRef.on('value', infoHandler);
             this._bvInfoConnectedOff = () => infoRef.off('value', infoHandler);
+
+            // Self-heal the presence marker. Writing it once per reconnect is
+            // not enough: the onDisconnect().remove() registered on a socket
+            // that has just died is executed by the SERVER when it notices the
+            // drop, which can be AFTER this client has reconnected and rewritten
+            // host/. The stale removal then wins and host/ stays gone — and
+            // because .info/connected is already true it never fires again, so
+            // nothing rewrites it. Phones then get "Ingen aktiv bingo-sesjon"
+            // for a session that is very much still running (exactly what a
+            // brief iPad wifi drop used to cause).
+            //
+            // Watching the node closes that hole: if it disappears while we
+            // believe we are online, put it straight back.
+            const hostWatch = (snap) => {
+                if (!bvOnline || snap.exists()) return;
+                hostRef.onDisconnect().remove();
+                hostRef.set({ ts: Date.now() });
+                console.log('[BV] host presence was cleared — re-registered');
+            };
+            hostRef.on('value', hostWatch);
+            this._bvHostWatchOff = () => hostRef.off('value', hostWatch);
 
             const codeEl = document.getElementById('bv-code-display');
             if (codeEl) codeEl.textContent = code;
