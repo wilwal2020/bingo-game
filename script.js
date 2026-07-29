@@ -2525,6 +2525,10 @@ class BingoApp {
 
         // Re-render counter with updated thresholds
         this.updateCounter();
+
+        // Push the refreshed averages out — a logged win changes them, and the
+        // phones show the same figures.
+        try { this.bvSendState(); } catch (e) {}
     }
 
     computeAverages(sessions, lastN = null) {
@@ -6871,6 +6875,19 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         });
     }
 
+    // [Rekke1, Rekke2, Rekke3] average ball counts, or null if unavailable.
+    _bvRekkeAverages() {
+        try {
+            const th = this.slot && this.slot.thresholds;
+            if (!th) return null;
+            const out = ['Rekke1', 'Rekke2', 'Rekke3'].map(k => {
+                const v = th[k] && Number(th[k].threshold);
+                return isFinite(v) && v > 0 ? v : null;
+            });
+            return out.some(v => v == null) ? null : out;
+        } catch (e) { return null; }
+    }
+
     bvSendState() {
         if (!this._bvChannelRef) return;
         this._bvChannelRef.child('state').set({
@@ -6879,6 +6896,11 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             // How long the phones' countdown ring should run. Whether to show
             // it at all is each phone's own choice.
             callTimer: this.settings.bvCallTimerSeconds ?? 30,
+            // Historical average ball count per rekke, so the phones can show
+            // "typically N numbers" next to their own running count. These are
+            // the same figures the avg boxes show — read off the slot
+            // thresholds, which updateAverages keeps in step with the history.
+            avgs: this._bvRekkeAverages(),
             ts:    Date.now()
         });
         this._bvUpdatePaperHighlights();
