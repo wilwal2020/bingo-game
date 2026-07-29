@@ -6503,6 +6503,12 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                 // Re-publish the current jackpot so phones that join (or rejoin
                 // after a host reconnect) immediately see it.
                 this.bvSendJackpot();
+                // …and the state node, which carries the countdown length and
+                // the per-rekke averages. Without this, state is only rewritten
+                // when the game/rekke changes or a phone appears, so a stale
+                // node written by an earlier build could sit there all evening
+                // and phones would keep showing whatever it was missing.
+                try { this.bvSendState(); } catch (e) {}
             };
             infoRef.on('value', infoHandler);
             this._bvInfoConnectedOff = () => infoRef.off('value', infoHandler);
