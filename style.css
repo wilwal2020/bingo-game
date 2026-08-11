@@ -4009,6 +4009,18 @@ option.user-sound {
     background: rgba(255, 200, 60, .95);
     box-shadow: 0 0 10px rgba(255, 200, 60, .6);
 }
+/* "This one came from a phone." Bottom-left so it can sit alongside the
+   offline-papers ping in the opposite corner without either hiding the other. */
+.bv-ball-remote {
+    position: absolute;
+    bottom: 4px;
+    left: 4px;
+    font-size: 0.6rem;
+    line-height: 1;
+    pointer-events: none;
+    z-index: 5;
+    animation: bv-ball-ping 1.6s ease-out forwards;
+}
 @keyframes bv-ball-ping {
     0%   { opacity: 0; transform: translateY(4px) scale(0.6); }
     20%  { opacity: 1; transform: translateY(0)    scale(1.05); }

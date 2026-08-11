@@ -6473,6 +6473,10 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
 
         const tryConnect = () => {
             this._bvChannelRef = firebase.database().ref('bingoview/' + code);
+            // Identity of THIS attach. Anything that finishes asynchronously
+            // below checks it before registering a listener, so a code change
+            // mid-flight can't leave a handler running on the old channel.
+            const channelRefAtAttach = this._bvChannelRef;
             console.log('[BV] hosting channel bingoview/' + code);
 
             // Host presence marker — re-register on every Firebase reconnect so phones
@@ -6657,6 +6661,24 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             };
             papersMetaRef.on('value', papersMetaHandler);
             this._bvChannelDetachFns.push(() => papersMetaRef.off('value', papersMetaHandler));
+
+            // Numbers called from a phone in BingoView's administrator mode.
+            // A queue rather than a single node so two taps in quick succession
+            // can't overwrite each other; every entry is removed the moment it
+            // is read, which is also what keeps child_added from replaying it.
+            const remoteRef = this._bvChannelRef.child('remoteCalls');
+            remoteRef.once('value', (snap) => {
+                // Reconnected onto a channel that still holds entries: those
+                // were called (or abandoned) in an earlier life of this session
+                // and must not go out again. Drop exactly the keys we saw —
+                // clearing the whole node would also take anything that arrived
+                // in the meantime, and that one is a real, waiting call.
+                if (this._bvChannelRef !== channelRefAtAttach) return;  // code changed under us
+                Object.keys(snap.val() || {}).forEach(k => remoteRef.child(k).remove());
+                const remoteHandler = (s) => this._bvHandleRemoteCall(s);
+                remoteRef.on('child_added', remoteHandler);
+                this._bvChannelDetachFns.push(() => remoteRef.off('child_added', remoteHandler));
+            });
 
         };
 
@@ -6856,6 +6878,42 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         badge.textContent = '📱' + offlinePapers;
         ball.appendChild(badge);
         setTimeout(() => { if (badge.parentNode) badge.remove(); }, 1400);
+    }
+
+    // A number called from a phone in BingoView's administrator mode. Routed
+    // through handleNormalClick so a remote call is the same event as a tap on
+    // the ball here — same sound, same big number, same broadcast back out.
+    _bvHandleRemoteCall(snap) {
+        const data = snap.val() || {};
+        // One-shot, and removed before anything can throw: a call that got
+        // half-applied is recoverable, one that replays on every reconnect
+        // is not.
+        snap.ref.remove().catch(() => {});
+        const number = data.number != null ? String(data.number) : '';
+        if (!number) return;
+        // Mid-jackpot the balls mean something else entirely — a remote call
+        // would set the jackpot instead of calling a number.
+        if (this.jackpotMode) return;
+        // handleNormalClick TOGGLES, so an already-called number would be
+        // un-called. A phone can only ever mean "call this".
+        if (this.slot.selectedNumbers.includes(number)) return;
+        const ball = this.el.ballMap.get(number);
+        if (!ball) return;
+        console.log('[BV] remote call ' + number + ' from ' + (data.from || 'ukjent'));
+        this.handleNormalClick(ball, number);
+        this._bvShowRemoteBadge(ball);
+    }
+
+    // Mark the ball so the host can see at a glance that this call came from a
+    // phone and not from someone at this screen.
+    _bvShowRemoteBadge(ball) {
+        const old = ball.querySelector('.bv-ball-remote');
+        if (old) old.remove();
+        const badge = document.createElement('div');
+        badge.className = 'bv-ball-remote';
+        badge.textContent = '📱';
+        ball.appendChild(badge);
+        setTimeout(() => { if (badge.parentNode) badge.remove(); }, 1600);
     }
 
     bvSendUncall(number) {
@@ -7079,16 +7137,47 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
     }
 
     // Return a copy of the phones array in a stable, first-seen order. Each
-    // block id is assigned an incrementing sequence the first time it appears
+    // block is assigned an incrementing sequence the first time it appears
     // and keeps it for the session, so reconnects (new ts) don't move blocks.
+    //
+    // The sequence belongs to the BLOCK, not to the phone id that happens to
+    // represent it. A shared paper is merged into one entry whose id is the
+    // online member's (see _bvMergeIdenticalBlocks), so that id flips whenever
+    // one of the two phones leaves or rejoins. Keyed on the id alone, the
+    // block then read as brand new: it jumped to the end of the bar and took a
+    // different colour, with nobody having called a number. Binding every
+    // member id to the same sequence — and taking the lowest a group can
+    // claim — pins the block in place through all of that.
+    //
+    // Each entry comes back tagged with _orderSeq (its colour + sort slot) and
+    // _orderKey (the id that owns the sequence — a stable identity for the
+    // block bar's chips to key on).
     _bvStableOrderPhones(phones) {
         if (!this._bvOrderMap) { this._bvOrderMap = new Map(); this._bvOrderSeq = 0; }
+        if (!this._bvOrderKeyBySeq) this._bvOrderKeyBySeq = new Map();
         const map = this._bvOrderMap;
+        const keyBySeq = this._bvOrderKeyBySeq;
         phones.forEach(p => {
-            if (p && p.id != null && !map.has(p.id)) map.set(p.id, this._bvOrderSeq++);
+            if (!p || p.id == null) return;
+            const ids = [p.id, ...(p._mergedIds || [])];
+            let seq = null;
+            ids.forEach(id => {
+                if (!map.has(id)) return;
+                const s = map.get(id);
+                if (seq === null || s < seq) seq = s;
+            });
+            if (seq === null) {
+                seq = this._bvOrderSeq++;
+                // The id a sequence was minted under is its permanent name, so
+                // the key stays put no matter which member represents the block.
+                keyBySeq.set(seq, p.id);
+            }
+            ids.forEach(id => { if (!map.has(id)) map.set(id, seq); });
+            p._orderSeq = seq;
+            p._orderKey = keyBySeq.get(seq) || p.id;
         });
         return phones.slice().sort((a, b) =>
-            (map.get(a.id) ?? 0) - (map.get(b.id) ?? 0));
+            (a._orderSeq ?? 0) - (b._orderSeq ?? 0));
     }
 
     // Render the fixed bottom bar of connected blocks (name + "x igjen").
@@ -7371,7 +7460,11 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         const blockBarItems = [];
 
         phones.forEach((phone, idx) => {
-            const color = BingoApp.BV_PHONE_COLORS[idx % BingoApp.BV_PHONE_COLORS.length];
+            // Colour by the block's own sequence, not its slot in this array:
+            // a slot moves the moment any block ahead of it drops off the list,
+            // which repainted everyone behind it for no reason the user could see.
+            const colorSeq = (phone._orderSeq != null) ? phone._orderSeq : idx;
+            const color = BingoApp.BV_PHONE_COLORS[colorSeq % BingoApp.BV_PHONE_COLORS.length];
             const papers = phone.papers || {};
             const strips = papers[game];
             const closeStrips = [];
@@ -7412,7 +7505,10 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             }
 
             blockBarItems.push({
-                id: phone.id,
+                // Stable across a merged block changing which phone represents
+                // it — the FLIP keying and the sort tiebreak both depend on
+                // this id not moving when someone leaves or rejoins.
+                id: phone._orderKey || phone.id,
                 name: displayName,
                 color,
                 online: !!phone.online,
