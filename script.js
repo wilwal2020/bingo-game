@@ -6894,11 +6894,31 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         // Mid-jackpot the balls mean something else entirely — a remote call
         // would set the jackpot instead of calling a number.
         if (this.jackpotMode) return;
-        // handleNormalClick TOGGLES, so an already-called number would be
-        // un-called. A phone can only ever mean "call this".
-        if (this.slot.selectedNumbers.includes(number)) return;
         const ball = this.el.ballMap.get(number);
         if (!ball) return;
+
+        if (data.action === 'uncall') {
+            // Already gone — an undo tapped twice before the board came back,
+            // or one racing an undo made here. Either way there is nothing left
+            // to take back, and re-running the toggle would CALL it.
+            if (!this.slot.selectedNumbers.includes(number)) return;
+            console.log('[BV] remote undo ' + number + ' from ' + (data.from || 'ukjent'));
+            // handleNormalClick's deselect branch does all the unwinding — the
+            // big number falling back to the previous call, the ball classes,
+            // the broadcast out — but one-way mode guards it against stray taps
+            // on the board here. An undo sent from the caller's own phone is
+            // not a stray tap, so it goes around that guard and puts it back.
+            const oneWay = this.settings.oneWay;
+            this.settings.oneWay = false;
+            try { this.handleNormalClick(ball, number); }
+            finally { this.settings.oneWay = oneWay; }
+            this._bvShowRemoteBadge(ball);
+            return;
+        }
+
+        // handleNormalClick TOGGLES, so an already-called number would be
+        // un-called. A plain call from a phone can only ever mean "call this".
+        if (this.slot.selectedNumbers.includes(number)) return;
         console.log('[BV] remote call ' + number + ' from ' + (data.from || 'ukjent'));
         this.handleNormalClick(ball, number);
         this._bvShowRemoteBadge(ball);
