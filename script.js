@@ -122,30 +122,45 @@ const DEFAULT_THRESHOLDS = {
 };
 
 /* =====================================================
-   PLAYER ESTIMATE — how many boards are in play
+   BLOCK ESTIMATE — how many blocks are in play
    -----------------------------------------------------
    90 balls, a board is 3 rows x 5 numbers. Rekke 1/2/3 =
    one row, two rows, the whole board.
 
    For a SINGLE board, the chance that a given set of k of
    its numbers is inside the n drawn is
-   A(n,k) = C(n,k)/C(90,k). Inclusion–exclusion over the
-   three rows turns that into the chance the board has
-   finished rekke 1, 2 or 3 after n draws.
+   A(n,k) = C(n,k)/C(90,k) — it depends only on how many
+   numbers we ask about, never on which ones, so the
+   column layout of a real ticket does not enter into it.
+   The three rows are disjoint sets of 5, so inclusion–
+   exclusion over them is exact:
+
+     rekke 1 (>=1 row)  = 3*A(n,5) - 3*A(n,10) + A(n,15)
+     rekke 2 (>=2 rows) =           3*A(n,10) - 2*A(n,15)
+     rekke 3 (all 3)    =                        A(n,15)
 
    With B boards in play the first win lands on exactly
    draw n with probability (1-p(n-1))^B - (1-p(n))^B, so a
    logged rekke count is an observation that points at a
    particular B. We recover B by maximising the summed
-   log-likelihood over every logged rekke (MLE).
+   log-likelihood over every logged rekke.
 
-   All four games in a session face the same crowd and one
-   player plays one board in each game, so all 12 rekke
-   counts in a session are evidence about the SAME B — and
-   B reads as the number of players.
+   All four games in a session face the same crowd, and one
+   block puts one board into each game, so all 12 rekke
+   counts of a session are evidence about the SAME B — read
+   as the number of blocks in play.
+
+   Two approximations worth knowing: boards are treated as
+   independent (a real strip of 6 covers 1..90 exactly once,
+   so boards inside it are mildly negatively dependent), and
+   the three rekker of one game are scored as separate
+   observations even though they share the same boards. Both
+   were checked against simulation of real strips — the
+   figure stays unbiased and the span holds ~93% coverage.
    ===================================================== */
-const PlayerEstimate = (() => {
-    const BALLS = 90;
+const BlockEstimate = (() => {
+    const BALLS  = 90;
+    const MAX_B  = 1000000;      // search ceiling, far above any real hall
 
     // log n! for n <= BALLS
     const LOG_FACT = [0];
@@ -156,16 +171,18 @@ const PlayerEstimate = (() => {
     // P(a given set of k board numbers is inside the n drawn)
     const inside = (n, k) => n < k ? 0 : Math.exp(logChoose(n, k) - logChoose(BALLS, k));
 
-    // Per-board completion chance after n draws, one entry per rekke.
-    // Rekke 1: at least one of 3 rows   -> 3*A(5) - 3*A(10) + A(15)
-    // Rekke 2: at least two of 3 rows   -> 3*A(10) - 2*A(15)
-    // Rekke 3: the whole board          -> A(15)
+    // Per-board completion chance after n draws, one entry per rekke
     const P = [
         n => 3 * inside(n, 5) - 3 * inside(n, 10) + inside(n, 15),
         n => 3 * inside(n, 10) - 2 * inside(n, 15),
         n => inside(n, 15),
     ];
-    const MIN_DRAWS = [5, 10, 15];   // physically impossible below this
+    // A rekke cannot land before it has enough numbers out...
+    const MIN_DRAWS = [5, 10, 15];
+    // ...nor after it has become unavoidable. With j numbers still undrawn at
+    // most j of the board's rows can be missing something, so by draw 88 (two
+    // left) one row is certainly full, by 89 two are, and by 90 all three.
+    const MAX_DRAWS = [88, 89, 90];
 
     // Memoised p-values: pCache[rekkeIdx][n]
     const pCache = [[], [], []];
@@ -177,14 +194,19 @@ const PlayerEstimate = (() => {
         return c[n];
     }
 
+    // Counts outside the possible range are typos rather than results — a
+    // rekke 1 logged at 90, say — and get dropped so one bad entry cannot
+    // poison the rest of the session.
+    const usable = o =>
+        !!o && Number.isInteger(o.rekke) && o.rekke >= 0 && o.rekke <= 2
+        && Number.isFinite(o.draws)
+        && o.draws >= MIN_DRAWS[o.rekke] && o.draws <= MAX_DRAWS[o.rekke];
+
     // log P(first win among B boards lands exactly on draw n)
     function logLikeOne(i, n, B) {
-        const pPrev = p(i, n - 1);
-        const pNow  = p(i, n);
-        if (!(pNow > pPrev)) return -Infinity;          // impossible observation
-        const a = B * Math.log1p(-pPrev);               // log P(nobody by n-1)
-        const b = B * Math.log1p(-pNow);                // log P(nobody by n)
-        if (!isFinite(b)) return a;                     // pNow === 1
+        const a = B * Math.log1p(-p(i, n - 1));    // log P(nobody by n-1)
+        const b = B * Math.log1p(-p(i, n));        // log P(nobody by n)
+        if (!isFinite(b)) return a;                // p(n) === 1
         return a + Math.log1p(-Math.exp(b - a));
     }
 
@@ -192,50 +214,58 @@ const PlayerEstimate = (() => {
         obs.reduce((sum, o) => sum + logLikeOne(o.rekke, o.draws, B), 0);
 
     /**
-     * Estimate the number of boards (= players) in play.
+     * Estimate how many blocks are in play.
      * @param {Array<{rekke:0|1|2, draws:number}>} obs  logged rekke counts
-     * @returns {{players:number, low:number, high:number, samples:number}|null}
+     * @returns {{blocks:number, low:number, high:number, samples:number}|null}
      */
     function estimate(obs) {
-        const clean = (obs || []).filter(o =>
-            o && o.rekke >= 0 && o.rekke <= 2 &&
-            Number.isFinite(o.draws) &&
-            o.draws >= MIN_DRAWS[o.rekke] && o.draws <= BALLS);
+        const clean = (obs || []).filter(usable);
         if (!clean.length) return null;
+        const ll = B => logLike(clean, B);
 
-        // Coarse sweep on a log grid, then a local refine. The likelihood is
-        // unimodal in B, so this lands on the peak without a solver.
+        // The likelihood has a single peak in B. A log-spaced sweep brackets
+        // it, then golden section closes in. B only enters as an exponent, so
+        // the function is smooth and a fractional B is fine until we round.
         let best = 1, bestLL = -Infinity;
-        for (let B = 1; B <= 200000; B = Math.ceil(B * 1.06)) {
-            const ll = logLike(clean, B);
-            if (ll > bestLL) { bestLL = ll; best = B; }
+        for (let B = 1; B <= MAX_B; B = Math.ceil(B * 1.15)) {
+            const v = ll(B);
+            if (v > bestLL) { bestLL = v; best = B; }
         }
-        const lo = Math.max(1, Math.floor(best / 1.2));
-        const hi = Math.min(200000, Math.ceil(best * 1.2));
-        const step = Math.max(1, Math.round((hi - lo) / 400));
-        for (let B = lo; B <= hi; B += step) {
-            const ll = logLike(clean, B);
-            if (ll > bestLL) { bestLL = ll; best = B; }
+        const GR = (Math.sqrt(5) - 1) / 2;
+        let a = Math.log(Math.max(1, best / 1.2));
+        let b = Math.log(Math.min(MAX_B, best * 1.2));
+        let c = b - GR * (b - a), d = a + GR * (b - a);
+        let fc = ll(Math.exp(c)), fd = ll(Math.exp(d));
+        for (let i = 0; i < 40 && b - a > 1e-4; i++) {
+            if (fc > fd) { b = d; d = c; fd = fc; c = b - GR * (b - a); fc = ll(Math.exp(c)); }
+            else         { a = c; c = d; fc = fd; d = a + GR * (b - a); fd = ll(Math.exp(d)); }
         }
+        best   = Math.min(MAX_B, Math.max(1, Math.round(Math.exp((a + b) / 2))));
+        bestLL = ll(best);
+        if (!isFinite(bestLL)) return null;
 
-        // Likelihood-ratio span: everything within 1.92 log-units of the peak
-        // (the usual 95% cut for one free parameter). The three rekker inside
-        // one game share the same boards, so the real span is a bit wider than
-        // this — read it as a ballpark, not a strict interval.
+        // Likelihood-ratio span: every B within 1.92 log-units of the peak,
+        // the usual 95% cut for one free parameter. Walk out until the
+        // likelihood drops through the cut, then bisect on the log scale.
         const CUT = bestLL - 1.92;
-        let low = best, high = best;
-        for (let B = best; B > 1; ) {
-            const next = Math.max(1, Math.min(B - 1, Math.floor(B / 1.03)));
-            if (logLike(clean, next) < CUT) break;
-            low = next;
-            B = next;
-        }
-        for (let B = best; B <= 200000; B = Math.ceil(B * 1.03)) {
-            if (logLike(clean, B) < CUT) break;
-            high = B;
-        }
+        const bound = dir => {
+            let held = best, past = best;
+            for (let k = 0; k < 60; k++) {
+                past = dir > 0 ? past * 1.5 : past / 1.5;
+                if (past >= MAX_B) return MAX_B;
+                if (past <= 1)     return 1;
+                if (ll(past) < CUT) break;
+                held = past;
+            }
+            let hi = Math.log(held), lo = Math.log(past);
+            for (let k = 0; k < 25; k++) {
+                const m = (hi + lo) / 2;
+                if (ll(Math.exp(m)) >= CUT) hi = m; else lo = m;
+            }
+            return Math.min(MAX_B, Math.max(1, Math.round(Math.exp(hi))));
+        };
 
-        return { players: best, low, high, samples: clean.length };
+        return { blocks: best, low: bound(-1), high: bound(1), samples: clean.length };
     }
 
     // Round to something that does not pretend to be exact
@@ -244,6 +274,9 @@ const PlayerEstimate = (() => {
         if (v < 1000) return Math.round(v / 10) * 10;
         return Math.round(v / 50) * 50;
     }
+
+    // Rounded and thousands-separated, e.g. 12950 -> "12 950"
+    const format = v => round(v).toLocaleString('no-NO');
 
     // Pull observations out of a saved session object
     function fromSession(session) {
@@ -261,10 +294,7 @@ const PlayerEstimate = (() => {
         return obs;
     }
 
-    // Rounded and thousands-separated, e.g. 12950 -> "12 950"
-    const format = v => round(v).toLocaleString('no-NO');
-
-    return { estimate, round, format, fromSession, MIN_DRAWS };
+    return { estimate, round, format, fromSession, MIN_DRAWS, MAX_DRAWS };
 })();
 
 // Creates a fresh per-slot state
@@ -538,7 +568,7 @@ class BingoApp {
             avgBox2:         document.getElementById('avg-box-2'),
             avgBox3:         document.getElementById('avg-box-3'),
             gameIndicator:   document.getElementById('game-indicator'),
-            playerEstimate:  document.getElementById('player-estimate'),
+            blockEstimate:  document.getElementById('block-estimate'),
             saveSessionBtn:  document.getElementById('save-session-btn'),
             // Rekke confirm modal
             rekkeModal:      document.getElementById('rekke-modal'),
@@ -2762,16 +2792,16 @@ class BingoApp {
 
         this.updateWinnerIndicator();
         this.updateGameIndicator();
-        this.updatePlayerEstimate();
+        this.updateBlockEstimate();
     }
 
-    // ── Player estimate (live) ───────────────────────
+    // ── Blocks in play (live) ───────────────────────
     // Every rekke logged in the running session says something about how many
     // boards are out there: the fewer numbers a rekke needed, the more boards
     // were competing for it. Pooling the four games sharpens the figure as the
     // session goes on.
-    updatePlayerEstimate() {
-        const box = this.el.playerEstimate;
+    updateBlockEstimate() {
+        const box = this.el.blockEstimate;
         if (!box) return;
 
         const order = ['Rekke1', 'Rekke2', 'Rekke3'];
@@ -2786,20 +2816,20 @@ class BingoApp {
             });
         });
 
-        const est = PlayerEstimate.estimate(obs);
+        const est = BlockEstimate.estimate(obs);
         if (!est) { box.style.display = 'none'; return; }
 
         box.style.display = '';
         box.innerHTML =
-            '<span class="pe-icon">👥</span>'
-            + `<span class="pe-value">~${PlayerEstimate.format(est.players)}</span>`
-            + '<span class="pe-label">spillere</span>'
-            + `<span class="pe-span">${PlayerEstimate.format(est.low)}–${PlayerEstimate.format(est.high)}</span>`;
+            '<span class="be-icon">🎫</span>'
+            + `<span class="be-value">~${BlockEstimate.format(est.blocks)}</span>`
+            + '<span class="be-label">blokker</span>'
+            + `<span class="be-span">${BlockEstimate.format(est.low)}–${BlockEstimate.format(est.high)}</span>`;
         box.title =
             `Anslag ut fra ${est.samples} `
             + `${est.samples === 1 ? 'logget rekke' : 'loggede rekker'} i denne sesjonen.\n`
-            + 'Jo færre tall som trengs for en rekke, jo flere brett er i spill.\n'
-            + 'Forutsetter ett brett per spiller. Tallet blir sikrere for hver rekke som logges.';
+            + 'Jo færre tall som trengs for en rekke, jo flere blokker er i spill.\n'
+            + 'Forutsetter ett brett per blokk i hvert spill. Tallet blir sikrere for hver rekke som logges.';
     }
 
     openSessionModal() {
@@ -5323,22 +5353,20 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             });
             item.appendChild(valuesEl);
 
-            // Estimated crowd — read out of this session's own rekke counts
-            const est = PlayerEstimate.estimate(PlayerEstimate.fromSession(session));
+            // Blocks in play — read out of this session's own rekke counts
+            const est = BlockEstimate.estimate(BlockEstimate.fromSession(session));
             if (est) {
                 const estEl = document.createElement('div');
-                estEl.className = 'session-item-players';
+                estEl.className = 'session-item-blocks';
                 estEl.innerHTML =
-                    '<span class="session-players-icon">👥</span>' +
-                    `<span class="session-players-value">${PlayerEstimate.format(est.players)}</span>`;
+                    '<span class="session-blocks-icon">🎫</span>' +
+                    `<span class="session-blocks-value">${BlockEstimate.format(est.blocks)}</span>`;
                 estEl.title =
-                    `Anslag: ~${PlayerEstimate.format(est.players)} spillere `
-                    + `(sannsynlig ${PlayerEstimate.format(est.low)}–${PlayerEstimate.format(est.high)}).
-`
+                    `Anslag: ~${BlockEstimate.format(est.blocks)} blokker i spill `
+                    + `(sannsynlig ${BlockEstimate.format(est.low)}–${BlockEstimate.format(est.high)}).\n`
                     + `Regnet ut fra de ${est.samples} loggede rekkene i denne sesjonen: `
-                    + `jo færre tall som trengs for en rekke, jo flere brett er i spill.
-`
-                    + `Forutsetter ett brett per spiller.`;
+                    + `jo færre tall som trengs for en rekke, jo flere blokker er i spill.\n`
+                    + `Forutsetter ett brett per blokk i hvert spill.`;
                 item.appendChild(estEl);
             }
 

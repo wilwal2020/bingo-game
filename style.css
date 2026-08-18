@@ -763,8 +763,8 @@ body.no-over-average-blink .circle.over-average { animation: none; }
     transition: opacity .15s;
 }
 
-/* Estimated crowd size for a saved session */
-.session-item-players {
+/* Blocks in play, for a saved session */
+.session-item-blocks {
     display:       flex;
     align-items:   center;
     gap:           5px;
@@ -778,11 +778,11 @@ body.no-over-average-blink .circle.over-average { animation: none; }
     white-space:   nowrap;
     cursor:        help;
 }
-.session-players-icon  { font-size: .75rem; opacity: .7; }
-.session-players-value { font-weight: 600; color: rgba(255,255,255,.88); }
+.session-blocks-icon  { font-size: .75rem; opacity: .7; }
+.session-blocks-value { font-weight: 600; color: rgba(255,255,255,.88); }
 
 /* Live estimate under the game indicator */
-.player-estimate {
+.block-estimate {
     display:       flex;
     align-items:   center;
     justify-content: center;
@@ -796,10 +796,10 @@ body.no-over-average-blink .circle.over-average { animation: none; }
     color:         rgba(255,255,255,.7);
     cursor:        help;
 }
-.player-estimate .pe-icon  { opacity: .8; }
-.player-estimate .pe-value { font-weight: 700; color: var(--accent-color); font-size: 1rem; }
-.player-estimate .pe-label { color: rgba(255,255,255,.55); }
-.player-estimate .pe-span  {
+.block-estimate .be-icon  { opacity: .8; }
+.block-estimate .be-value { font-weight: 700; color: var(--accent-color); font-size: 1rem; }
+.block-estimate .be-label { color: rgba(255,255,255,.55); }
+.block-estimate .be-span  {
     font-size:   .72rem;
     color:       rgba(255,255,255,.35);
     padding-left: 4px;
