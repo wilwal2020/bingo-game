@@ -145,10 +145,16 @@ const DEFAULT_THRESHOLDS = {
    particular B. We recover B by maximising the summed
    log-likelihood over every logged rekke.
 
-   All four games in a session face the same crowd, and one
-   block puts one board into each game, so all 12 rekke
-   counts of a session are evidence about the SAME B — read
-   as the number of blocks in play.
+   All four games in a session face the same crowd, so all
+   12 rekke counts of a session are evidence about the SAME
+   B — the number of boards competing in one game.
+
+   Blocks follow from B. One person plays a whole strip of 6
+   boards in each game, and a block is four strips, one per
+   game of the session. A block therefore puts 6 boards into
+   every game, and the block count is B / 6. The four strips
+   are spent one game at a time and never sit on the table
+   together, so there is no further division by four.
 
    Two approximations worth knowing: boards are treated as
    independent (a real strip of 6 covers 1..90 exactly once,
@@ -161,6 +167,7 @@ const DEFAULT_THRESHOLDS = {
 const BlockEstimate = (() => {
     const BALLS  = 90;
     const MAX_B  = 1000000;      // search ceiling, far above any real hall
+    const PER_BLOCK = 6;         // boards one block puts into a single game
 
     // log n! for n <= BALLS
     const LOG_FACT = [0];
@@ -216,7 +223,7 @@ const BlockEstimate = (() => {
     /**
      * Estimate how many blocks are in play.
      * @param {Array<{rekke:0|1|2, draws:number}>} obs  logged rekke counts
-     * @returns {{blocks:number, low:number, high:number, samples:number}|null}
+     * @returns {{blocks:number, boards:number, low:number, high:number, samples:number}|null}
      */
     function estimate(obs) {
         const clean = (obs || []).filter(usable);
@@ -265,7 +272,13 @@ const BlockEstimate = (() => {
             return Math.min(MAX_B, Math.max(1, Math.round(Math.exp(hi))));
         };
 
-        return { blocks: best, low: bound(-1), high: bound(1), samples: clean.length };
+        return {
+            boards:  best,                        // boards competing in one game
+            blocks:  best / PER_BLOCK,
+            low:     bound(-1) / PER_BLOCK,
+            high:    bound(1)  / PER_BLOCK,
+            samples: clean.length,
+        };
     }
 
     // Round to something that does not pretend to be exact
@@ -2828,8 +2841,8 @@ class BingoApp {
         box.title =
             `Anslag ut fra ${est.samples} `
             + `${est.samples === 1 ? 'logget rekke' : 'loggede rekker'} i denne sesjonen.\n`
-            + 'Jo færre tall som trengs for en rekke, jo flere blokker er i spill.\n'
-            + 'Forutsetter ett brett per blokk i hvert spill. Tallet blir sikrere for hver rekke som logges.';
+            + 'Jo færre tall som trengs for en rekke, jo flere brett er i spill.\n'
+            + '6 brett per blokk i hvert spill. Tallet blir sikrere for hver rekke som logges.';
     }
 
     openSessionModal() {
@@ -5365,8 +5378,8 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                     `Anslag: ~${BlockEstimate.format(est.blocks)} blokker i spill `
                     + `(sannsynlig ${BlockEstimate.format(est.low)}–${BlockEstimate.format(est.high)}).\n`
                     + `Regnet ut fra de ${est.samples} loggede rekkene i denne sesjonen: `
-                    + `jo færre tall som trengs for en rekke, jo flere blokker er i spill.\n`
-                    + `Forutsetter ett brett per blokk i hvert spill.`;
+                    + `jo færre tall som trengs for en rekke, jo flere brett er i spill.\n`
+                    + `6 brett per blokk i hvert spill — ~${BlockEstimate.format(est.boards)} brett totalt.`;
                 item.appendChild(estEl);
             }
 
