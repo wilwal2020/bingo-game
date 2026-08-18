@@ -762,6 +762,50 @@ body.no-over-average-blink .circle.over-average { animation: none; }
     opacity:    0;
     transition: opacity .15s;
 }
+
+/* Estimated crowd size for a saved session */
+.session-item-players {
+    display:       flex;
+    align-items:   center;
+    gap:           5px;
+    flex-shrink:   0;
+    padding:       2px 9px;
+    border-radius: 999px;
+    background:    rgba(255,255,255,.05);
+    border:        1px solid rgba(255,255,255,.1);
+    color:         rgba(255,255,255,.65);
+    font-size:     .8rem;
+    white-space:   nowrap;
+    cursor:        help;
+}
+.session-players-icon  { font-size: .75rem; opacity: .7; }
+.session-players-value { font-weight: 600; color: rgba(255,255,255,.88); }
+
+/* Live estimate under the game indicator */
+.player-estimate {
+    display:       flex;
+    align-items:   center;
+    justify-content: center;
+    gap:           6px;
+    margin-top:    10px;
+    padding:       4px 12px;
+    border-radius: 999px;
+    background:    rgba(var(--accent-rgb), .08);
+    border:        1px solid rgba(var(--accent-rgb), .25);
+    font-size:     .85rem;
+    color:         rgba(255,255,255,.7);
+    cursor:        help;
+}
+.player-estimate .pe-icon  { opacity: .8; }
+.player-estimate .pe-value { font-weight: 700; color: var(--accent-color); font-size: 1rem; }
+.player-estimate .pe-label { color: rgba(255,255,255,.55); }
+.player-estimate .pe-span  {
+    font-size:   .72rem;
+    color:       rgba(255,255,255,.35);
+    padding-left: 4px;
+    border-left: 1px solid rgba(255,255,255,.15);
+}
+
 .session-list-item:hover .session-item-actions {
     opacity: 1;
 }

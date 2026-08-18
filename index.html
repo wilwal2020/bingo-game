@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#101c2d">
     <title>Geithus Bingo</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
-    <link rel="stylesheet" href="style.css?v=5">
+    <link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
 
@@ -103,6 +103,9 @@
 
             <!-- Game indicator -->
             <div class="game-indicator" id="game-indicator"></div>
+
+            <!-- Estimated crowd, from the rekker logged so far this session -->
+            <div class="player-estimate" id="player-estimate" style="display:none"></div>
 
             <!-- Save full session button (shown when all 4 games done) -->
             <button class="save-session-btn" id="save-session-btn" style="display:none">
@@ -1347,6 +1350,6 @@
       </div>
     </div>
 
-    <script src="script.js?v=5" defer></script>
+    <script src="script.js?v=6" defer></script>
 </body>
 </html>
