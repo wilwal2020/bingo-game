@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#101c2d">
     <title>Geithus Bingo</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
-    <link rel="stylesheet" href="style.css?v=8">
+    <link rel="stylesheet" href="style.css?v=9">
 </head>
 <body>
 
@@ -323,7 +323,11 @@
     <!-- GRAPH MODAL -->
     <div class="modal-overlay" id="graph-modal" style="display:none">
         <div class="modal modal-viewer modal-graph">
-            <h2 class="modal-title">Gjennomsnitt over tid</h2>
+            <h2 class="modal-title" id="graph-title">Gjennomsnitt over tid</h2>
+            <div class="graph-mode-toggle">
+                <button class="graph-mode-btn active" id="graph-mode-rekker" type="button">Rekker</button>
+                <button class="graph-mode-btn" id="graph-mode-blokker" type="button">Blokker</button>
+            </div>
             <canvas id="avg-graph-canvas"></canvas>
             <div class="graph-legend" id="graph-legend"></div>
             <div class="modal-buttons" style="margin-top:14px">
@@ -549,6 +553,21 @@
                     <div class="viewer-avg-label">Rekke 3</div>
                     <div class="viewer-avg-value" id="viewer-avg-3">—</div>
                 </div>
+            </div>
+
+            <!-- Win odds: your blocks vs the average crowd over the filter window -->
+            <div class="win-odds" id="win-odds">
+                <div class="win-odds-controls">
+                    <label class="win-odds-label" for="win-odds-input">Vinnersjanse med</label>
+                    <button class="rekke-adjust-btn" id="win-odds-minus" type="button">−</button>
+                    <input type="number" id="win-odds-input" class="session-input win-odds-input"
+                           min="1" value="1" title="Hvor mange blokker du har">
+                    <label class="win-odds-label" for="win-odds-input">blokk(er), av</label>
+                    <span class="win-odds-total" id="win-odds-total">—</span>
+                    <span class="win-odds-label">i snitt</span>
+                    <button class="rekke-adjust-btn" id="win-odds-plus" type="button">+</button>
+                </div>
+                <div class="win-odds-result" id="win-odds-result">—</div>
             </div>
 
             <div class="session-list" id="session-list"></div>
@@ -1350,6 +1369,6 @@
       </div>
     </div>
 
-    <script src="script.js?v=8" defer></script>
+    <script src="script.js?v=9" defer></script>
 </body>
 </html>

@@ -307,7 +307,39 @@ const BlockEstimate = (() => {
         return obs;
     }
 
-    return { estimate, round, format, fromSession, MIN_DRAWS, MAX_DRAWS };
+    // ── Derived odds, once the block count is known ──────────────
+
+    const PRIZES_PER_SESSION = 12;           // 3 rekker x 4 games (PER_BLOCK defined above)
+
+    // P(the field-wide first win of rekke i is a tie — 2+ boards land it on the
+    // same draw). Board-level; for a real hall the two coincident boards almost
+    // always sit on different blocks, so this tracks the "delt gevinst" rate.
+    function sharedChance(blocks, i) {
+        const N = Math.max(1, Math.round(blocks * PER_BLOCK));
+        let tot = 0;
+        for (let n = MIN_DRAWS[i]; n <= BALLS; n++) {
+            const pPrev = p(i, n - 1), pNow = p(i, n);
+            const none1 = Math.pow(1 - pPrev, N);          // none by n-1
+            const none0 = Math.pow(1 - pNow,  N);          // none by n
+            const exactlyOne = N * (pNow - pPrev) * Math.pow(1 - pNow, N - 1);
+            tot += Math.max(0, none1 - none0 - exactlyOne);
+        }
+        return Math.min(1, Math.max(0, tot));
+    }
+
+    // Holding `hold` blocks out of `total` in play: your share of the boards in
+    // any game is hold/total, and the 12 prizes fall roughly independently.
+    function winChance(hold, total) {
+        if (!(total > 0)) return null;
+        const share = Math.min(1, hold / total);
+        return {
+            any:      1 - Math.pow(1 - share, PRIZES_PER_SESSION),   // at least one prize
+            expected: PRIZES_PER_SESSION * share,                    // prizes won on average
+        };
+    }
+
+    return { estimate, round, format, fromSession, sharedChance, winChance,
+             MIN_DRAWS, MAX_DRAWS, PER_BLOCK, PRIZES_PER_SESSION };
 })();
 
 // Creates a fresh per-slot state
@@ -359,6 +391,13 @@ class BingoApp {
 
         // Average filter (null = all sessions)
         this.avgFilter = null;
+
+        // Graph view mode: 'rekker' (default) or 'blokker'
+        this.graphMode = 'rekker';
+
+        // Win-odds: how many blocks the operator holds (persisted)
+        const savedHold = parseInt(localStorage.getItem('bingoWinOddsBlocks'), 10);
+        this.winOddsBlocks = savedHold >= 1 ? savedHold : 1;
 
         // BingoView Firebase channel — listeners are registered on child
         // paths; their detach functions live here so a reconnect can remove
@@ -630,6 +669,12 @@ class BingoApp {
             viewerAvg1:         document.getElementById('viewer-avg-1'),
             viewerAvg2:         document.getElementById('viewer-avg-2'),
             viewerAvg3:         document.getElementById('viewer-avg-3'),
+            winOdds:            document.getElementById('win-odds'),
+            winOddsInput:       document.getElementById('win-odds-input'),
+            winOddsMinus:       document.getElementById('win-odds-minus'),
+            winOddsPlus:        document.getElementById('win-odds-plus'),
+            winOddsTotal:       document.getElementById('win-odds-total'),
+            winOddsResult:      document.getElementById('win-odds-result'),
             settingsBtn:        document.getElementById('settings-btn'),
             settingsModal:      document.getElementById('settings-modal'),
             settingsClose:      document.getElementById('settings-close'),
@@ -779,6 +824,9 @@ class BingoApp {
             graphModal:          document.getElementById('graph-modal'),
             graphCanvas:         document.getElementById('avg-graph-canvas'),
             graphLegend:         document.getElementById('graph-legend'),
+            graphTitle:          document.getElementById('graph-title'),
+            graphModeRekker:     document.getElementById('graph-mode-rekker'),
+            graphModeBlokker:    document.getElementById('graph-mode-blokker'),
             graphClose:          document.getElementById('graph-close'),
             // Unsaved confirm
             unsavedModal:        document.getElementById('unsaved-modal'),
@@ -984,6 +1032,12 @@ class BingoApp {
         this.el.avgFilterPlus.addEventListener('click', () => { this.playSound('select'); this.stepAvgFilter(1); });
         this.el.avgFilterMinus.addEventListener('click', () => { this.playSound('select'); this.stepAvgFilter(-1); });
 
+        // Win-odds — you set how many blocks you hold; total comes from the
+        // average estimated crowd over the same session-filter window.
+        this.el.winOddsInput.addEventListener('input', () => this.handleWinOddsInput());
+        this.el.winOddsPlus.addEventListener('click',  () => { this.playSound('select'); this.stepWinOdds(1); });
+        this.el.winOddsMinus.addEventListener('click', () => { this.playSound('select'); this.stepWinOdds(-1); });
+
         // Winner logging
         this.el.logWinnerBtn.addEventListener('click',  () => this.openWinnerModal());
 
@@ -1108,6 +1162,8 @@ class BingoApp {
         // Graph
         this.el.graphBtn.addEventListener('click',   () => this.openGraph());
         this.el.graphClose.addEventListener('click', () => this.closeGraph());
+        this.el.graphModeRekker.addEventListener('click',  () => this.setGraphMode('rekker'));
+        this.el.graphModeBlokker.addEventListener('click', () => this.setGraphMode('blokker'));
 
         // Statistics
         if (this.el.statsBtn) {
@@ -2090,6 +2146,7 @@ class BingoApp {
         // Restore average filter
         const savedFilter = localStorage.getItem('bingoAvgFilter');
         this.avgFilter = (savedFilter && savedFilter !== '') ? parseInt(savedFilter, 10) : null;
+        if (this.el.winOddsInput) this.el.winOddsInput.value = this.winOddsBlocks;
 
         // Load settings
         const savedSettings = localStorage.getItem('bingoSettings');
@@ -4095,6 +4152,75 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         });
         sec.appendChild(table);
         wrap.appendChild(sec);
+
+        // ── Delt gevinst: modellert vs observert ──
+        // Observed: group each session's winners by game+rekke — one prize each,
+        // shared when it carries 2+ names (split>1). Predicted: the model's tie
+        // chance at the average estimated crowd.
+        const avgBlocks = this.computeAverageBlocks(sessions);
+        const prizeTot  = [0, 0, 0];
+        const prizeShared = [0, 0, 0];
+        sessions.forEach(s => {
+            const groups = {};
+            (s.winners || []).forEach(w => {
+                if (!w || !w.rekke) return;
+                const ri = ['Rekke1', 'Rekke2', 'Rekke3'].indexOf(w.rekke);
+                if (ri < 0) return;
+                const key = (w.game || w.gameName || '?') + '|' + w.rekke;
+                if (!groups[key]) groups[key] = { ri, split: 1, n: 0 };
+                groups[key].n++;
+                groups[key].split = Math.max(groups[key].split, w.split || 1);
+            });
+            Object.values(groups).forEach(g => {
+                prizeTot[g.ri]++;
+                if (g.split > 1 || g.n > 1) prizeShared[g.ri]++;
+            });
+        });
+
+        const anyPrizes = prizeTot.some(t => t > 0);
+        if (avgBlocks !== null || anyPrizes) {
+            const sec = document.createElement('div');
+            sec.className = 'stats-section';
+            const h = document.createElement('div');
+            h.className = 'stats-section-title';
+            h.textContent = 'Delt gevinst';
+            sec.appendChild(h);
+            const desc = document.createElement('div');
+            desc.className = 'stats-section-desc';
+            desc.textContent = avgBlocks !== null
+                ? 'Modellert sjanse for delt gevinst ved ~' + BlockEstimate.format(avgBlocks)
+                  + ' blokker i snitt, mot hva som faktisk er logget.'
+                : 'Faktisk andel loggede gevinster som ble delt.';
+            sec.appendChild(desc);
+
+            const table = document.createElement('div');
+            table.className = 'stats-game-table stats-shared-table';
+            table.innerHTML = '<div class="stats-game-cell stats-game-head"></div>'
+                + '<div class="stats-game-cell stats-game-head">Modellert</div>'
+                + '<div class="stats-game-cell stats-game-head">Observert</div>';
+            rekkeNames.forEach((name, i) => {
+                const nameCell = document.createElement('div');
+                nameCell.className = 'stats-game-cell stats-game-name';
+                nameCell.textContent = name.replace('Rekke ', 'R');
+                table.appendChild(nameCell);
+
+                const modelCell = document.createElement('div');
+                modelCell.className = 'stats-game-cell';
+                modelCell.textContent = avgBlocks !== null
+                    ? (BlockEstimate.sharedChance(avgBlocks, i) * 100).toFixed(1) + '%'
+                    : '–';
+                table.appendChild(modelCell);
+
+                const obsCell = document.createElement('div');
+                obsCell.className = 'stats-game-cell';
+                obsCell.textContent = prizeTot[i] > 0
+                    ? (prizeShared[i] / prizeTot[i] * 100).toFixed(0) + '% (' + prizeShared[i] + '/' + prizeTot[i] + ')'
+                    : '–';
+                table.appendChild(obsCell);
+            });
+            sec.appendChild(table);
+            wrap.appendChild(sec);
+        }
     }
 
     // Sessions since a player's last win (0 = won in the latest session).
@@ -5001,7 +5127,23 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         this.playSound('select');
         this.el.graphModal.style.display = 'flex';
         document.body.style.overflow = 'hidden';
+        this.syncGraphModeUI();
         setTimeout(() => this.drawGraph(), 50); // let canvas render first
+    }
+
+    setGraphMode(mode) {
+        if (this.graphMode === mode) return;
+        this.playSound('select');
+        this.graphMode = mode;
+        this.syncGraphModeUI();
+        this.drawGraph();
+    }
+
+    syncGraphModeUI() {
+        const blocks = this.graphMode === 'blokker';
+        this.el.graphModeRekker.classList.toggle('active',  !blocks);
+        this.el.graphModeBlokker.classList.toggle('active',  blocks);
+        this.el.graphTitle.textContent = blocks ? 'Blokker i spill over tid' : 'Gjennomsnitt over tid';
     }
 
     closeGraph() {
@@ -5031,6 +5173,8 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         ctx.scale(dpr, dpr);
         const W = rect.width;
         const H = rect.height;
+
+        if (this.graphMode === 'blokker') { this.drawBlocksGraph(ctx, W, H, sessions); return; }
 
         const rekkeKeys   = ['rekke1', 'rekke2', 'rekke3'];
         const rekkeLabels = ['Rekke 1', 'Rekke 2', 'Rekke 3'];
@@ -5172,6 +5316,116 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         typeInfo.textContent = '— Rullende snitt  · · ·  Sesjonsverdi';
         legend.appendChild(typeInfo);
     }
+    // Blocks-in-play per session, over time. Self-contained: own y-scale, a
+    // faint per-session line with dots and a solid rolling-average line.
+    drawBlocksGraph(ctx, W, H, sessions) {
+        const est = sessions.map(s => {
+            const e = BlockEstimate.estimate(BlockEstimate.fromSession(s));
+            return e ? e.blocks : null;
+        });
+        // rolling mean of the estimates
+        let sum = 0, cnt = 0;
+        const roll = est.map(v => {
+            if (v !== null) { sum += v; cnt++; }
+            return cnt > 0 ? sum / cnt : null;
+        });
+        const labels = sessions.map(s => {
+            const d = new Date(s.date);
+            return d.getDate() + '.' + (d.getMonth() + 1) + '.' + String(d.getFullYear()).slice(2);
+        });
+
+        const vals = est.filter(v => v !== null);
+        if (!vals.length) {
+            ctx.fillStyle = 'rgba(255,255,255,.3)';
+            ctx.font = '16px Trebuchet MS';
+            ctx.textAlign = 'center';
+            ctx.fillText('Ingen blokkanslag enda', W / 2, H / 2);
+            return;
+        }
+        const maxV = Math.max(...vals) * 1.15 + 1;
+        const minV = 0;
+
+        const pad = { top: 20, right: 20, bottom: 40, left: 44 };
+        const gW = W - pad.left - pad.right;
+        const gH = H - pad.top - pad.bottom;
+        const xPos = i => pad.left + (sessions.length < 2 ? gW / 2 : (i / (sessions.length - 1)) * gW);
+        const yPos = v => pad.top + gH - ((v - minV) / (maxV - minV)) * gH;
+        const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent-color').trim() || '#F1B924';
+
+        ctx.clearRect(0, 0, W, H);
+
+        // Grid + y labels
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= 4; i++) {
+            const y = pad.top + (gH / 4) * i;
+            ctx.strokeStyle = 'rgba(255,255,255,.08)';
+            ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
+            const val = Math.round(maxV - ((maxV - minV) / 4) * i);
+            ctx.fillStyle = 'rgba(255,255,255,.4)';
+            ctx.font = '11px Trebuchet MS';
+            ctx.textAlign = 'right';
+            ctx.fillText(BlockEstimate.format(val), pad.left - 4, y + 4);
+        }
+
+        // X labels
+        ctx.fillStyle = 'rgba(255,255,255,.4)';
+        ctx.font = '10px Trebuchet MS';
+        ctx.textAlign = 'center';
+        const step = Math.max(1, Math.ceil(sessions.length / 8));
+        labels.forEach((lbl, i) => {
+            if (i % step === 0 || i === sessions.length - 1)
+                ctx.fillText(lbl, xPos(i), H - pad.bottom + 16);
+        });
+
+        // Per-session faint line + dots
+        ctx.strokeStyle = accent + '44';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        let started = false;
+        est.forEach((v, i) => {
+            if (v === null) return;
+            if (!started) { ctx.moveTo(xPos(i), yPos(v)); started = true; }
+            else          { ctx.lineTo(xPos(i), yPos(v)); }
+        });
+        ctx.stroke();
+        ctx.setLineDash([]);
+        est.forEach((v, i) => {
+            if (v === null) return;
+            ctx.beginPath();
+            ctx.arc(xPos(i), yPos(v), 4, 0, Math.PI * 2);
+            ctx.fillStyle = accent + 'aa';
+            ctx.strokeStyle = accent;
+            ctx.lineWidth = 1.5;
+            ctx.fill(); ctx.stroke();
+        });
+
+        // Rolling average, solid on top
+        ctx.strokeStyle = accent;
+        ctx.lineWidth = 2.5;
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        started = false;
+        roll.forEach((v, i) => {
+            if (v === null) return;
+            if (!started) { ctx.moveTo(xPos(i), yPos(v)); started = true; }
+            else          { ctx.lineTo(xPos(i), yPos(v)); }
+        });
+        ctx.stroke();
+
+        // Legend
+        const legend = this.el.graphLegend;
+        legend.innerHTML = '';
+        const item = document.createElement('div');
+        item.className = 'graph-legend-item';
+        item.innerHTML = '<span class="graph-legend-dot" style="background:' + accent + '"></span>Blokker i spill';
+        legend.appendChild(item);
+        const typeInfo = document.createElement('div');
+        typeInfo.style.cssText = 'width:100%;text-align:center;font-size:.75rem;color:rgba(255,255,255,.3);margin-top:4px';
+        typeInfo.textContent = '\u2014 Rullende snitt  \u00b7 \u00b7 \u00b7  Sesjonsanslag';
+        legend.appendChild(typeInfo);
+    }
+
 
     // ── Session Viewer ───────────────────────────────
     openViewerModal() {
@@ -5183,6 +5437,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         this.updateBackupStatus();
         this.syncFilterUI();
         this.updateViewerAverages(sessions);
+        this.updateWinOdds(sessions);
         this.renderSessionList(sessions);
         this.updateViewerModeButtons();
         document.body.style.overflow = 'hidden';
@@ -5234,6 +5489,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         const sessions = this.getSessions();
         this.updateAverages(sessions);
         this.updateViewerAverages(sessions);
+        this.updateWinOdds(sessions);
         this.renderSessionList(sessions);
     }
 
@@ -5258,6 +5514,61 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             this.el[`viewerAvg${n}`].textContent = avgs[i] !== null ? avgs[i] : defaults[i];
         });
     }
+    // Mean estimated blocks across the filtered session window. Each session's
+    // own rekke counts give one estimate; we average those, matching how the
+    // called-number averages above are built.
+    computeAverageBlocks(sessions, lastN = null) {
+        const src = lastN ? sessions.slice(-lastN) : sessions;
+        let sum = 0, count = 0;
+        src.forEach(session => {
+            const est = BlockEstimate.estimate(BlockEstimate.fromSession(session));
+            if (est) { sum += est.blocks; count++; }
+        });
+        return count > 0 ? sum / count : null;
+    }
+
+    // ── Win odds ─────────────────────────────────────
+    handleWinOddsInput() {
+        const v = parseInt(this.el.winOddsInput.value, 10);
+        this.winOddsBlocks = v >= 1 ? v : 1;
+        this.scheduleWrite('bingoWinOddsBlocks', () => String(this.winOddsBlocks));
+        this.updateWinOdds();
+    }
+
+    stepWinOdds(delta) {
+        const next = Math.max(1, (this.winOddsBlocks || 1) + delta);
+        this.winOddsBlocks = next;
+        this.el.winOddsInput.value = next;
+        this.scheduleWrite('bingoWinOddsBlocks', () => String(next));
+        this.updateWinOdds();
+    }
+
+    updateWinOdds(sessions = null) {
+        if (!this.el.winOdds) return;
+        if (!sessions) sessions = this.getSessions();
+        const avgBlocks = this.computeAverageBlocks(sessions, this.avgFilter);
+        const hold      = this.winOddsBlocks || 1;
+
+        if (avgBlocks === null) {
+            this.el.winOddsTotal.textContent  = '\u2014';
+            this.el.winOddsResult.textContent = 'Lagre en sesjon for \u00e5 ansl\u00e5.';
+            this.el.winOddsResult.classList.add('win-odds-empty');
+            return;
+        }
+        this.el.winOddsResult.classList.remove('win-odds-empty');
+        this.el.winOddsTotal.textContent = BlockEstimate.format(avgBlocks);
+
+        const odds   = BlockEstimate.winChance(hold, avgBlocks);
+        const pct    = odds.any * 100;
+        const oneIn  = odds.any > 0 ? (1 / odds.any) : Infinity;
+        const pctStr = pct >= 10 ? pct.toFixed(0) : pct.toFixed(1);
+        const expStr = odds.expected.toFixed(odds.expected < 1 ? 2 : 1);
+        this.el.winOddsResult.innerHTML =
+            '<strong>~' + pctStr + '%</strong> sjanse for minst \u00e9n premie '
+            + '<span class="win-odds-sub">\u00b7 ca. 1 av ' + oneIn.toFixed(1) + ' kvelder '
+            + '\u00b7 ~' + expStr + ' av 12 premier i snitt</span>';
+    }
+
 
     closeViewerModal() {
         this.playSound('cancel');

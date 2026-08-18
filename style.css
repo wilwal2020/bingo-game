@@ -2769,6 +2769,79 @@ body.layout-vertical #random-button {
     margin-bottom:   12px;
 }
 
+/* Win-odds panel (session viewer) */
+.win-odds {
+    margin-bottom:    12px;
+    padding:          12px 14px;
+    background-color: rgba(var(--accent-rgb), .06);
+    border:           1px solid rgba(var(--accent-rgb), .22);
+    border-radius:    10px;
+}
+.win-odds-controls {
+    display:     flex;
+    align-items: center;
+    flex-wrap:   wrap;
+    gap:         8px;
+    justify-content: center;
+}
+.win-odds-label {
+    font-size: .9rem;
+    color:     rgba(255,255,255,.7);
+}
+.win-odds-input {
+    width:      64px;
+    text-align: center;
+    -moz-appearance: textfield;
+}
+.win-odds-input::-webkit-outer-spin-button,
+.win-odds-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.win-odds-total {
+    font-weight: 700;
+    color:       var(--accent-color);
+    font-size:   1.05rem;
+}
+.win-odds-result {
+    margin-top:  10px;
+    text-align:  center;
+    font-size:   .95rem;
+    color:       rgba(255,255,255,.85);
+}
+.win-odds-result strong { color: var(--accent-color); font-size: 1.1rem; }
+.win-odds-sub {
+    display:   block;
+    margin-top: 3px;
+    font-size: .78rem;
+    color:     rgba(255,255,255,.45);
+}
+.win-odds-result.win-odds-empty { color: rgba(255,255,255,.4); font-size: .85rem; }
+
+/* Graph mode toggle */
+.graph-mode-toggle {
+    display:         flex;
+    justify-content: center;
+    gap:             0;
+    margin-top:      8px;
+}
+.graph-mode-btn {
+    padding:      5px 18px;
+    background:   rgba(255,255,255,.05);
+    border:       1px solid rgba(255,255,255,.15);
+    color:        rgba(255,255,255,.6);
+    cursor:       pointer;
+    font-size:    .85rem;
+    font-family:  inherit;
+    transition:   background .15s, color .15s, border-color .15s;
+}
+.graph-mode-btn:first-child { border-radius: 8px 0 0 8px; }
+.graph-mode-btn:last-child  { border-radius: 0 8px 8px 0; border-left: none; }
+.graph-mode-btn.active {
+    background:   rgba(var(--accent-rgb), .18);
+    border-color: var(--accent-color);
+    color:        var(--accent-color);
+    font-weight:  600;
+}
+
+
 .viewer-avg-box {
     flex:             1;
     padding:          10px 8px;
