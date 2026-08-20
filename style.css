@@ -805,6 +805,12 @@ body.no-over-average-blink .circle.over-average { animation: none; }
     padding-left: 4px;
     border-left: 1px solid rgba(255,255,255,.15);
 }
+.block-estimate .be-src {
+    font-size:    .68rem;
+    font-style:   italic;
+    color:        rgba(255,255,255,.3);
+    padding-left: 4px;
+}
 
 .session-list-item:hover .session-item-actions {
     opacity: 1;

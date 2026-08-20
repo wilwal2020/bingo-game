@@ -220,6 +220,50 @@ const BlockEstimate = (() => {
     const logLike = (obs, B) =>
         obs.reduce((sum, o) => sum + logLikeOne(o.rekke, o.draws, B), 0);
 
+    // Bayesian blend: tonight's rekker against a lognormal prior taken from past
+    // sessions. The prior is Normal(ln median, sigma) in log-blocks; sigma comes
+    // from how much past nights vary, so a steady hall anchors hard and a swingy
+    // one anchors gently — and tonight's data overrules it as rekker accumulate.
+    // With no usable rekker the result is just the prior (the historical anchor).
+    function bayes(obs, prior) {
+        if (!prior || !(prior.median > 0) || !(prior.sigma > 0)) return estimate(obs);
+        const clean = (obs || []).filter(usable);
+        const mu = Math.log(prior.median), sig = prior.sigma;
+
+        // uniform grid in u = ln(blocks); prior is Normal(mu, sig) there
+        const U_LO = 0, U_HI = Math.log(200000), M = 700, du = (U_HI - U_LO) / (M - 1);
+        const lp = new Float64Array(M);
+        let mx = -Infinity;
+        for (let j = 0; j < M; j++) {
+            const u = U_LO + j * du;
+            const d = (u - mu) / sig;
+            let s = -0.5 * d * d;                       // log prior (up to a constant)
+            const N = Math.exp(u) * PER_BLOCK;          // boards
+            for (let c = 0; c < clean.length; c++) s += logLikeOne(clean[c].rekke, clean[c].draws, N);
+            lp[j] = s;
+            if (s > mx) mx = s;
+        }
+        let wsum = 0, xsum = 0;
+        const w = new Float64Array(M);
+        for (let j = 0; j < M; j++) {
+            const e = Math.exp(lp[j] - mx);
+            w[j] = e; wsum += e; xsum += e * Math.exp(U_LO + j * du);
+        }
+        const quant = q => {
+            let acc = 0; const target = q * wsum;
+            for (let j = 0; j < M; j++) { acc += w[j]; if (acc >= target) return Math.exp(U_LO + j * du); }
+            return Math.exp(U_HI);
+        };
+        return {
+            blocks:  xsum / wsum,
+            low:     quant(0.05),
+            high:    quant(0.95),
+            samples: clean.length,
+            prior:   prior.median,
+        };
+    }
+
+
     /**
      * Estimate how many blocks are in play.
      * @param {Array<{rekke:0|1|2, draws:number}>} obs  logged rekke counts
@@ -338,7 +382,7 @@ const BlockEstimate = (() => {
         };
     }
 
-    return { estimate, round, format, fromSession, sharedChance, winChance,
+    return { estimate, bayes, round, format, fromSession, sharedChance, winChance,
              MIN_DRAWS, MAX_DRAWS, PER_BLOCK, PRIZES_PER_SESSION };
 })();
 
@@ -2705,6 +2749,7 @@ class BingoApp {
         this.saveSlotToStorage();
         this.applySlotToDOM();
         this.updateAverages();
+        this.updateBlockEstimate();
         this.syncSettingsThemeSwitcher();
         this.bvSendState();
     }
@@ -2865,11 +2910,34 @@ class BingoApp {
         this.updateBlockEstimate();
     }
 
-    // ── Blocks in play (live) ───────────────────────
-    // Every rekke logged in the running session says something about how many
-    // boards are out there: the fewer numbers a rekke needed, the more boards
-    // were competing for it. Pooling the four games sharpens the figure as the
-    // session goes on.
+    // Lognormal prior for the live tracker, taken from past sessions in the
+    // same window the averages use. Median = geometric mean of the per-session
+    // estimates; sigma = how much those vary in log-space, so a steady hall
+    // anchors hard and a swingy one gently. Null when there is too little
+    // history to anchor on — the tracker then falls back to tonight only.
+    computeBlockPrior(sessions, lastN = null) {
+        const src = lastN ? sessions.slice(-lastN) : sessions;
+        const logs = [];
+        src.forEach(s => {
+            const e = BlockEstimate.estimate(BlockEstimate.fromSession(s));
+            if (e && e.blocks > 0) logs.push(Math.log(e.blocks));
+        });
+        if (logs.length < 2) return null;
+        const mean = logs.reduce((a, b) => a + b, 0) / logs.length;
+        let sigma = 0.5;                                  // gentle default with few nights
+        if (logs.length >= 3) {
+            const varr = logs.reduce((a, x) => a + (x - mean) * (x - mean), 0) / (logs.length - 1);
+            sigma = Math.sqrt(varr);
+        }
+        sigma = Math.min(0.9, Math.max(0.15, sigma));     // never absurdly tight or useless
+        return { median: Math.exp(mean), sigma, n: logs.length };
+    }
+
+    // ── Blocks in play (live) ────────────────────────
+    // Blends tonight's logged rekker with a prior from past sessions: early on
+    // it reads close to the historical crowd, and each rekke pulls it toward
+    // what tonight is actually showing. With no history it falls back to a
+    // tonight-only estimate.
     updateBlockEstimate() {
         const box = this.el.blockEstimate;
         if (!box) return;
@@ -2886,21 +2954,45 @@ class BingoApp {
             });
         });
 
-        const est = BlockEstimate.estimate(obs);
+        const prior      = this.computeBlockPrior(this.getSessions(), this.avgFilter);
+        const gameActive = this.currentTheme !== 'default';
+
+        let est = null, blended = false;
+        if (prior && (obs.length > 0 || gameActive)) {
+            est = BlockEstimate.bayes(obs, prior);
+            blended = true;
+        } else if (obs.length > 0) {
+            est = BlockEstimate.estimate(obs);
+        }
         if (!est) { box.style.display = 'none'; return; }
 
+        const fromHistory = blended && obs.length === 0;
         box.style.display = '';
         box.innerHTML =
-            '<span class="be-icon">🎫</span>'
-            + `<span class="be-value">~${BlockEstimate.format(est.blocks)}</span>`
+            '<span class="be-icon">\u{1F3AB}</span>'
+            + '<span class="be-value">~' + BlockEstimate.format(est.blocks) + '</span>'
             + '<span class="be-label">blokker</span>'
-            + `<span class="be-span">${BlockEstimate.format(est.low)}–${BlockEstimate.format(est.high)}</span>`;
-        box.title =
-            `Anslag ut fra ${est.samples} `
-            + `${est.samples === 1 ? 'logget rekke' : 'loggede rekker'} i denne sesjonen.\n`
-            + 'Jo færre tall som trengs for en rekke, jo flere brett er i spill.\n'
-            + '6 brett per blokk i hvert spill. Tallet blir sikrere for hver rekke som logges.';
+            + '<span class="be-span">' + BlockEstimate.format(est.low) + '\u2013' + BlockEstimate.format(est.high) + '</span>'
+            + (fromHistory ? '<span class="be-src">fra historikk</span>' : '');
+
+        if (blended) {
+            const base = 'Historisk snitt ~' + BlockEstimate.format(prior.median)
+                + ' blokker fra ' + prior.n + ' kveld' + (prior.n === 1 ? '' : 'er') + '.\n';
+            box.title = obs.length === 0
+                ? base + 'Justeres etter hvert som rekker logges i kveld.'
+                : base + 'Justert med ' + obs.length + ' logget'
+                    + (obs.length === 1 ? ' rekke' : 'e rekker') + ' i kveld \u2014 '
+                    + 'jo flere rekker, jo mer styrer kveldens tall.\n'
+                    + '6 brett per blokk i hvert spill.';
+        } else {
+            box.title =
+                'Anslag ut fra ' + est.samples + ' '
+                + (est.samples === 1 ? 'logget rekke' : 'loggede rekker') + ' i denne sesjonen.\n'
+                + 'Jo f\u00e6rre tall som trengs for en rekke, jo flere brett er i spill.\n'
+                + '6 brett per blokk i hvert spill. Tallet blir sikrere for hver rekke som logges.';
+        }
     }
+
 
     openSessionModal() {
         const now = new Date();
@@ -5490,6 +5582,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         this.updateAverages(sessions);
         this.updateViewerAverages(sessions);
         this.updateWinOdds(sessions);
+        this.updateBlockEstimate();
         this.renderSessionList(sessions);
     }
 
