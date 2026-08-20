@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#101c2d">
     <title>Geithus Bingo</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
-    <link rel="stylesheet" href="style.css?v=11">
+    <link rel="stylesheet" href="style.css?v=13">
 </head>
 <body>
 
@@ -327,6 +327,14 @@
             <div class="graph-mode-toggle">
                 <button class="graph-mode-btn active" id="graph-mode-rekker" type="button">Rekker</button>
                 <button class="graph-mode-btn" id="graph-mode-blokker" type="button">Blokker</button>
+            </div>
+            <div class="graph-window">
+                <label class="graph-window-label" for="graph-window-input">Snitt av siste</label>
+                <button class="rekke-adjust-btn" id="graph-window-minus" type="button">−</button>
+                <input type="number" id="graph-window-input" class="session-input graph-window-input"
+                       min="1" placeholder="Alle" title="Antall sesjoner snittlinjen bygger på">
+                <button class="rekke-adjust-btn" id="graph-window-plus" type="button">+</button>
+                <button class="viewer-filter-all-btn" id="graph-window-all" type="button">Alle</button>
             </div>
             <canvas id="avg-graph-canvas"></canvas>
             <div class="graph-legend" id="graph-legend"></div>
@@ -1369,6 +1377,6 @@
       </div>
     </div>
 
-    <script src="script.js?v=11" defer></script>
+    <script src="script.js?v=13" defer></script>
 </body>
 </html>

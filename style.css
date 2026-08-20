@@ -2828,6 +2828,24 @@ body.layout-vertical #random-button {
     gap:             0;
     margin-top:      8px;
 }
+
+/* Graph moving-average window control */
+.graph-window {
+    display:         flex;
+    align-items:     center;
+    justify-content: center;
+    flex-wrap:       wrap;
+    gap:             7px;
+    margin-top:      10px;
+}
+.graph-window-label { font-size: .85rem; color: rgba(255,255,255,.65); }
+.graph-window-input {
+    width:      58px;
+    text-align: center;
+    -moz-appearance: textfield;
+}
+.graph-window-input::-webkit-outer-spin-button,
+.graph-window-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .graph-mode-btn {
     padding:      5px 18px;
     background:   rgba(255,255,255,.05);
@@ -3088,8 +3106,8 @@ body.layout-vertical #random-button {
 
 #avg-graph-canvas {
     width:      100%;
-    flex:       1;
-    min-height: 0;
+    flex:       1 1 auto;
+    min-height: 340px;
     display:    block;
     margin-top: 12px;
 }

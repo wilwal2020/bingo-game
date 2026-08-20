@@ -439,6 +439,11 @@ class BingoApp {
         // Graph view mode: 'rekker' (default) or 'blokker'
         this.graphMode = 'rekker';
 
+        // Graph moving-average window: null = all sessions, or a session count.
+        // Persisted; default 3 so the smoothed line tracks recent change.
+        const savedGW = localStorage.getItem('bingoGraphWindow');
+        this.graphWindow = savedGW === null ? 3 : (savedGW === '' ? null : parseInt(savedGW, 10));
+
         // Win-odds: how many blocks the operator holds (persisted)
         const savedHold = parseInt(localStorage.getItem('bingoWinOddsBlocks'), 10);
         this.winOddsBlocks = savedHold >= 1 ? savedHold : 1;
@@ -871,6 +876,10 @@ class BingoApp {
             graphTitle:          document.getElementById('graph-title'),
             graphModeRekker:     document.getElementById('graph-mode-rekker'),
             graphModeBlokker:    document.getElementById('graph-mode-blokker'),
+            graphWindowInput:    document.getElementById('graph-window-input'),
+            graphWindowMinus:    document.getElementById('graph-window-minus'),
+            graphWindowPlus:     document.getElementById('graph-window-plus'),
+            graphWindowAll:      document.getElementById('graph-window-all'),
             graphClose:          document.getElementById('graph-close'),
             // Unsaved confirm
             unsavedModal:        document.getElementById('unsaved-modal'),
@@ -1208,6 +1217,10 @@ class BingoApp {
         this.el.graphClose.addEventListener('click', () => this.closeGraph());
         this.el.graphModeRekker.addEventListener('click',  () => this.setGraphMode('rekker'));
         this.el.graphModeBlokker.addEventListener('click', () => this.setGraphMode('blokker'));
+        this.el.graphWindowInput.addEventListener('input', () => this.handleGraphWindowInput());
+        this.el.graphWindowPlus.addEventListener('click',  () => { this.playSound('select'); this.stepGraphWindow(1); });
+        this.el.graphWindowMinus.addEventListener('click', () => { this.playSound('select'); this.stepGraphWindow(-1); });
+        this.el.graphWindowAll.addEventListener('click',   () => { this.playSound('select'); this.setGraphWindow(null); });
 
         // Statistics
         if (this.el.statsBtn) {
@@ -2191,6 +2204,7 @@ class BingoApp {
         const savedFilter = localStorage.getItem('bingoAvgFilter');
         this.avgFilter = (savedFilter && savedFilter !== '') ? parseInt(savedFilter, 10) : null;
         if (this.el.winOddsInput) this.el.winOddsInput.value = this.winOddsBlocks;
+        this.syncGraphWindowUI();
 
         // Load settings
         const savedSettings = localStorage.getItem('bingoSettings');
@@ -5220,8 +5234,19 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         this.el.graphModal.style.display = 'flex';
         document.body.style.overflow = 'hidden';
         this.syncGraphModeUI();
-        // wait for the modal to lay out, then draw at the settled size
-        requestAnimationFrame(() => requestAnimationFrame(() => this.drawGraph()));
+        this.syncGraphWindowUI();
+        this._drawGraphWhenReady();
+    }
+
+    // Draw only once the canvas actually has height — the modal animates in, so
+    // an eager draw can land on a zero-height canvas and poison its size.
+    _drawGraphWhenReady(tries = 0) {
+        const r = this.el.graphCanvas.getBoundingClientRect();
+        if (r.height < 20 && tries < 12) {
+            requestAnimationFrame(() => this._drawGraphWhenReady(tries + 1));
+            return;
+        }
+        this.drawGraph();
     }
 
     setGraphMode(mode) {
@@ -5238,6 +5263,53 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         this.el.graphModeBlokker.classList.toggle('active',  blocks);
         this.el.graphTitle.textContent = blocks ? 'Blokker i spill over tid' : 'Gjennomsnitt over tid';
     }
+    // ── Graph moving-average window ──────────────────
+    setGraphWindow(n) {
+        this.graphWindow = n;
+        this.scheduleWrite('bingoGraphWindow', () => this.graphWindow === null ? '' : String(this.graphWindow));
+        this.syncGraphWindowUI();
+        this.drawGraph();
+    }
+
+    stepGraphWindow(delta) {
+        const cur = this.graphWindow;
+        if (cur === null) { this.setGraphWindow(delta > 0 ? 2 : 1); return; }
+        this.setGraphWindow(Math.max(1, cur + delta));
+    }
+
+    handleGraphWindowInput() {
+        const val = this.el.graphWindowInput.value.trim();
+        if (val === '' || parseInt(val, 10) < 1) this.setGraphWindow(null);
+        else this.setGraphWindow(parseInt(val, 10));
+    }
+
+    syncGraphWindowUI() {
+        if (!this.el.graphWindowInput) return;
+        this.el.graphWindowInput.value = this.graphWindow === null ? '' : this.graphWindow;
+        this.el.graphWindowAll.classList.toggle('active', this.graphWindow === null);
+    }
+
+    // Trailing moving average over the last `win` non-null values (null = all
+    // so far, i.e. the expanding/cumulative average). Partial window at the
+    // start so the line has no gap.
+    _movingAvg(vals, win) {
+        return vals.map((_, i) => {
+            const from = win ? Math.max(0, i - win + 1) : 0;
+            let sum = 0, cnt = 0;
+            for (let j = from; j <= i; j++) {
+                if (vals[j] !== null && vals[j] !== undefined) { sum += vals[j]; cnt++; }
+            }
+            return cnt > 0 ? sum / cnt : null;
+        });
+    }
+
+    // Legend label for the smoothed line, given the active window.
+    _graphAvgLabel() {
+        return this.graphWindow === null
+            ? 'snitt (alle sesjoner)'
+            : 'snitt av siste ' + this.graphWindow;
+    }
+
 
     closeGraph() {
         this.playSound('cancel');
@@ -5349,24 +5421,17 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         const rekkeLabels = ['Rekke 1', 'Rekke 2', 'Rekke 3'];
         const colors      = ['#38a9ff', '#ffd23f', '#ff6b9d'];
 
-        // Rolling cumulative average per session
-        const avgLines = rekkeKeys.map(rk => {
-            let sum = 0, count = 0;
-            return sessions.map(s => {
-                const vals = s.games.map(g => g ? g[rk] : null)
-                    .filter(v => v !== null && v !== undefined && v !== '');
-                vals.forEach(v => { sum += Number(v); count++; });
-                return count > 0 ? Math.round((sum / count) * 10) / 10 : null;
-            });
-        });
-
-        // Individual session average (mean of that session's games for the rekke)
+        // Per-session average (mean of that session's games for the rekke) = dots
         const sessionLines = rekkeKeys.map(rk => sessions.map(s => {
             const vals = s.games.map(g => g ? g[rk] : null)
                 .filter(v => v !== null && v !== undefined && v !== '');
             if (vals.length === 0) return null;
             return Math.round((vals.reduce((a, b) => a + Number(b), 0) / vals.length) * 10) / 10;
         }));
+
+        // Smoothed line = trailing moving average over the chosen window
+        const avgLines = sessionLines.map(sl =>
+            this._movingAvg(sl, this.graphWindow).map(v => v === null ? null : Math.round(v * 10) / 10));
 
         const labels = sessions.map(s => {
             const d = new Date(s.date);
@@ -5430,7 +5495,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         });
         const typeInfo = document.createElement('div');
         typeInfo.style.cssText = 'width:100%;text-align:center;font-size:.78rem;color:rgba(255,255,255,.45);margin-top:6px';
-        typeInfo.textContent = 'Linje = rullende snitt   ·   prikker = enkeltsesjoner';
+        typeInfo.textContent = 'Linje = ' + this._graphAvgLabel() + '   ·   prikker = enkeltsesjoner';
         legend.appendChild(typeInfo);
     }
     // Blocks-in-play per session, over time. Self-contained: own y-scale, a
@@ -5440,11 +5505,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             const e = BlockEstimate.estimate(BlockEstimate.fromSession(s));
             return e ? e.blocks : null;
         });
-        let sum = 0, cnt = 0;
-        const roll = est.map(v => {
-            if (v !== null) { sum += v; cnt++; }
-            return cnt > 0 ? sum / cnt : null;
-        });
+        const roll = this._movingAvg(est, this.graphWindow);
         const labels = sessions.map(s => {
             const d = new Date(s.date);
             return d.getDate() + '.' + (d.getMonth() + 1) + '.' + String(d.getFullYear()).slice(2);
@@ -5522,7 +5583,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         legend.appendChild(item);
         const typeInfo = document.createElement('div');
         typeInfo.style.cssText = 'width:100%;text-align:center;font-size:.78rem;color:rgba(255,255,255,.45);margin-top:6px';
-        typeInfo.textContent = 'Linje = rullende snitt   \u00b7   prikker = enkeltsesjoner';
+        typeInfo.textContent = 'Linje = ' + this._graphAvgLabel() + '   ·   prikker = enkeltsesjoner';
         legend.appendChild(typeInfo);
     }
 
