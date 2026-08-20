@@ -5220,7 +5220,8 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         this.el.graphModal.style.display = 'flex';
         document.body.style.overflow = 'hidden';
         this.syncGraphModeUI();
-        setTimeout(() => this.drawGraph(), 50); // let canvas render first
+        // wait for the modal to lay out, then draw at the settled size
+        requestAnimationFrame(() => requestAnimationFrame(() => this.drawGraph()));
     }
 
     setGraphMode(mode) {
@@ -5242,6 +5243,82 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         this.playSound('cancel');
         this.el.graphModal.style.display = 'none';
         this.restoreBodyScroll();
+    }
+
+    // Rounded-rect path with a manual fallback for older canvas engines.
+    _roundRectPath(ctx, x, y, w, h, r) {
+        if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); return; }
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.arcTo(x + w, y,     x + w, y + h, r);
+        ctx.arcTo(x + w, y + h, x,     y + h, r);
+        ctx.arcTo(x,     y + h, x,     y,     r);
+        ctx.arcTo(x,     y,     x + w, y,     r);
+        ctx.closePath();
+    }
+
+    // A small value chip at the end of a line, so the latest figure is readable
+    // without eyeballing the axis. Returns the y actually used (nudged to avoid
+    // running off the top/bottom).
+    _graphEndChip(ctx, x, y, text, color, bounds) {
+        ctx.font = 'bold 12px Trebuchet MS';
+        const tw = ctx.measureText(text).width;
+        const px = 6, h = 18, w = tw + px * 2, bx = x + 9;
+        let by = y - h / 2;
+        if (bounds) by = Math.max(bounds.top, Math.min(bounds.bottom - h, by));
+        this._roundRectPath(ctx, bx, by, w, h, 5);
+        ctx.fillStyle = 'rgba(8,10,18,.9)'; ctx.fill();
+        ctx.lineWidth = 1; ctx.strokeStyle = color + '88'; ctx.stroke();
+        ctx.fillStyle = color; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+        ctx.fillText(text, bx + px, by + h / 2 + 0.5);
+        return by + h / 2;
+    }
+
+    // Shared axes/grid/labels for both graphs. Returns the plot geometry.
+    // o = { minV, maxV, labels, n, yFmt, yTitle }
+    _graphFrame(ctx, W, H, o) {
+        const pad = { top: 24, right: 70, bottom: 48, left: 58 };
+        const gW = W - pad.left - pad.right;
+        const gH = H - pad.top - pad.bottom;
+        const xPos = i => pad.left + (o.n < 2 ? gW / 2 : (i / (o.n - 1)) * gW);
+        const yPos = v => pad.top + gH - ((v - o.minV) / (o.maxV - o.minV)) * gH;
+        const STEPS = 5;
+
+        ctx.clearRect(0, 0, W, H);
+
+        // horizontal gridlines + y labels
+        ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+        for (let i = 0; i <= STEPS; i++) {
+            const y = pad.top + (gH / STEPS) * i;
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = i === STEPS ? 'rgba(255,255,255,.30)' : 'rgba(255,255,255,.11)';
+            ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + gW, y); ctx.stroke();
+            const val = o.maxV - ((o.maxV - o.minV) / STEPS) * i;
+            ctx.fillStyle = 'rgba(255,255,255,.62)'; ctx.font = '13px Trebuchet MS';
+            ctx.fillText(o.yFmt(val), pad.left - 9, y);
+        }
+        // left axis
+        ctx.strokeStyle = 'rgba(255,255,255,.30)'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(pad.left, pad.top); ctx.lineTo(pad.left, pad.top + gH); ctx.stroke();
+
+        // x labels
+        ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+        ctx.fillStyle = 'rgba(255,255,255,.6)'; ctx.font = '12px Trebuchet MS';
+        const step = Math.max(1, Math.ceil(o.n / 10));
+        o.labels.forEach((lbl, i) => {
+            if (i % step === 0 || i === o.n - 1) ctx.fillText(lbl, xPos(i), pad.top + gH + 22);
+        });
+
+        // rotated y-axis title
+        if (o.yTitle) {
+            ctx.save();
+            ctx.translate(15, pad.top + gH / 2); ctx.rotate(-Math.PI / 2);
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillStyle = 'rgba(255,255,255,.42)'; ctx.font = '12px Trebuchet MS';
+            ctx.fillText(o.yTitle, 0, 0);
+            ctx.restore();
+        }
+        return { pad, gW, gH, xPos, yPos, bounds: { top: pad.top, bottom: pad.top + gH } };
     }
 
     drawGraph() {
@@ -5270,7 +5347,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
 
         const rekkeKeys   = ['rekke1', 'rekke2', 'rekke3'];
         const rekkeLabels = ['Rekke 1', 'Rekke 2', 'Rekke 3'];
-        const colors      = ['#1e9fff', '#f0c030', '#ff4488'];
+        const colors      = ['#38a9ff', '#ffd23f', '#ff6b9d'];
 
         // Rolling cumulative average per session
         const avgLines = rekkeKeys.map(rk => {
@@ -5283,129 +5360,77 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             });
         });
 
-        // Individual session average (mean of all games that session for that rekke)
-        const sessionLines = rekkeKeys.map(rk => {
-            return sessions.map(s => {
-                const vals = s.games.map(g => g ? g[rk] : null)
-                    .filter(v => v !== null && v !== undefined && v !== '');
-                if (vals.length === 0) return null;
-                const avg = vals.reduce((a, b) => a + Number(b), 0) / vals.length;
-                return Math.round(avg * 10) / 10;
-            });
-        });
+        // Individual session average (mean of that session's games for the rekke)
+        const sessionLines = rekkeKeys.map(rk => sessions.map(s => {
+            const vals = s.games.map(g => g ? g[rk] : null)
+                .filter(v => v !== null && v !== undefined && v !== '');
+            if (vals.length === 0) return null;
+            return Math.round((vals.reduce((a, b) => a + Number(b), 0) / vals.length) * 10) / 10;
+        }));
 
-        // X axis labels
         const labels = sessions.map(s => {
             const d = new Date(s.date);
-            return `${d.getDate()}.${d.getMonth()+1}.${String(d.getFullYear()).slice(2)}`;
+            return `${d.getDate()}.${d.getMonth() + 1}.${String(d.getFullYear()).slice(2)}`;
         });
 
-        // Value range covers both data sets
         const allVals = [...avgLines.flat(), ...sessionLines.flat()].filter(v => v !== null);
-        const minV = Math.max(0, Math.min(...allVals) - 5);
-        const maxV = Math.max(...allVals) + 5;
+        const minV = Math.max(0, Math.floor((Math.min(...allVals) - 3) / 5) * 5);
+        const maxV = Math.ceil((Math.max(...allVals) + 3) / 5) * 5;
 
-        const pad = { top: 20, right: 20, bottom: 40, left: 36 };
-        const gW  = W - pad.left - pad.right;
-        const gH  = H - pad.top  - pad.bottom;
-
-        const xPos = i => pad.left + (sessions.length < 2 ? gW / 2 : (i / (sessions.length - 1)) * gW);
-        const yPos = v => pad.top + gH - ((v - minV) / (maxV - minV)) * gH;
-
-        ctx.clearRect(0, 0, W, H);
-
-        // Grid lines + y labels
-        ctx.lineWidth = 1;
-        for (let i = 0; i <= 4; i++) {
-            const y = pad.top + (gH / 4) * i;
-            ctx.strokeStyle = 'rgba(255,255,255,.08)';
-            ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
-            const val = Math.round(maxV - ((maxV - minV) / 4) * i);
-            ctx.fillStyle = 'rgba(255,255,255,.4)';
-            ctx.font = '11px Trebuchet MS';
-            ctx.textAlign = 'right';
-            ctx.fillText(val, pad.left - 4, y + 4);
-        }
-
-        // X axis labels
-        ctx.fillStyle = 'rgba(255,255,255,.4)';
-        ctx.font = '10px Trebuchet MS';
-        ctx.textAlign = 'center';
-        const step = Math.max(1, Math.ceil(sessions.length / 8));
-        labels.forEach((lbl, i) => {
-            if (i % step === 0 || i === sessions.length - 1)
-                ctx.fillText(lbl, xPos(i), H - pad.bottom + 16);
+        const F = this._graphFrame(ctx, W, H, {
+            minV, maxV, labels, n: sessions.length,
+            yFmt: v => Math.round(v), yTitle: 'Antall tall',
         });
+        const { xPos, yPos, bounds } = F;
 
-        // Draw session scatter dots + faint connecting line (per rekke)
+        // faint session-value dots (spread, without spaghetti lines)
         sessionLines.forEach((points, ri) => {
-            const col = colors[ri];
-            // Faint connecting line
-            ctx.strokeStyle = col + '44';
-            ctx.lineWidth   = 1;
-            ctx.setLineDash([4, 4]);
-            ctx.beginPath();
-            let started = false;
             points.forEach((v, i) => {
                 if (v === null) return;
-                if (!started) { ctx.moveTo(xPos(i), yPos(v)); started = true; }
-                else          { ctx.lineTo(xPos(i), yPos(v)); }
-            });
-            ctx.stroke();
-            ctx.setLineDash([]);
-
-            // Dots
-            points.forEach((v, i) => {
-                if (v === null) return;
-                ctx.beginPath();
-                ctx.arc(xPos(i), yPos(v), 4, 0, Math.PI * 2);
-                ctx.fillStyle   = col + 'aa';
-                ctx.strokeStyle = col;
-                ctx.lineWidth   = 1.5;
-                ctx.fill();
-                ctx.stroke();
+                ctx.beginPath(); ctx.arc(xPos(i), yPos(v), 2.6, 0, Math.PI * 2);
+                ctx.fillStyle = colors[ri] + '55'; ctx.fill();
             });
         });
 
-        // Draw rolling average lines on top (solid, thicker)
+        // rolling-average lines — the hero, with a soft glow and dots
         avgLines.forEach((points, ri) => {
             const col = colors[ri];
-            ctx.strokeStyle = col;
-            ctx.lineWidth   = 2.5;
-            ctx.lineJoin    = 'round';
+            ctx.save();
+            ctx.shadowColor = col; ctx.shadowBlur = 6;
+            ctx.strokeStyle = col; ctx.lineWidth = 3; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
             ctx.beginPath();
             let started = false;
             points.forEach((v, i) => {
                 if (v === null) return;
                 if (!started) { ctx.moveTo(xPos(i), yPos(v)); started = true; }
-                else          { ctx.lineTo(xPos(i), yPos(v)); }
+                else ctx.lineTo(xPos(i), yPos(v));
             });
             ctx.stroke();
+            ctx.restore();
 
-            // Small filled dots on avg line
             points.forEach((v, i) => {
                 if (v === null) return;
-                ctx.beginPath();
-                ctx.arc(xPos(i), yPos(v), 3, 0, Math.PI * 2);
-                ctx.fillStyle = col;
-                ctx.fill();
+                ctx.beginPath(); ctx.arc(xPos(i), yPos(v), 3.4, 0, Math.PI * 2);
+                ctx.fillStyle = col; ctx.fill();
             });
+
+            let li = -1;
+            for (let i = points.length - 1; i >= 0; i--) { if (points[i] !== null) { li = i; break; } }
+            if (li >= 0) this._graphEndChip(ctx, xPos(li), yPos(points[li]), String(Math.round(points[li])), col, bounds);
         });
 
-        // Legend: solid line = rolling avg, dashed = session values
+        // legend
         const legend = this.el.graphLegend;
         legend.innerHTML = '';
         rekkeLabels.forEach((lbl, i) => {
             const item = document.createElement('div');
             item.className = 'graph-legend-item';
-            item.innerHTML =
-                `<span class="graph-legend-dot" style="background:${colors[i]}"></span>${lbl}`;
+            item.innerHTML = `<span class="graph-legend-dot" style="background:${colors[i]}"></span>${lbl}`;
             legend.appendChild(item);
         });
-        // Add line type legend
         const typeInfo = document.createElement('div');
-        typeInfo.style.cssText = 'width:100%;text-align:center;font-size:.75rem;color:rgba(255,255,255,.3);margin-top:4px';
-        typeInfo.textContent = '— Rullende snitt  · · ·  Sesjonsverdi';
+        typeInfo.style.cssText = 'width:100%;text-align:center;font-size:.78rem;color:rgba(255,255,255,.45);margin-top:6px';
+        typeInfo.textContent = 'Linje = rullende snitt   ·   prikker = enkeltsesjoner';
         legend.appendChild(typeInfo);
     }
     // Blocks-in-play per session, over time. Self-contained: own y-scale, a
@@ -5415,7 +5440,6 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             const e = BlockEstimate.estimate(BlockEstimate.fromSession(s));
             return e ? e.blocks : null;
         });
-        // rolling mean of the estimates
         let sum = 0, cnt = 0;
         const roll = est.map(v => {
             if (v !== null) { sum += v; cnt++; }
@@ -5428,84 +5452,68 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
 
         const vals = est.filter(v => v !== null);
         if (!vals.length) {
-            ctx.fillStyle = 'rgba(255,255,255,.3)';
-            ctx.font = '16px Trebuchet MS';
-            ctx.textAlign = 'center';
-            ctx.fillText('Ingen blokkanslag enda', W / 2, H / 2);
+            ctx.clearRect(0, 0, W, H);
+            ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.font = '16px Trebuchet MS';
+            ctx.textAlign = 'center'; ctx.fillText('Ingen blokkanslag enda', W / 2, H / 2);
             return;
         }
-        const maxV = Math.max(...vals) * 1.15 + 1;
+        const maxV = Math.max(25, Math.ceil((Math.max(...vals) * 1.12) / 25) * 25);
         const minV = 0;
-
-        const pad = { top: 20, right: 20, bottom: 40, left: 44 };
-        const gW = W - pad.left - pad.right;
-        const gH = H - pad.top - pad.bottom;
-        const xPos = i => pad.left + (sessions.length < 2 ? gW / 2 : (i / (sessions.length - 1)) * gW);
-        const yPos = v => pad.top + gH - ((v - minV) / (maxV - minV)) * gH;
         const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent-color').trim() || '#F1B924';
 
-        ctx.clearRect(0, 0, W, H);
+        const F = this._graphFrame(ctx, W, H, {
+            minV, maxV, labels, n: sessions.length,
+            yFmt: v => BlockEstimate.format(v), yTitle: 'Blokker',
+        });
+        const { xPos, yPos, pad, gH, bounds } = F;
 
-        // Grid + y labels
-        ctx.lineWidth = 1;
-        for (let i = 0; i <= 4; i++) {
-            const y = pad.top + (gH / 4) * i;
-            ctx.strokeStyle = 'rgba(255,255,255,.08)';
-            ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
-            const val = Math.round(maxV - ((maxV - minV) / 4) * i);
-            ctx.fillStyle = 'rgba(255,255,255,.4)';
-            ctx.font = '11px Trebuchet MS';
-            ctx.textAlign = 'right';
-            ctx.fillText(BlockEstimate.format(val), pad.left - 4, y + 4);
+        // shaded area under the rolling line
+        const grad = ctx.createLinearGradient(0, pad.top, 0, pad.top + gH);
+        grad.addColorStop(0, accent + '3a'); grad.addColorStop(1, accent + '05');
+        let started = false, firstX = 0, lastX = 0;
+        ctx.beginPath();
+        roll.forEach((v, i) => {
+            if (v === null) return;
+            const x = xPos(i), y = yPos(v);
+            if (!started) { ctx.moveTo(x, y); firstX = x; started = true; } else ctx.lineTo(x, y);
+            lastX = x;
+        });
+        if (started) {
+            ctx.lineTo(lastX, pad.top + gH); ctx.lineTo(firstX, pad.top + gH); ctx.closePath();
+            ctx.fillStyle = grad; ctx.fill();
         }
 
-        // X labels
-        ctx.fillStyle = 'rgba(255,255,255,.4)';
-        ctx.font = '10px Trebuchet MS';
-        ctx.textAlign = 'center';
-        const step = Math.max(1, Math.ceil(sessions.length / 8));
-        labels.forEach((lbl, i) => {
-            if (i % step === 0 || i === sessions.length - 1)
-                ctx.fillText(lbl, xPos(i), H - pad.bottom + 16);
-        });
-
-        // Per-session faint line + dots
-        ctx.strokeStyle = accent + '44';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([4, 4]);
-        ctx.beginPath();
-        let started = false;
+        // faint per-session dots
         est.forEach((v, i) => {
             if (v === null) return;
-            if (!started) { ctx.moveTo(xPos(i), yPos(v)); started = true; }
-            else          { ctx.lineTo(xPos(i), yPos(v)); }
-        });
-        ctx.stroke();
-        ctx.setLineDash([]);
-        est.forEach((v, i) => {
-            if (v === null) return;
-            ctx.beginPath();
-            ctx.arc(xPos(i), yPos(v), 4, 0, Math.PI * 2);
-            ctx.fillStyle = accent + 'aa';
-            ctx.strokeStyle = accent;
-            ctx.lineWidth = 1.5;
-            ctx.fill(); ctx.stroke();
+            ctx.beginPath(); ctx.arc(xPos(i), yPos(v), 3, 0, Math.PI * 2);
+            ctx.fillStyle = accent + '66'; ctx.fill();
+            ctx.lineWidth = 1; ctx.strokeStyle = accent + 'aa'; ctx.stroke();
         });
 
-        // Rolling average, solid on top
-        ctx.strokeStyle = accent;
-        ctx.lineWidth = 2.5;
-        ctx.lineJoin = 'round';
+        // rolling-average line — hero, with glow and dots
+        ctx.save();
+        ctx.shadowColor = accent; ctx.shadowBlur = 7;
+        ctx.strokeStyle = accent; ctx.lineWidth = 3; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
         ctx.beginPath();
         started = false;
         roll.forEach((v, i) => {
             if (v === null) return;
-            if (!started) { ctx.moveTo(xPos(i), yPos(v)); started = true; }
-            else          { ctx.lineTo(xPos(i), yPos(v)); }
+            if (!started) { ctx.moveTo(xPos(i), yPos(v)); started = true; } else ctx.lineTo(xPos(i), yPos(v));
         });
         ctx.stroke();
+        ctx.restore();
+        roll.forEach((v, i) => {
+            if (v === null) return;
+            ctx.beginPath(); ctx.arc(xPos(i), yPos(v), 3.4, 0, Math.PI * 2);
+            ctx.fillStyle = accent; ctx.fill();
+        });
 
-        // Legend
+        let li = -1;
+        for (let i = roll.length - 1; i >= 0; i--) { if (roll[i] !== null) { li = i; break; } }
+        if (li >= 0) this._graphEndChip(ctx, xPos(li), yPos(roll[li]), BlockEstimate.format(roll[li]), accent, bounds);
+
+        // legend
         const legend = this.el.graphLegend;
         legend.innerHTML = '';
         const item = document.createElement('div');
@@ -5513,8 +5521,8 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         item.innerHTML = '<span class="graph-legend-dot" style="background:' + accent + '"></span>Blokker i spill';
         legend.appendChild(item);
         const typeInfo = document.createElement('div');
-        typeInfo.style.cssText = 'width:100%;text-align:center;font-size:.75rem;color:rgba(255,255,255,.3);margin-top:4px';
-        typeInfo.textContent = '\u2014 Rullende snitt  \u00b7 \u00b7 \u00b7  Sesjonsanslag';
+        typeInfo.style.cssText = 'width:100%;text-align:center;font-size:.78rem;color:rgba(255,255,255,.45);margin-top:6px';
+        typeInfo.textContent = 'Linje = rullende snitt   \u00b7   prikker = enkeltsesjoner';
         legend.appendChild(typeInfo);
     }
 
