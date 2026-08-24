@@ -2345,6 +2345,25 @@ body.fullscreen .page-layout {
     pointer-events:  auto;
 }
 
+/* Centre the Reset / Jackpot / Random group in the space between the "90"
+   ball and the right edge of the grid (horizontal layout only).
+
+   The row keeps all 10 flex cells so the vertical layout still lines this
+   column up with the others. In horizontal mode we pin "90" to one ball
+   width, collapse the padding spacers, and let auto margins split the
+   leftover space evenly on both sides of the button group. Because the gaps
+   sit as margins on the buttons themselves, the group stays centred whether
+   or not the Random button is showing. */
+body:not(.layout-vertical) .row1.last-row > .balls        { flex: 0 0 10%; }
+body:not(.layout-vertical) .row1.last-row > .balls.spacer { flex: 0 0 0; }
+body:not(.layout-vertical) .row1.last-row > #reset-btn-cell    { margin-left: auto; }
+body:not(.layout-vertical) .row1.last-row > #jackpot-btn-cell,
+body:not(.layout-vertical) .row1.last-row > #random-btn-cell   { margin-left: 10%; }
+body:not(.layout-vertical) .row1.last-row > #random-btn-cell   { margin-right: auto; }
+/* When Random is hidden, Jackpot becomes the last button and takes the
+   right-hand auto margin so the pair stays centred. */
+body:not(.layout-vertical) .row1.last-row.random-off > #jackpot-btn-cell { margin-right: auto; }
+
 /* Stop ball hover applying to the button cells */
 .grid-btn-cell:hover {
     transform: none !important;

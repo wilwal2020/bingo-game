@@ -1611,6 +1611,7 @@ class BingoApp {
             this.el.settingRandomBtn.addEventListener('change', () => {
                 this.settings.randomBtnEnabled = this.el.settingRandomBtn.checked;
                 this.el.randomBtnCell.style.display = this.settings.randomBtnEnabled ? '' : 'none';
+                this.el.randomBtnCell.closest('.row1')?.classList.toggle('random-off', !this.settings.randomBtnEnabled);
                 this.saveSettings();
             });
         }
@@ -2029,6 +2030,7 @@ class BingoApp {
             const enabled = s.randomBtnEnabled ?? true;
             this.el.settingRandomBtn.checked = enabled;
             this.el.randomBtnCell.style.display = enabled ? '' : 'none';
+            this.el.randomBtnCell.closest('.row1')?.classList.toggle('random-off', !enabled);
         }
 
         // BingoView highlight
