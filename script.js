@@ -483,6 +483,10 @@ class BingoApp {
             typingDelay: 5,
             typingOverwrite: false,
             typingOverwriteDelay: 10,
+            // Lockout after a number is called before a NEW one can be typed,
+            // in tenths of a second (10 = 1.0 s). Stops a stray keypad tap
+            // right after a two-digit entry from sneaking in a bogus call.
+            callSafetyDelay: 10,
             ballAnimStyle: 'spin',
             gridLayout: 'horizontal',
             volHover:   1,
@@ -777,6 +781,9 @@ class BingoApp {
             settingOverwriteDelayPlus:   document.getElementById('overwrite-delay-plus'),
             settingOverwriteDelayMinus:  document.getElementById('overwrite-delay-minus'),
             overwriteDelayRow:           document.getElementById('overwrite-delay-row'),
+            settingCallSafety:           document.getElementById('setting-call-safety'),
+            settingCallSafetyPlus:       document.getElementById('call-safety-plus'),
+            settingCallSafetyMinus:      document.getElementById('call-safety-minus'),
             settingBallAnim:             document.getElementById('setting-ball-anim'),
             settingGridLayout:           document.getElementById('setting-grid-layout'),
             statsRow:           document.querySelector('.stats-row'),
@@ -1561,6 +1568,23 @@ class BingoApp {
                 this.saveSettings();
             });
         }
+        if (this.el.settingCallSafetyPlus) {
+            const renderCallSafety = () => {
+                // 0 reads as "Av" (off); otherwise show the value in seconds.
+                const v = this.settings.callSafetyDelay ?? 10;
+                this.el.settingCallSafety.textContent = v === 0 ? 'Av' : (v / 10).toFixed(1);
+            };
+            this.el.settingCallSafetyPlus.addEventListener('click', () => {
+                this.settings.callSafetyDelay = Math.min(50, (this.settings.callSafetyDelay ?? 10) + 1);
+                renderCallSafety();
+                this.saveSettings();
+            });
+            this.el.settingCallSafetyMinus.addEventListener('click', () => {
+                this.settings.callSafetyDelay = Math.max(0, (this.settings.callSafetyDelay ?? 10) - 1);
+                renderCallSafety();
+                this.saveSettings();
+            });
+        }
         if (this.el.settingBallAnim) {
             this.el.settingBallAnim.addEventListener('change', () => {
                 this.settings.ballAnimStyle = this.el.settingBallAnim.value;
@@ -1965,6 +1989,10 @@ class BingoApp {
             this.el.settingTypingOverwrite.checked = s.typingOverwrite ?? false;
             this.el.settingOverwriteDelay.textContent = s.typingOverwriteDelay ?? 10;
             this.el.overwriteDelayRow.style.display = s.typingOverwrite ? '' : 'none';
+        }
+        if (this.el.settingCallSafety) {
+            const v = s.callSafetyDelay ?? 10;
+            this.el.settingCallSafety.textContent = v === 0 ? 'Av' : (v / 10).toFixed(1);
         }
         this.el.bigNumber.dataset.ballAnim = s.ballAnimStyle ?? 'spin';
         if (this.el.settingBallAnim) this.el.settingBallAnim.value = s.ballAnimStyle ?? 'spin';
@@ -4902,6 +4930,14 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
 
         // ── 0-9: typing buffer ─────────────────────────
         if (e.key >= '0' && e.key <= '9') {
+            // Safety lockout: for a short window after a number is called,
+            // ignore the START of a NEW number so a stray keypad tap right
+            // after a two-digit entry (hear "78", type 7-8, fumble a 9) can't
+            // sneak in a bogus call. Only a fresh number is held — a digit
+            // continuing a number already in the buffer always goes through,
+            // so two-digit entry is never interrupted.
+            if (this.typingBuffer.length === 0 && this._isCallLocked()) return;
+
             const overwrite = this.settings.typingOverwrite;
 
             if (overwrite && this.typingBuffer.length === 1) {
@@ -4946,6 +4982,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                             if (ball) {
                                 this.handleNormalClick(ball, numStr);
                                 this._lastOverwriteNum = num;
+                                this._lastCallTypedTs = Date.now();
                             }
                         }
                         // Whether or not first digit was already selected, keep buffer
@@ -4996,10 +5033,22 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             const numStr = String(num);
             if (!this.slot.selectedNumbers.includes(numStr)) {
                 const ball = this.el.ballMap.get(numStr);
-                if (ball) this.handleNormalClick(ball, numStr);
+                if (ball) {
+                    this.handleNormalClick(ball, numStr);
+                    // Arm the safety lockout so a stray keypad tap right after
+                    // this call is ignored (see keyboard handler / callSafetyDelay).
+                    this._lastCallTypedTs = Date.now();
+                }
             }
         }
         this.clearTypingBuffer();
+    }
+
+    // True while the post-call safety window is still running. 0 disables it.
+    _isCallLocked() {
+        const tenths = this.settings.callSafetyDelay ?? 0;
+        if (!tenths) return false;
+        return (Date.now() - (this._lastCallTypedTs || 0)) < tenths * 100;
     }
 
     clearTypingBuffer() {

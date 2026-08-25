@@ -4297,14 +4297,18 @@ option.user-sound {
    colored block with offset shadow, uppercase Barlow Condensed text. */
 .bv-watch-names {
     position: absolute;
+    /* Sit the label in the gutter ABOVE the ball, centred on the horizontal
+       gap between this number and the one above it — "in between the numbers"
+       rather than hanging out to one side. Pulled down by half its own height
+       so it straddles the gap and reads as belonging to the row of numbers. */
     bottom: 100%;
     left: 50%;
-    transform: translateX(-50%);
-    margin-bottom: 8px;
+    transform: translate(-50%, 50%);
+    margin-bottom: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 3px;
+    gap: 4px;
     pointer-events: none;
     z-index: 6;
     white-space: nowrap;
@@ -4313,25 +4317,28 @@ option.user-sound {
     background:     var(--bv-name-color, #fff);
     color:          #0c0d1a;
     font-family:    'Barlow Condensed', sans-serif;
-    font-size:      0.85rem;
+    /* Bigger so the name is readable from across the room. */
+    font-size:      1.3rem;
     font-weight:    700;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
-    padding:        2px 8px 1px;
-    border-radius:  3px;
-    max-width:      150px;
+    padding:        3px 11px 2px;
+    border-radius:  4px;
+    max-width:      190px;
     overflow:       hidden;
     text-overflow:  ellipsis;
     box-shadow:     2px 2px 0 rgba(0, 0, 0, 0.55);
-    line-height:    1.15;
+    line-height:    1.1;
 }
 /* Flip below the ball when the label would otherwise overflow off the
-   top edge of the screen (set dynamically by JS). */
+   top edge of the screen (set dynamically by JS). Straddles the gap under
+   the ball the same way the default straddles the gap above it. */
 .balls.bv-watch.bv-watch-flip .bv-watch-names {
     bottom: auto;
     top: 100%;
+    transform: translate(-50%, -50%);
     margin-bottom: 0;
-    margin-top: 8px;
+    margin-top: 0;
 }
 
 /* Phone-win notification stack — slides in from the top-right when a
