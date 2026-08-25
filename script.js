@@ -503,13 +503,17 @@ class BingoApp {
             blurEnabled: true,
             randomBtnEnabled: true,
             bvHighlightEnabled:    true,
+            // Highlighting always tracks the current rekke; the per-rekke
+            // selector was removed, so this stays fixed at 'current'.
             bvHighlightRekke:      'current',
-            bvHighlightThreshold:  2,
+            // The "maks manglende tall" stepper was removed — highlight only
+            // strips that are 1 number away from the row.
+            bvHighlightThreshold:  1,
             // Length of the phones' countdown ring, in seconds. The host owns
             // the pace; each phone decides for itself whether to show the ring.
-            bvCallTimerSeconds:    30,
+            bvCallTimerSeconds:    15,
             bvWinNotifyEnabled:    true,
-            bvWinAutoOpenWinModal: false,
+            bvWinAutoOpenWinModal: true,
             autoBackupDownload:    true,
             // Bottom block-bar: when true, chips are ordered by how many
             // numbers each block is missing (fewest = leftmost).
@@ -887,12 +891,6 @@ class BingoApp {
             unsavedCancel:       document.getElementById('unsaved-cancel'),
             // Over-average blink + next-game countdown
             bvHighlightEnabled:       document.getElementById('bv-highlight-enabled'),
-            bvHighlightRekke:         document.getElementById('bv-highlight-rekke'),
-            bvHighlightRekkeRow:      document.getElementById('bv-highlight-rekke-row'),
-            bvHighlightThresholdRow:  document.getElementById('bv-highlight-threshold-row'),
-            bvThresholdValue:         document.getElementById('bv-threshold-value'),
-            bvThresholdPlus:          document.getElementById('bv-threshold-plus'),
-            bvThresholdMinus:         document.getElementById('bv-threshold-minus'),
             bvCallTimerValue:         document.getElementById('bv-call-timer-value'),
             bvCallTimerPlus:          document.getElementById('bv-call-timer-plus'),
             bvCallTimerMinus:         document.getElementById('bv-call-timer-minus'),
@@ -1685,16 +1683,6 @@ class BingoApp {
         if (this.el.bvHighlightEnabled) {
             this.el.bvHighlightEnabled.addEventListener('change', () => {
                 this.settings.bvHighlightEnabled = this.el.bvHighlightEnabled.checked;
-                const on = this.settings.bvHighlightEnabled;
-                if (this.el.bvHighlightRekkeRow)      this.el.bvHighlightRekkeRow.style.display      = on ? '' : 'none';
-                if (this.el.bvHighlightThresholdRow)  this.el.bvHighlightThresholdRow.style.display  = on ? '' : 'none';
-                this.saveSettings();
-                try { this._bvUpdatePaperHighlights(); } catch(e) {}
-            });
-        }
-        if (this.el.bvHighlightRekke) {
-            this.el.bvHighlightRekke.addEventListener('change', () => {
-                this.settings.bvHighlightRekke = this.el.bvHighlightRekke.value;
                 this.saveSettings();
                 try { this._bvUpdatePaperHighlights(); } catch(e) {}
             });
@@ -1702,7 +1690,7 @@ class BingoApp {
         // BingoView call-countdown length. Pushed straight out so the phones'
         // rings retime without waiting for the next number.
         const bvBumpCallTimer = (delta) => {
-            const next = Math.min(300, Math.max(1, (this.settings.bvCallTimerSeconds ?? 30) + delta));
+            const next = Math.min(300, Math.max(1, (this.settings.bvCallTimerSeconds ?? 15) + delta));
             this.settings.bvCallTimerSeconds = next;
             if (this.el.bvCallTimerValue) this.el.bvCallTimerValue.textContent = next;
             this.saveSettings();
@@ -1713,22 +1701,6 @@ class BingoApp {
         }
         if (this.el.bvCallTimerMinus) {
             this.el.bvCallTimerMinus.addEventListener('click', () => bvBumpCallTimer(-1));
-        }
-        if (this.el.bvThresholdPlus) {
-            this.el.bvThresholdPlus.addEventListener('click', () => {
-                this.settings.bvHighlightThreshold = Math.min(9, (this.settings.bvHighlightThreshold ?? 2) + 1);
-                if (this.el.bvThresholdValue) this.el.bvThresholdValue.textContent = this.settings.bvHighlightThreshold;
-                this.saveSettings();
-                try { this._bvUpdatePaperHighlights(); } catch(e) {}
-            });
-        }
-        if (this.el.bvThresholdMinus) {
-            this.el.bvThresholdMinus.addEventListener('click', () => {
-                this.settings.bvHighlightThreshold = Math.max(1, (this.settings.bvHighlightThreshold ?? 2) - 1);
-                if (this.el.bvThresholdValue) this.el.bvThresholdValue.textContent = this.settings.bvHighlightThreshold;
-                this.saveSettings();
-                try { this._bvUpdatePaperHighlights(); } catch(e) {}
-            });
         }
         if (this.el.bvWinNotifyEnabled) {
             this.el.bvWinNotifyEnabled.addEventListener('change', () => {
@@ -2034,24 +2006,14 @@ class BingoApp {
         }
 
         // BingoView highlight
-        if (this.el.bvHighlightEnabled) {
-            const hlOn = s.bvHighlightEnabled ?? true;
-            this.el.bvHighlightEnabled.checked = hlOn;
-            if (this.el.bvHighlightRekkeRow)
-                this.el.bvHighlightRekkeRow.style.display = hlOn ? '' : 'none';
-            if (this.el.bvHighlightThresholdRow)
-                this.el.bvHighlightThresholdRow.style.display = hlOn ? '' : 'none';
-        }
-        if (this.el.bvHighlightRekke)
-            this.el.bvHighlightRekke.value = s.bvHighlightRekke || 'current';
-        if (this.el.bvThresholdValue)
-            this.el.bvThresholdValue.textContent = s.bvHighlightThreshold ?? 2;
+        if (this.el.bvHighlightEnabled)
+            this.el.bvHighlightEnabled.checked = s.bvHighlightEnabled ?? true;
         if (this.el.bvCallTimerValue)
-            this.el.bvCallTimerValue.textContent = s.bvCallTimerSeconds ?? 30;
+            this.el.bvCallTimerValue.textContent = s.bvCallTimerSeconds ?? 15;
         if (this.el.bvWinNotifyEnabled)
             this.el.bvWinNotifyEnabled.checked = s.bvWinNotifyEnabled ?? true;
         if (this.el.bvWinAutoOpen)
-            this.el.bvWinAutoOpen.checked = s.bvWinAutoOpenWinModal ?? false;
+            this.el.bvWinAutoOpen.checked = s.bvWinAutoOpenWinModal ?? true;
 
         // Next-game countdown
         if (this.el.settingNextGameCountdown) {
@@ -2213,6 +2175,10 @@ class BingoApp {
         if (savedSettings) {
             try { Object.assign(this.settings, JSON.parse(savedSettings)); } catch(e) {}
         }
+        // These two lost their controls in the BingoView modal, so a stale
+        // persisted value can no longer be corrected from the UI — pin them.
+        this.settings.bvHighlightRekke     = 'current';
+        this.settings.bvHighlightThreshold = 1;
         // Repair corrupt volume values. Old builds could persist NaN (JSON
         // null) from parseFloat on an empty slider, and a null/NaN volume
         // makes every sound of that type silently fail — gain ends up 0 or
@@ -7699,7 +7665,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             rekke: this.slot.currentRekke,
             // How long the phones' countdown ring should run. Whether to show
             // it at all is each phone's own choice.
-            callTimer: this.settings.bvCallTimerSeconds ?? 30,
+            callTimer: this.settings.bvCallTimerSeconds ?? 15,
             // Historical average ball count per rekke, so the phones can show
             // "typically N numbers" next to their own running count. These are
             // the same figures the avg boxes show — read off the slot
@@ -8189,7 +8155,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         const rekke = (this.settings.bvHighlightRekke === 'current' || !this.settings.bvHighlightRekke)
             ? (this.slot ? this.slot.currentRekke : 'Rekke1')
             : this.settings.bvHighlightRekke;
-        const threshold = this.settings.bvHighlightThreshold ?? 2;
+        const threshold = this.settings.bvHighlightThreshold ?? 1;
         const game  = this.currentTheme;
 
         // Aggregate: { number: [{phoneIdx, level, color, name}, ...] }

@@ -4221,12 +4221,42 @@ option.user-sound {
 .bv-strip-row.regular .bv-strip-nums { color: #ffc83d; }
 
 /* ── BingoView modal: highlight settings rows ────────────────── */
-.bv-settings-section {
+/* BingoView settings, collapsed into a dropdown so the modal opens tidy */
+.bv-settings-dropdown {
     margin-bottom: 16px;
-    padding: 6px 0;
     border-top:    1px solid rgba(255,255,255,.08);
     border-bottom: 1px solid rgba(255,255,255,.08);
 }
+.bv-settings-summary {
+    display:         flex;
+    align-items:     center;
+    justify-content: space-between;
+    cursor:          pointer;
+    list-style:      none;
+    padding:         10px 2px;
+    font-family:     'Barlow Condensed', sans-serif;
+    font-size:       0.9rem;
+    font-weight:     600;
+    letter-spacing:  0.06em;
+    color:           rgba(255,255,255,.7);
+    user-select:     none;
+}
+.bv-settings-summary::-webkit-details-marker { display: none; }
+.bv-settings-summary::after {
+    content:    '▾';
+    font-size:  0.8rem;
+    color:      rgba(255,255,255,.45);
+    transition: transform 0.2s ease;
+}
+.bv-settings-dropdown[open] .bv-settings-summary::after { transform: rotate(180deg); }
+.bv-settings-dropdown[open] .bv-settings-summary {
+    border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.bv-settings-section {
+    padding: 6px 0;
+}
+/* Belt-and-braces collapse — don't rely on the UA hiding the closed content */
+.bv-settings-dropdown:not([open]) .bv-settings-section { display: none; }
 .bv-settings-row {
     display:         flex;
     align-items:     center;

@@ -1230,57 +1230,43 @@
                 <button id="bv-apply-code" style="background:#2e6db4;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:0.8rem;cursor:pointer;white-space:nowrap;">Bruk</button>
             </div>
 
-            <!-- Highlight settings -->
-            <div class="bv-settings-section">
-                <div class="bv-settings-row">
-                    <div class="bv-settings-label">Vis markering i tallfeltet</div>
-                    <label class="settings-toggle">
-                        <input type="checkbox" id="bv-highlight-enabled" checked>
-                        <span class="settings-toggle-track"></span>
-                    </label>
-                </div>
-                <div class="bv-settings-row" id="bv-highlight-rekke-row">
-                    <div class="bv-settings-label">Markering for rekke</div>
-                    <select id="bv-highlight-rekke" class="session-input" style="width:120px;">
-                        <option value="current">Gjeldende</option>
-                        <option value="Rekke1">Rekke 1</option>
-                        <option value="Rekke2">Rekke 2</option>
-                        <option value="Rekke3">Rekke 3</option>
-                    </select>
-                </div>
-                <div class="bv-settings-row" id="bv-highlight-threshold-row">
-                    <div class="bv-settings-label">Maks manglende tall</div>
-                    <div class="settings-stepper">
-                        <button type="button" class="rekke-adjust-btn" id="bv-threshold-minus">−</button>
-                        <span class="settings-stepper-value" id="bv-threshold-value">2</span>
-                        <button type="button" class="rekke-adjust-btn" id="bv-threshold-plus">+</button>
+            <!-- Highlight settings — tucked into a dropdown so the modal opens tidy -->
+            <details class="bv-settings-dropdown">
+                <summary class="bv-settings-summary">Innstillinger</summary>
+                <div class="bv-settings-section">
+                    <div class="bv-settings-row">
+                        <div class="bv-settings-label">Vis markering i tallfeltet</div>
+                        <label class="settings-toggle">
+                            <input type="checkbox" id="bv-highlight-enabled" checked>
+                            <span class="settings-toggle-track"></span>
+                        </label>
+                    </div>
+                    <div class="bv-settings-row" id="bv-call-timer-row">
+                        <div class="bv-settings-label">Sekunder per tall
+                            <span style="display:block;font-size:0.72rem;color:#888;margin-top:2px;">Lengden på nedtellingen — hver telefon slår den på selv</span>
+                        </div>
+                        <div class="settings-stepper">
+                            <button type="button" class="rekke-adjust-btn" id="bv-call-timer-minus">−</button>
+                            <span class="settings-stepper-value" id="bv-call-timer-value">15</span>
+                            <button type="button" class="rekke-adjust-btn" id="bv-call-timer-plus">+</button>
+                        </div>
+                    </div>
+                    <div class="bv-settings-row">
+                        <div class="bv-settings-label">Vis varsel når telefon vinner</div>
+                        <label class="settings-toggle">
+                            <input type="checkbox" id="bv-win-notify-enabled" checked>
+                            <span class="settings-toggle-track"></span>
+                        </label>
+                    </div>
+                    <div class="bv-settings-row">
+                        <div class="bv-settings-label">Åpne &laquo;Logg vinner&raquo; automatisk</div>
+                        <label class="settings-toggle">
+                            <input type="checkbox" id="bv-win-auto-open" checked>
+                            <span class="settings-toggle-track"></span>
+                        </label>
                     </div>
                 </div>
-                <div class="bv-settings-row" id="bv-call-timer-row">
-                    <div class="bv-settings-label">Sekunder per tall
-                        <span style="display:block;font-size:0.72rem;color:#888;margin-top:2px;">Lengden på nedtellingen — hver telefon slår den på selv</span>
-                    </div>
-                    <div class="settings-stepper">
-                        <button type="button" class="rekke-adjust-btn" id="bv-call-timer-minus">−</button>
-                        <span class="settings-stepper-value" id="bv-call-timer-value">30</span>
-                        <button type="button" class="rekke-adjust-btn" id="bv-call-timer-plus">+</button>
-                    </div>
-                </div>
-                <div class="bv-settings-row">
-                    <div class="bv-settings-label">Vis varsel når telefon vinner</div>
-                    <label class="settings-toggle">
-                        <input type="checkbox" id="bv-win-notify-enabled" checked>
-                        <span class="settings-toggle-track"></span>
-                    </label>
-                </div>
-                <div class="bv-settings-row">
-                    <div class="bv-settings-label">Åpne &laquo;Logg vinner&raquo; automatisk</div>
-                    <label class="settings-toggle">
-                        <input type="checkbox" id="bv-win-auto-open">
-                        <span class="settings-toggle-track"></span>
-                    </label>
-                </div>
-            </div>
+            </details>
 
             <!-- Connected phones with their close-to-winning strips -->
             <div class="bv-phones-section" id="bv-phones-section" style="display:none">
