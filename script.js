@@ -518,6 +518,9 @@ class BingoApp {
             bvCallTimerSeconds:    15,
             bvWinNotifyEnabled:    true,
             bvWinAutoOpenWinModal: true,
+            // Play a chime the moment a phone drops to a single number left.
+            bvOneAwaySoundEnabled: true,
+            volOneAway:            1,
             autoBackupDownload:    true,
             // Bottom block-bar: when true, chips are ordered by how many
             // numbers each block is missing (fewest = leftmost).
@@ -902,6 +905,7 @@ class BingoApp {
             bvCallTimerPlus:          document.getElementById('bv-call-timer-plus'),
             bvCallTimerMinus:         document.getElementById('bv-call-timer-minus'),
             bvWinNotifyEnabled:       document.getElementById('bv-win-notify-enabled'),
+            bvOneAwaySoundEnabled:    document.getElementById('bv-oneaway-sound-enabled'),
             bvWinModal:               document.getElementById('bv-win-modal'),
             bvWinAutoOpen:            document.getElementById('bv-win-auto-open'),
             settingOverAverageBlink:    document.getElementById('setting-over-average-blink'),
@@ -1733,6 +1737,14 @@ class BingoApp {
                 if (!this.settings.bvWinNotifyEnabled) this._bvClearWinNotices();
             });
         }
+        if (this.el.bvOneAwaySoundEnabled) {
+            this.el.bvOneAwaySoundEnabled.addEventListener('change', () => {
+                this.settings.bvOneAwaySoundEnabled = this.el.bvOneAwaySoundEnabled.checked;
+                this.saveSettings();
+                // Preview the chime when the caller flips it on.
+                if (this.settings.bvOneAwaySoundEnabled) this.playSound('one-away');
+            });
+        }
         if (this.el.bvWinAutoOpen) {
             this.el.bvWinAutoOpen.addEventListener('change', () => {
                 this.settings.bvWinAutoOpenWinModal = this.el.bvWinAutoOpen.checked;
@@ -2040,6 +2052,8 @@ class BingoApp {
             this.el.bvCallTimerValue.textContent = s.bvCallTimerSeconds ?? 15;
         if (this.el.bvWinNotifyEnabled)
             this.el.bvWinNotifyEnabled.checked = s.bvWinNotifyEnabled ?? true;
+        if (this.el.bvOneAwaySoundEnabled)
+            this.el.bvOneAwaySoundEnabled.checked = s.bvOneAwaySoundEnabled ?? true;
         if (this.el.bvWinAutoOpen)
             this.el.bvWinAutoOpen.checked = s.bvWinAutoOpenWinModal ?? true;
 
@@ -6884,6 +6898,20 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                 o.frequency.exponentialRampToValueAtTime(340, n+0.3);
                 g.gain.setValueAtTime(0, n); g.gain.linearRampToValueAtTime(0.25, n+0.02); g.gain.exponentialRampToValueAtTime(0.001, n+0.4);
                 o.connect(g); g.connect(md); o.start(n); o.stop(n+0.4); }
+
+            } else if (type === 'one-away') {
+                // A phone just dropped to a single number left — a bright,
+                // quick two-note "ping". Kept short and pitched well above the
+                // call/win chimes so it reads as its own distinct event.
+                const md = MD(s.volOneAway ?? 1);
+                [[988, 0], [1319, 0.11]].forEach(([freq, delay]) => {
+                    const o = osc('triangle', freq); const g = gn();
+                    const o2 = osc('sine', freq * 2); const g2 = gn();
+                    g.gain.setValueAtTime(0, n+delay); g.gain.linearRampToValueAtTime(0.22, n+delay+0.008); g.gain.exponentialRampToValueAtTime(0.001, n+delay+0.5);
+                    g2.gain.setValueAtTime(0, n+delay); g2.gain.linearRampToValueAtTime(0.05, n+delay+0.008); g2.gain.exponentialRampToValueAtTime(0.001, n+delay+0.3);
+                    o.connect(g); g.connect(md); o2.connect(g2); g2.connect(md);
+                    o.start(n+delay); o.stop(n+delay+0.5); o2.start(n+delay); o2.stop(n+delay+0.3);
+                });
             }
         } catch(e) {}
     }
@@ -8330,6 +8358,10 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         // generate alerts.
         this._bvProcessWinNotifications(phones, calledSet, rekke, game);
 
+        // One-away chime — fires once as a strip newly drops to a single
+        // number left, using the same close-info the ball rings are built from.
+        this._bvProcessOneAwaySound(phones, calledSet, rekke, threshold, game, highlightOn);
+
         // Cache items so the sort toggle can re-render without a new snapshot,
         // then paint the always-visible bottom block-bar.
         this._bvBlockBarItems = blockBarItems;
@@ -8546,6 +8578,35 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                 try { this.openWinnerModal(); } catch (e) {}
             }
         }
+    }
+
+    // Called from _bvUpdatePaperHighlights. Diffs the set of strips that are
+    // exactly one number from a win (level 'strong') against the previous run
+    // and plays a single chime when any new one appears. Keyed per
+    // (phoneId, game, rekke, stripId) so it fires once per strip as it crosses
+    // the line, not every render. The first run only seeds the set (no sound),
+    // so opening BingoView on an already-close board stays quiet.
+    _bvProcessOneAwaySound(phones, calledSet, rekke, threshold, game, highlightOn) {
+        const currentKeys = new Set();
+        if (highlightOn) {
+            phones.forEach(phone => {
+                const strips = (phone.papers || {})[game];
+                if (!Array.isArray(strips)) return;
+                strips.forEach(strip => {
+                    const infos = this._bvStripCloseInfos(strip, calledSet, rekke, threshold);
+                    if (infos.some(info => info.level === 'strong')) {
+                        currentKeys.add(`${phone.id}|${game}|${rekke}|${strip.id}`);
+                    }
+                });
+            });
+        }
+        const prev = this._bvOneAwayKeysPrev;
+        this._bvOneAwayKeysPrev = currentKeys;
+        if (!prev) return; // first run: seed only, never chime on load
+        if (this.settings.bvOneAwaySoundEnabled === false) return;
+        let isNew = false;
+        currentKeys.forEach(k => { if (!prev.has(k)) isNew = true; });
+        if (isNew) this.playSound('one-away');
     }
 
     // Accepts either a single win object or an array of wins. When more
