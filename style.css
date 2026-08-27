@@ -4275,6 +4275,9 @@ option.user-sound {
 /* ── Ball grid: highlights for balls phones still need to win ── */
 .balls.bv-watch {
     position: relative;
+    /* Circle diameter — shared by the ring, the burst and the name-plate
+       offset so they stay locked together if the size ever changes. */
+    --bv-circle-d: 1.55em;
 }
 /* A static ring drawn AROUND the number (not the whole cell). Sized in em so
    it scales with the ball font and always renders as a true circle centred on
@@ -4288,8 +4291,8 @@ option.user-sound {
     position:       absolute;
     top:            50%;
     left:           50%;
-    width:          1.55em;
-    height:         1.55em;
+    width:          var(--bv-circle-d);
+    height:         var(--bv-circle-d);
     transform:      translate(-50%, -50%);
     border-radius:  50%;
     pointer-events: none;
@@ -4301,13 +4304,13 @@ option.user-sound {
    colored block with offset shadow, uppercase Barlow Condensed text. */
 .bv-watch-names {
     position: absolute;
-    /* Sit the label in the gutter ABOVE the ball, centred on the horizontal
-       gap between this number and the one above it — "in between the numbers"
-       rather than hanging out to one side. Pulled down by half its own height
-       so it straddles the gap and reads as belonging to the row of numbers. */
-    bottom: 100%;
+    /* Attach the plate directly to the TOP of the circle instead of floating
+       above the cell: anchor its bottom edge at the ball centre, then lift it
+       by the circle's radius so it butts onto the ring (a 3px overlap closes
+       any sub-pixel gap, so plate + circle read as one connected unit). */
+    bottom: 50%;
     left: 50%;
-    transform: translate(-50%, 50%);
+    transform: translate(-50%, calc(-1 * var(--bv-circle-d) / 2 + 3px));
     margin-bottom: 0;
     display: flex;
     flex-direction: column;
@@ -4334,15 +4337,73 @@ option.user-sound {
     box-shadow:     2px 2px 0 rgba(0, 0, 0, 0.55);
     line-height:    1.1;
 }
-/* Flip below the ball when the label would otherwise overflow off the
-   top edge of the screen (set dynamically by JS). Straddles the gap under
-   the ball the same way the default straddles the gap above it. */
+/* Flip below the ball when the label would otherwise overflow off the top
+   edge of the screen (set dynamically by JS). Attaches its TOP edge to the
+   BOTTOM of the circle, the mirror of the default above-the-ball attachment. */
 .balls.bv-watch.bv-watch-flip .bv-watch-names {
     bottom: auto;
-    top: 100%;
-    transform: translate(-50%, -50%);
+    top: 50%;
+    transform: translate(-50%, calc(var(--bv-circle-d) / 2 - 3px));
     margin-bottom: 0;
     margin-top: 0;
+}
+
+/* ── Flashy one-shot entrance when a ball FIRST becomes one-away ──
+   Added by JS (class bv-watch-new + an appended .bv-burst) only for newly
+   appearing circles, so it fires once as it crosses the line — never on a
+   plain re-render. Ends on the circle's normal resting state, so if a rapid
+   re-render cuts it short the ball simply settles instead of glitching. */
+.balls.bv-watch-new::before {
+    animation: bvCirclePop 0.45s cubic-bezier(0.2, 1.5, 0.45, 1) both;
+}
+@keyframes bvCirclePop {
+    0%   { transform: translate(-50%, -50%) scale(0.3); opacity: 0; }
+    55%  { opacity: 1; }
+    70%  { transform: translate(-50%, -50%) scale(1.18); }
+    100% { transform: translate(-50%, -50%) scale(1);    opacity: 1; }
+}
+
+/* Radiating "ping" shockwave — two hollow, glowing rings fanning outward so
+   the number underneath stays readable. Coloured to the player's ring. */
+.bv-burst {
+    position:       absolute;
+    top:            50%;
+    left:           50%;
+    width:          var(--bv-circle-d);
+    height:         var(--bv-circle-d);
+    border-radius:  50%;
+    border:         3px solid var(--bv-burst-color, var(--accent-color));
+    box-shadow:     0 0 16px var(--bv-burst-color, var(--accent-color));
+    pointer-events: none;
+    z-index:        4;
+    opacity:        0;
+    animation:      bvBurst 0.6s ease-out both;
+}
+.bv-burst::after {
+    content:       '';
+    position:      absolute;
+    inset:         0;
+    border-radius: 50%;
+    border:        2px solid var(--bv-burst-color, var(--accent-color));
+    animation:     bvBurstRing 0.6s ease-out 0.14s both;
+}
+@keyframes bvBurst {
+    0%   { transform: translate(-50%, -50%) scale(0.9); opacity: 0.95; }
+    100% { transform: translate(-50%, -50%) scale(2.2); opacity: 0; }
+}
+@keyframes bvBurstRing {
+    0%   { transform: scale(0.9); opacity: 0.8; }
+    100% { transform: scale(2.7); opacity: 0; }
+}
+
+/* Name plate pops in alongside the circle (only on first appearance). */
+.bv-names-new .bv-watch-name {
+    animation: bvNamePop 0.42s cubic-bezier(0.2, 1.5, 0.45, 1) both;
+}
+@keyframes bvNamePop {
+    0%   { transform: scale(0.4); opacity: 0; }
+    70%  { transform: scale(1.08); }
+    100% { transform: scale(1);    opacity: 1; }
 }
 
 /* Phone-win notification stack — slides in from the top-right when a

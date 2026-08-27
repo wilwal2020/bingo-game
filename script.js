@@ -8263,9 +8263,9 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         // Clear previous styling on every ball
         const ballMap = this._bvBallMap();
         Object.values(ballMap).forEach(el => {
-            el.classList.remove('bv-watch', 'bv-pulse', 'bv-watch-flip');
+            el.classList.remove('bv-watch', 'bv-pulse', 'bv-watch-flip', 'bv-watch-new');
             el.style.removeProperty('--bv-rings');
-            // Remove old name labels
+            // Remove old name labels (leave any .bv-burst to self-remove)
             const oldLabel = el.querySelector('.bv-watch-names');
             if (oldLabel) oldLabel.remove();
         });
@@ -8356,11 +8356,20 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             });
         });
 
+        // Balls that carried a circle on the previous render — used to fire the
+        // flashy entrance animation ONLY on newly-appearing circles, not on
+        // every re-render. Undefined on the very first pass = seed silently
+        // (opening BingoView on an already-close board doesn't flash).
+        const prevWatched = this._bvWatchedNumsPrev;
+        const seeding     = !prevWatched;
+        const nowWatched  = new Set();
+
         // Apply ball highlights
         Object.entries(byBall).forEach(([numStr, entries]) => {
             const num = Number(numStr);
             const ball = ballMap[num];
             if (!ball) return;
+            nowWatched.add(num);
             // Stack rings outward as solid 3px bands — one per phone that
             // needs this ball. Crisper/chunkier than the old 2px to match the
             // site's flat retro weight; see .balls.bv-watch::before.
@@ -8373,6 +8382,18 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                 ball.classList.add('bv-pulse');
             }
 
+            // Did this circle just appear? Fire the one-shot flashy entrance:
+            // the circle pops in and a radiating "ping" burst fans out.
+            const isNewWatch = !seeding && !prevWatched.has(num);
+            if (isNewWatch) {
+                ball.classList.add('bv-watch-new');
+                const burst = document.createElement('span');
+                burst.className = 'bv-burst';
+                burst.style.setProperty('--bv-burst-color', entries[0].color);
+                ball.appendChild(burst);
+                setTimeout(() => burst.remove(), 750);
+            }
+
             // Add name label(s) beside the ball — dedupe per phone (a phone can
             // appear multiple times if multiple strips need this same number).
             const seen = new Set();
@@ -8381,7 +8402,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                 seen.add(e.phoneIdx); return true;
             });
             const label = document.createElement('div');
-            label.className = 'bv-watch-names';
+            label.className = 'bv-watch-names' + (isNewWatch ? ' bv-names-new' : '');
             uniqueEntries.forEach(e => {
                 const tag = document.createElement('span');
                 tag.className = 'bv-watch-name';
@@ -8391,6 +8412,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             });
             ball.appendChild(label);
         });
+        this._bvWatchedNumsPrev = nowWatched;
 
         // After labels render, flip below the ball any that would overflow
         // off the top edge of the viewport.
