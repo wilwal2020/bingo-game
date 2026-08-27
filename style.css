@@ -4352,9 +4352,9 @@ option.user-sound {
    The sequence, fired by JS only for newly appearing circles (never on a
    plain re-render, and never on the first seeding pass):
 
-     0 → 400ms   a big square covering the whole number field collapses in on
-                 the ball, its corners rounding off as it goes (.bv-slam —
-                 driven from JS so it can start at the grid's real bounds)
+     0 → 400ms   a big circle covering the whole number field collapses in on
+                 the ball (.bv-slam — driven from JS so it can start at the
+                 grid's real bounds and land exactly on the ring)
      ~400ms      IMPACT: the ring lands hard, squashing before it settles,
                  and a shockwave fans back out (.bv-burst)
      ~460ms      the name plate pops out of the circle and into place
@@ -4362,7 +4362,7 @@ option.user-sound {
    Every step ends on the element's normal resting state, so if a rapid
    re-render cuts the sequence short the ball simply settles. */
 
-/* The collapsing square. Fixed + JS-sized so it can start from the real
+/* The collapsing circle. Fixed + JS-sized so it can start from the real
    .ball-grid bounds and land exactly on the ring; see _bvPlaySlamIn. */
 .bv-slam {
     position:       fixed;
@@ -4374,7 +4374,7 @@ option.user-sound {
     z-index:        120;   /* above the grid and block bar, below every modal */
 }
 
-/* The ring stays hidden until the square lands on it, then punches in with a
+/* The ring stays hidden until the circle lands on it, then punches in with a
    squash-and-settle so the collapse reads as having real force. */
 .balls.bv-watch-new::before {
     animation: bvCircleImpact 0.5s cubic-bezier(0.2, 1.5, 0.45, 1) 0.38s both;

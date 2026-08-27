@@ -8576,11 +8576,11 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         });
     }
 
-    // Opening beat of the one-away entrance: a square covering the whole
-    // number field collapses in on the ball and slams onto its ring, corners
-    // rounding off into a circle on the way down. Driven here rather than in
-    // CSS so it can start from the grid's real on-screen bounds and land
-    // exactly on the ring, whatever the layout or ball size. Self-removing.
+    // Opening beat of the one-away entrance: a big circle covering the whole
+    // number field collapses in on the ball and slams onto its ring. Driven
+    // here rather than in CSS so it can start from the grid's real on-screen
+    // bounds and land exactly on the ring, whatever the layout or ball size.
+    // Self-removing.
     _bvPlaySlamIn(ball, color) {
         try {
             const grid = document.querySelector('.ball-grid');
@@ -8594,9 +8594,10 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             const d  = 1.55 * fs;
             const cx = r.left + r.width  / 2;
             const cy = r.top  + r.height / 2;
-            // Opening square: big enough to cover the number field, centred on
-            // it. Square by side = the field's longer edge, so it always does.
-            const side = Math.max(g.width, g.height);
+            // Opening circle: centred on the number field and wide enough to
+            // cover it — a circle only covers a rectangle once its diameter
+            // reaches that rectangle's diagonal.
+            const side = Math.hypot(g.width, g.height);
             const sx = g.left + g.width  / 2 - side / 2;
             const sy = g.top  + g.height / 2 - side / 2;
             const el = document.createElement('div');
@@ -8606,7 +8607,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             const anim = el.animate([
                 { left: sx + 'px', top: sy + 'px',
                   width: side + 'px', height: side + 'px',
-                  borderRadius: '10px', borderWidth: '6px', opacity: 0 },
+                  borderRadius: '50%', borderWidth: '6px', opacity: 0 },
                 { opacity: 1, offset: 0.15 },
                 { left: (cx - d / 2) + 'px', top: (cy - d / 2) + 'px',
                   width: d + 'px', height: d + 'px',
