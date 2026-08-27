@@ -1381,6 +1381,14 @@ class BingoApp {
             this.saveSettings();
         });
 
+        // Warm up the speech-synthesis voice list (used by the one-away "Tale"
+        // announcement). Voices load async; re-resolve the cached pick whenever
+        // the list changes so a Norwegian voice is used as soon as it's ready.
+        if ('speechSynthesis' in window) {
+            try { window.speechSynthesis.getVoices(); } catch (e) {}
+            window.speechSynthesis.onvoiceschanged = () => { this._ttsVoice = undefined; };
+        }
+
         // Fullscreen
         this.el.fullscreenBtn.addEventListener('click', () => { this.playSound('select'); this.toggleFullscreen(); });
         document.addEventListener('fullscreenchange',   () => this.onFullscreenChange());
@@ -1547,6 +1555,13 @@ class BingoApp {
         bindVol(this.el.volOvertime,    'volOvertime',    'overtime');
         bindVol(this.el.volFirstRekke,  'volFirstRekke',  'first-rekke');
         bindVol(this.el.volOneAway,     'volOneAway',     'one-away');
+        // Preview the spoken name when "Tale (navn)" is chosen (bindSoundStyle
+        // already previews the ping; this adds the voice, "chime then name").
+        if (this.el.settingOneAwayStyle) {
+            this.el.settingOneAwayStyle.addEventListener('change', () => {
+                if (this.el.settingOneAwayStyle.value === 'speech') this._speakOneAway(['Kari']);
+            });
+        }
         if (this.el.settingTypingDelayPlus) {
             this.el.settingTypingDelayPlus.addEventListener('click', () => {
                 this.settings.typingDelay = Math.min(30, (this.settings.typingDelay ?? 8) + 1);
@@ -8590,14 +8605,22 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
     // so opening BingoView on an already-close board stays quiet.
     _bvProcessOneAwaySound(phones, calledSet, rekke, threshold, game, highlightOn) {
         const currentKeys = new Set();
+        // Map each one-away strip key to the player's display name, so a newly
+        // one-away key can be announced by name (Tale mode).
+        const keyName = new Map();
         if (highlightOn) {
-            phones.forEach(phone => {
+            phones.forEach((phone, idx) => {
                 const strips = (phone.papers || {})[game];
                 if (!Array.isArray(strips)) return;
+                const rawName = (phone.userName || '').trim();
+                const displayName = rawName.replace(/\s*\(Blokk\s*\d+\)\s*$/i, '')
+                                  || `Telefon ${idx + 1}`;
                 strips.forEach(strip => {
                     const infos = this._bvStripCloseInfos(strip, calledSet, rekke, threshold);
                     if (infos.some(info => info.level === 'strong')) {
-                        currentKeys.add(`${phone.id}|${game}|${rekke}|${strip.id}`);
+                        const key = `${phone.id}|${game}|${rekke}|${strip.id}`;
+                        currentKeys.add(key);
+                        keyName.set(key, displayName);
                     }
                 });
             });
@@ -8605,20 +8628,72 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         const prev = this._bvOneAwayKeysPrev;
         this._bvOneAwayKeysPrev = currentKeys;
         if (!prev) return; // first run: seed only, never chime on load
-        let isNew = false;
-        currentKeys.forEach(k => { if (!prev.has(k)) isNew = true; });
-        if (!isNew) return;
-        // Only chime — and only suppress the call blip — when the sound will
-        // actually be heard: master sound on, this effect not set to 'off',
-        // and not individually muted. Otherwise the call sound plays as normal.
+        // Names of players who just crossed to one away (deduped, in order).
+        const newNames = [];
+        const seenNames = new Set();
+        currentKeys.forEach(k => {
+            if (prev.has(k)) return;
+            const nm = keyName.get(k);
+            if (nm && !seenNames.has(nm)) { seenNames.add(nm); newNames.push(nm); }
+        });
+        if (!newNames.length) return;
+        // Only chime/speak — and only suppress the call blip — when the sound
+        // will actually be heard: master sound on, this effect not set to
+        // 'off', and not individually muted. Otherwise the call plays as normal.
         const audible = this.settings.soundEnabled
             && this.settings.oneAwayStyle !== 'off'
             && !(this.settings.mutedSounds && this.settings.mutedSounds['one-away']);
         if (!audible) return;
         this.playSound('one-away');
+        // In Tale mode, follow the ping with the spoken name(s).
+        if (this.settings.oneAwayStyle === 'speech') this._speakOneAway(newNames);
         // Let the just-fired call know it dropped someone to one away, so it
         // can skip the normal call blip and let this chime stand alone.
         this._bvOneAwayJustChimed = true;
+    }
+
+    // Speak "<name> mangler ett tall" via the browser's built-in speech
+    // synthesis — no external model, works offline. Prefers a Norwegian voice
+    // when the machine has one installed, else the default. Delayed briefly so
+    // it lands just AFTER the one-away ping ("chime, then name").
+    _speakOneAway(names) {
+        try {
+            if (!names || !names.length) return;
+            if (!('speechSynthesis' in window)) return;
+            // Respect the same gates as the chime.
+            if (!this.settings.soundEnabled) return;
+            if (this.settings.oneAwayStyle !== 'speech') return;
+            if (this.settings.mutedSounds && this.settings.mutedSounds['one-away']) return;
+            // Join multiple simultaneous names naturally: "A", "A og B",
+            // "A, B og C" — a rare case, but reads cleanly when it happens.
+            let who;
+            if (names.length === 1) who = names[0];
+            else who = names.slice(0, -1).join(', ') + ' og ' + names[names.length - 1];
+            const vol = this.settings.volOneAway;
+            window.setTimeout(() => {
+                try {
+                    const u = new SpeechSynthesisUtterance(`${who} mangler ett tall`);
+                    u.lang = 'nb-NO';
+                    const v = this._getNorwegianVoice();
+                    if (v) u.voice = v;
+                    u.volume = Number.isFinite(vol) ? Math.min(1, Math.max(0, vol)) : 1;
+                    window.speechSynthesis.speak(u);
+                } catch (e) {}
+            }, 320);
+        } catch (e) {}
+    }
+
+    // Cache and return a Norwegian speech-synthesis voice (nb/no), or null to
+    // let the engine use its default. Voice lists load async, so this may
+    // return null on the first calls and a real voice once populated.
+    _getNorwegianVoice() {
+        if (this._ttsVoice !== undefined) return this._ttsVoice;
+        let voices = [];
+        try { voices = window.speechSynthesis.getVoices() || []; } catch (e) { voices = []; }
+        if (!voices.length) return null; // not loaded yet; don't cache the miss
+        const nb = voices.find(v => /^(nb|no)\b/i.test(v.lang) || /norsk|norwegian/i.test(v.name));
+        this._ttsVoice = nb || null; // cache the resolved choice (may be default)
+        return this._ttsVoice;
     }
 
     // Accepts either a single win object or an array of wins. When more
