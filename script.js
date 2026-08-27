@@ -8672,23 +8672,20 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             const base = this.settings.volOneAway;
             const vol = Number.isFinite(base) ? Math.min(1, Math.max(0, base)) : 1;
             const voice = this._getNorwegianVoice();
-            const say = (text, rate, pitch, volume) => {
-                const u = new SpeechSynthesisUtterance(text);
-                u.lang = 'nb-NO';
-                if (voice) u.voice = voice;
-                u.rate = rate; u.pitch = pitch; u.volume = volume;
-                window.speechSynthesis.speak(u);
-            };
             window.setTimeout(() => {
                 try {
-                    // Split so "ett" (the ONE) gets its own emphasis — drawn
-                    // out, higher-pitched and a touch louder, with the natural
-                    // gaps between utterances landing as stress around it:
-                    // "<navn> mangler … ETT … tall". Chrome ignores SSML, so
-                    // separate utterances are the reliable way to stress a word.
-                    say(`${who} mangler`, 1, 1, vol);
-                    say('ett', 0.8, 1.4, Math.min(1, vol + 0.15));
-                    say('tall', 1, 1, vol);
+                    // One flowing utterance — separate utterances leave a long
+                    // browser-controlled gap between them, which is why the
+                    // earlier "<navn> mangler | ett | tall" split sounded
+                    // broken. Chrome ignores SSML, so instead lean the stress
+                    // onto "ett" with a single short comma pause right before
+                    // it and a slightly slower overall pace: the pause inside
+                    // one utterance is far shorter and more natural.
+                    const u = new SpeechSynthesisUtterance(`${who} mangler, ett tall`);
+                    u.lang = 'nb-NO';
+                    if (voice) u.voice = voice;
+                    u.rate = 0.95; u.pitch = 1; u.volume = vol;
+                    window.speechSynthesis.speak(u);
                 } catch (e) {}
             }, 120);
         } catch (e) {}
