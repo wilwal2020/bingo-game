@@ -8669,17 +8669,28 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             let who;
             if (names.length === 1) who = names[0];
             else who = names.slice(0, -1).join(', ') + ' og ' + names[names.length - 1];
-            const vol = this.settings.volOneAway;
+            const base = this.settings.volOneAway;
+            const vol = Number.isFinite(base) ? Math.min(1, Math.max(0, base)) : 1;
+            const voice = this._getNorwegianVoice();
+            const say = (text, rate, pitch, volume) => {
+                const u = new SpeechSynthesisUtterance(text);
+                u.lang = 'nb-NO';
+                if (voice) u.voice = voice;
+                u.rate = rate; u.pitch = pitch; u.volume = volume;
+                window.speechSynthesis.speak(u);
+            };
             window.setTimeout(() => {
                 try {
-                    const u = new SpeechSynthesisUtterance(`${who} mangler ett tall`);
-                    u.lang = 'nb-NO';
-                    const v = this._getNorwegianVoice();
-                    if (v) u.voice = v;
-                    u.volume = Number.isFinite(vol) ? Math.min(1, Math.max(0, vol)) : 1;
-                    window.speechSynthesis.speak(u);
+                    // Split so "ett" (the ONE) gets its own emphasis — drawn
+                    // out, higher-pitched and a touch louder, with the natural
+                    // gaps between utterances landing as stress around it:
+                    // "<navn> mangler … ETT … tall". Chrome ignores SSML, so
+                    // separate utterances are the reliable way to stress a word.
+                    say(`${who} mangler`, 1, 1, vol);
+                    say('ett', 0.8, 1.4, Math.min(1, vol + 0.15));
+                    say('tall', 1, 1, vol);
                 } catch (e) {}
-            }, 320);
+            }, 120);
         } catch (e) {}
     }
 
