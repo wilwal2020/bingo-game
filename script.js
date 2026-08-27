@@ -8283,9 +8283,11 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             const num = Number(numStr);
             const ball = ballMap[num];
             if (!ball) return;
-            // Stack rings outward — innermost at 2px, each phone adds 2px
+            // Stack rings outward as solid 3px bands — one per phone that
+            // needs this ball. Crisper/chunkier than the old 2px to match the
+            // site's flat retro weight; see .balls.bv-watch::before.
             const rings = entries.map((e, i) =>
-                `0 0 0 ${2 + i * 2}px ${e.color}`
+                `0 0 0 ${3 + i * 3}px ${e.color}`
             ).join(', ');
             ball.style.setProperty('--bv-rings', rings);
             ball.classList.add('bv-watch');
