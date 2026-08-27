@@ -1167,11 +1167,31 @@
                             <div class="sound-row-controls">
                                 <select id="setting-one-away-style" class="session-input" style="width:130px;">
                                     <option value="synth">Synth (ping)</option>
-                                    <option value="speech">Tale (navn)</option>
                                     <option value="off">Av</option>
                                 </select>
                                 <input type="range" id="vol-one-away" class="vol-slider" min="0" max="1" step="0.05" value="0.9">
                                 <button class="sound-mute-btn" data-sound-type="one-away" title="Mute">🔊</button>
+                            </div>
+                        </div>
+                        <div class="settings-row">
+                            <div class="settings-label">
+                                <span>&nbsp;&nbsp;&#8226; Les opp navn (tale)</span>
+                                <span class="settings-desc">Sier «[navn] mangler ett tall» høyt</span>
+                            </div>
+                            <label class="settings-toggle">
+                                <input type="checkbox" id="setting-one-away-speech">
+                                <span class="settings-toggle-track"></span>
+                            </label>
+                        </div>
+                        <div class="settings-row">
+                            <div class="settings-label">
+                                <span>&nbsp;&nbsp;&#8226; Forsinkelse på tale (1/10 sek)</span>
+                                <span class="settings-desc">Ventetid etter pinget før navnet leses opp</span>
+                            </div>
+                            <div class="settings-stepper">
+                                <button class="rekke-adjust-btn" id="one-away-speech-delay-minus">−</button>
+                                <span class="settings-stepper-value" id="setting-one-away-speech-delay">1</span>
+                                <button class="rekke-adjust-btn" id="one-away-speech-delay-plus">+</button>
                             </div>
                         </div>
                         <div class="settings-row">
@@ -1206,6 +1226,7 @@
                 <label class="upload-cat-item"><input type="checkbox" value="reset-hard"> Nullstill alle</label>
                 <label class="upload-cat-item"><input type="checkbox" value="overtime"> Overtid</label>
                 <label class="upload-cat-item"><input type="checkbox" value="first-rekke"> Første tall i rekke</label>
+                <label class="upload-cat-item"><input type="checkbox" value="one-away"> Mangler ett tall</label>
             </div>
 
             <div class="add-win-section-label" style="margin-top:18px">Fra lydmappen</div>

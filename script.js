@@ -519,9 +519,14 @@ class BingoApp {
             bvWinNotifyEnabled:    true,
             bvWinAutoOpenWinModal: true,
             // Chime the moment a phone drops to a single number left. 'off'
-            // disables it; configured in the Lydeffekter settings tab.
+            // disables it; a user-uploaded sound key plays that instead.
+            // Configured in the Lydeffekter settings tab.
             oneAwayStyle:          'synth',
             volOneAway:            1,
+            // Optional spoken announcement of the player's name, independent of
+            // the chime. Delay is in tenths of a second after the chime.
+            oneAwaySpeechEnabled:  false,
+            oneAwaySpeechDelay:    1,
             autoBackupDownload:    true,
             // Bottom block-bar: when true, chips are ordered by how many
             // numbers each block is missing (fewest = leftmost).
@@ -779,6 +784,10 @@ class BingoApp {
             volFirstRekke:           document.getElementById('vol-first-rekke'),
             settingOneAwayStyle:     document.getElementById('setting-one-away-style'),
             volOneAway:              document.getElementById('vol-one-away'),
+            settingOneAwaySpeech:    document.getElementById('setting-one-away-speech'),
+            oneAwaySpeechDelayValue: document.getElementById('setting-one-away-speech-delay'),
+            oneAwaySpeechDelayPlus:  document.getElementById('one-away-speech-delay-plus'),
+            oneAwaySpeechDelayMinus: document.getElementById('one-away-speech-delay-minus'),
             settingTypingDelay:   document.getElementById('setting-typing-delay'),
             settingTypingDelayPlus:  document.getElementById('typing-delay-plus'),
             settingTypingDelayMinus: document.getElementById('typing-delay-minus'),
@@ -1555,13 +1564,27 @@ class BingoApp {
         bindVol(this.el.volOvertime,    'volOvertime',    'overtime');
         bindVol(this.el.volFirstRekke,  'volFirstRekke',  'first-rekke');
         bindVol(this.el.volOneAway,     'volOneAway',     'one-away');
-        // Preview the spoken name when "Tale (navn)" is chosen (bindSoundStyle
-        // already previews the ping; this adds the voice, "chime then name").
-        if (this.el.settingOneAwayStyle) {
-            this.el.settingOneAwayStyle.addEventListener('change', () => {
-                if (this.el.settingOneAwayStyle.value === 'speech') this._speakOneAway(['Kari']);
+        // Speak-name toggle — preview the announcement when switched on.
+        if (this.el.settingOneAwaySpeech) {
+            this.el.settingOneAwaySpeech.addEventListener('change', () => {
+                this.settings.oneAwaySpeechEnabled = this.el.settingOneAwaySpeech.checked;
+                this.saveSettings();
+                if (this.settings.oneAwaySpeechEnabled) this._speakOneAway(['Kari']);
             });
         }
+        // Speech delay stepper (tenths of a second, 0–20). Previews on change.
+        const bumpSpeechDelay = (delta) => {
+            const cur = this.settings.oneAwaySpeechDelay ?? 1;
+            const next = Math.min(20, Math.max(0, cur + delta));
+            this.settings.oneAwaySpeechDelay = next;
+            if (this.el.oneAwaySpeechDelayValue) this.el.oneAwaySpeechDelayValue.textContent = next;
+            this.saveSettings();
+            if (this.settings.oneAwaySpeechEnabled) this._speakOneAway(['Kari']);
+        };
+        if (this.el.oneAwaySpeechDelayPlus)
+            this.el.oneAwaySpeechDelayPlus.addEventListener('click', () => bumpSpeechDelay(1));
+        if (this.el.oneAwaySpeechDelayMinus)
+            this.el.oneAwaySpeechDelayMinus.addEventListener('click', () => bumpSpeechDelay(-1));
         if (this.el.settingTypingDelayPlus) {
             this.el.settingTypingDelayPlus.addEventListener('click', () => {
                 this.settings.typingDelay = Math.min(30, (this.settings.typingDelay ?? 8) + 1);
@@ -2003,6 +2026,8 @@ class BingoApp {
         if (this.el.volFirstRekke)          this.el.volFirstRekke.value          = s.volFirstRekke;
         if (this.el.settingOneAwayStyle)    this.el.settingOneAwayStyle.value    = s.oneAwayStyle ?? 'synth';
         if (this.el.volOneAway)             this.el.volOneAway.value             = s.volOneAway ?? 1;
+        if (this.el.settingOneAwaySpeech)   this.el.settingOneAwaySpeech.checked = s.oneAwaySpeechEnabled ?? false;
+        if (this.el.oneAwaySpeechDelayValue) this.el.oneAwaySpeechDelayValue.textContent = s.oneAwaySpeechDelay ?? 1;
         // Restore mute button states
         document.querySelectorAll('.sound-mute-btn').forEach(btn => {
             const muted = !!(s.mutedSounds?.[btn.dataset.soundType]);
@@ -2232,6 +2257,12 @@ class BingoApp {
         // persisted value can no longer be corrected from the UI — pin them.
         this.settings.bvHighlightRekke     = 'current';
         this.settings.bvHighlightThreshold = 1;
+        // Migrate: the one-away "speech" style became a separate speech toggle,
+        // so an old saved value of 'speech' would leave no chime selected.
+        if (this.settings.oneAwayStyle === 'speech') {
+            this.settings.oneAwayStyle = 'synth';
+            this.settings.oneAwaySpeechEnabled = true;
+        }
         // Repair corrupt volume values. Old builds could persist NaN (JSON
         // null) from parseFloat on an empty slider, and a null/NaN volume
         // makes every sound of that type silently fail — gain ends up 0 or
@@ -6483,6 +6514,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             'reset-hard': 'setting-reset-hard-style',
             overtime:      'setting-overtime-style',
             'first-rekke': 'setting-first-rekke-style',
+            'one-away':    'setting-one-away-style',
         };
         return map[cat] || null;
     }
@@ -6574,6 +6606,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             [this.el.settingResetHardStyle,  s.resetHardStyle],
             [this.el.settingOvertimeStyle,   s.overtimeStyle],
             [this.el.settingFirstRekkeStyle, s.firstRekkeStyle],
+            [this.el.settingOneAwayStyle,    s.oneAwayStyle],
         ].forEach(([el, val]) => { if (el && val != null) el.value = val; });
     }
 
@@ -6729,7 +6762,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                 hover: 'hoverStyle', call: 'callStyle', select: 'selectStyle',
                 switch: 'switchStyle', confirm: 'confirmStyle', cancel: 'cancelStyle',
                 reset: 'resetStyle', 'reset-hard': 'resetHardStyle', overtime: 'overtimeStyle',
-                'first-rekke': 'firstRekkeStyle',
+                'first-rekke': 'firstRekkeStyle', 'one-away': 'oneAwayStyle',
             }[type];
             if (styleKey) {
                 const style = this.settings[styleKey];
@@ -8637,18 +8670,19 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             if (nm && !seenNames.has(nm)) { seenNames.add(nm); newNames.push(nm); }
         });
         if (!newNames.length) return;
-        // Only chime/speak — and only suppress the call blip — when the sound
-        // will actually be heard: master sound on, this effect not set to
-        // 'off', and not individually muted. Otherwise the call plays as normal.
-        const audible = this.settings.soundEnabled
-            && this.settings.oneAwayStyle !== 'off'
-            && !(this.settings.mutedSounds && this.settings.mutedSounds['one-away']);
-        if (!audible) return;
-        this.playSound('one-away');
-        // In Tale mode, follow the ping with the spoken name(s).
-        if (this.settings.oneAwayStyle === 'speech') this._speakOneAway(newNames);
+        // The chime and the spoken announcement are independent toggles. Only
+        // sound — and only suppress the call blip — when at least one will
+        // actually be heard: master sound on, not muted, and either a chime
+        // style other than 'off' or the speak-name toggle. Otherwise the call
+        // plays as normal.
+        const muted    = !!(this.settings.mutedSounds && this.settings.mutedSounds['one-away']);
+        const chimeOn  = this.settings.oneAwayStyle !== 'off';
+        const speechOn = this.settings.oneAwaySpeechEnabled === true;
+        if (!this.settings.soundEnabled || muted || (!chimeOn && !speechOn)) return;
+        if (chimeOn)  this.playSound('one-away');       // synth or a custom sound
+        if (speechOn) this._speakOneAway(newNames);     // "<navn> mangler ett tall"
         // Let the just-fired call know it dropped someone to one away, so it
-        // can skip the normal call blip and let this chime stand alone.
+        // can skip the normal call blip and let this stand alone.
         this._bvOneAwayJustChimed = true;
     }
 
@@ -8660,9 +8694,9 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         try {
             if (!names || !names.length) return;
             if (!('speechSynthesis' in window)) return;
-            // Respect the same gates as the chime.
+            // Respect the same gates as the chime, plus the speak-name toggle.
             if (!this.settings.soundEnabled) return;
-            if (this.settings.oneAwayStyle !== 'speech') return;
+            if (this.settings.oneAwaySpeechEnabled !== true) return;
             if (this.settings.mutedSounds && this.settings.mutedSounds['one-away']) return;
             // Join multiple simultaneous names naturally: "A", "A og B",
             // "A, B og C" — a rare case, but reads cleanly when it happens.
@@ -8672,6 +8706,9 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             const base = this.settings.volOneAway;
             const vol = Number.isFinite(base) ? Math.min(1, Math.max(0, base)) : 1;
             const voice = this._getNorwegianVoice();
+            // Configurable delay after the ping, stored in tenths of a second.
+            const tenths = this.settings.oneAwaySpeechDelay;
+            const delayMs = (Number.isFinite(tenths) ? Math.max(0, tenths) : 1) * 100;
             window.setTimeout(() => {
                 try {
                     // One flowing utterance — separate utterances leave a long
@@ -8687,7 +8724,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                     u.rate = 0.95; u.pitch = 1; u.volume = vol;
                     window.speechSynthesis.speak(u);
                 } catch (e) {}
-            }, 120);
+            }, delayMs);
         } catch (e) {}
     }
 
