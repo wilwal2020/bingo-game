@@ -8387,11 +8387,15 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             const isNewWatch = !seeding && !prevWatched.has(num);
             if (isNewWatch) {
                 ball.classList.add('bv-watch-new');
+                // The square that collapses in from the whole number field...
+                this._bvPlaySlamIn(ball, entries[0].color);
+                // ...and the shockwave it kicks up on impact (CSS-delayed to
+                // land the moment the square finishes collapsing).
                 const burst = document.createElement('span');
                 burst.className = 'bv-burst';
                 burst.style.setProperty('--bv-burst-color', entries[0].color);
                 ball.appendChild(burst);
-                setTimeout(() => burst.remove(), 750);
+                setTimeout(() => burst.remove(), 1300);
             }
 
             // Add name label(s) beside the ball — dedupe per phone (a phone can
@@ -8570,6 +8574,53 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
 
             list.appendChild(div);
         });
+    }
+
+    // Opening beat of the one-away entrance: a square covering the whole
+    // number field collapses in on the ball and slams onto its ring, corners
+    // rounding off into a circle on the way down. Driven here rather than in
+    // CSS so it can start from the grid's real on-screen bounds and land
+    // exactly on the ring, whatever the layout or ball size. Self-removing.
+    _bvPlaySlamIn(ball, color) {
+        try {
+            const grid = document.querySelector('.ball-grid');
+            if (!grid || !ball || typeof ball.animate !== 'function') return;
+            const g = grid.getBoundingClientRect();
+            const r = ball.getBoundingClientRect();
+            if (!g.width || !r.width) return;
+            // Landing geometry = the ring itself: 1.55em of the ball's font,
+            // matching --bv-circle-d in the stylesheet.
+            const fs = parseFloat(getComputedStyle(ball).fontSize) || 48;
+            const d  = 1.55 * fs;
+            const cx = r.left + r.width  / 2;
+            const cy = r.top  + r.height / 2;
+            // Opening square: big enough to cover the number field, centred on
+            // it. Square by side = the field's longer edge, so it always does.
+            const side = Math.max(g.width, g.height);
+            const sx = g.left + g.width  / 2 - side / 2;
+            const sy = g.top  + g.height / 2 - side / 2;
+            const el = document.createElement('div');
+            el.className = 'bv-slam';
+            el.style.setProperty('--bv-slam-color', color);
+            document.body.appendChild(el);
+            const anim = el.animate([
+                { left: sx + 'px', top: sy + 'px',
+                  width: side + 'px', height: side + 'px',
+                  borderRadius: '10px', borderWidth: '6px', opacity: 0 },
+                { opacity: 1, offset: 0.15 },
+                { left: (cx - d / 2) + 'px', top: (cy - d / 2) + 'px',
+                  width: d + 'px', height: d + 'px',
+                  borderRadius: '50%', borderWidth: '3px', opacity: 1 },
+            ], {
+                duration: 400,
+                // Slow start, hard rush at the end — the collapse lands with force.
+                easing: 'cubic-bezier(0.62, 0.02, 0.86, 0.24)',
+                fill: 'both',
+            });
+            const done = () => { try { el.remove(); } catch (e) {} };
+            anim.onfinish = done;
+            setTimeout(done, 900);   // safety net if onfinish never fires
+        } catch (e) {}
     }
 
     _bvFormatLastSeen(ts) {

@@ -4349,22 +4349,45 @@ option.user-sound {
 }
 
 /* ── Flashy one-shot entrance when a ball FIRST becomes one-away ──
-   Added by JS (class bv-watch-new + an appended .bv-burst) only for newly
-   appearing circles, so it fires once as it crosses the line — never on a
-   plain re-render. Ends on the circle's normal resting state, so if a rapid
-   re-render cuts it short the ball simply settles instead of glitching. */
-.balls.bv-watch-new::before {
-    animation: bvCirclePop 0.45s cubic-bezier(0.2, 1.5, 0.45, 1) both;
+   The sequence, fired by JS only for newly appearing circles (never on a
+   plain re-render, and never on the first seeding pass):
+
+     0 → 400ms   a big square covering the whole number field collapses in on
+                 the ball, its corners rounding off as it goes (.bv-slam —
+                 driven from JS so it can start at the grid's real bounds)
+     ~400ms      IMPACT: the ring lands hard, squashing before it settles,
+                 and a shockwave fans back out (.bv-burst)
+     ~460ms      the name plate pops out of the circle and into place
+
+   Every step ends on the element's normal resting state, so if a rapid
+   re-render cuts the sequence short the ball simply settles. */
+
+/* The collapsing square. Fixed + JS-sized so it can start from the real
+   .ball-grid bounds and land exactly on the ring; see _bvPlaySlamIn. */
+.bv-slam {
+    position:       fixed;
+    box-sizing:     border-box;
+    border:         6px solid var(--bv-slam-color, var(--accent-color));
+    box-shadow:     0 0 22px var(--bv-slam-color, var(--accent-color)),
+                    inset 0 0 26px rgba(255, 255, 255, 0.07);
+    pointer-events: none;
+    z-index:        120;   /* above the grid and block bar, below every modal */
 }
-@keyframes bvCirclePop {
-    0%   { transform: translate(-50%, -50%) scale(0.3); opacity: 0; }
-    55%  { opacity: 1; }
-    70%  { transform: translate(-50%, -50%) scale(1.18); }
+
+/* The ring stays hidden until the square lands on it, then punches in with a
+   squash-and-settle so the collapse reads as having real force. */
+.balls.bv-watch-new::before {
+    animation: bvCircleImpact 0.5s cubic-bezier(0.2, 1.5, 0.45, 1) 0.38s both;
+}
+@keyframes bvCircleImpact {
+    0%   { transform: translate(-50%, -50%) scale(1.25); opacity: 0; }
+    20%  { transform: translate(-50%, -50%) scale(0.9);  opacity: 1; }
+    55%  { transform: translate(-50%, -50%) scale(1.12); }
     100% { transform: translate(-50%, -50%) scale(1);    opacity: 1; }
 }
 
-/* Radiating "ping" shockwave — two hollow, glowing rings fanning outward so
-   the number underneath stays readable. Coloured to the player's ring. */
+/* Impact shockwave — two hollow, glowing rings fanning outward so the number
+   underneath stays readable. Coloured to the player's ring, timed to the hit. */
 .bv-burst {
     position:       absolute;
     top:            50%;
@@ -4377,7 +4400,7 @@ option.user-sound {
     pointer-events: none;
     z-index:        4;
     opacity:        0;
-    animation:      bvBurst 0.6s ease-out both;
+    animation:      bvBurst 0.6s ease-out 0.4s both;
 }
 .bv-burst::after {
     content:       '';
@@ -4385,24 +4408,30 @@ option.user-sound {
     inset:         0;
     border-radius: 50%;
     border:        2px solid var(--bv-burst-color, var(--accent-color));
-    animation:     bvBurstRing 0.6s ease-out 0.14s both;
+    animation:     bvBurstRing 0.6s ease-out 0.54s both;
 }
 @keyframes bvBurst {
     0%   { transform: translate(-50%, -50%) scale(0.9); opacity: 0.95; }
-    100% { transform: translate(-50%, -50%) scale(2.2); opacity: 0; }
+    100% { transform: translate(-50%, -50%) scale(2.4); opacity: 0; }
 }
 @keyframes bvBurstRing {
     0%   { transform: scale(0.9); opacity: 0.8; }
     100% { transform: scale(2.7); opacity: 0; }
 }
 
-/* Name plate pops in alongside the circle (only on first appearance). */
+/* Name plate is thrown out of the circle by the impact: it grows from the
+   edge it is attached to (bottom edge normally, top edge when flipped below),
+   so it reads as emerging from the ring rather than fading in over it. */
 .bv-names-new .bv-watch-name {
-    animation: bvNamePop 0.42s cubic-bezier(0.2, 1.5, 0.45, 1) both;
+    transform-origin: 50% 100%;
+    animation: bvNamePop 0.4s cubic-bezier(0.2, 1.55, 0.4, 1) 0.46s both;
+}
+.balls.bv-watch-flip .bv-names-new .bv-watch-name {
+    transform-origin: 50% 0;
 }
 @keyframes bvNamePop {
-    0%   { transform: scale(0.4); opacity: 0; }
-    70%  { transform: scale(1.08); }
+    0%   { transform: scale(0.15); opacity: 0; }
+    60%  { transform: scale(1.12); opacity: 1; }
     100% { transform: scale(1);    opacity: 1; }
 }
 
