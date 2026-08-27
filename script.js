@@ -518,8 +518,9 @@ class BingoApp {
             bvCallTimerSeconds:    15,
             bvWinNotifyEnabled:    true,
             bvWinAutoOpenWinModal: true,
-            // Play a chime the moment a phone drops to a single number left.
-            bvOneAwaySoundEnabled: true,
+            // Chime the moment a phone drops to a single number left. 'off'
+            // disables it; configured in the Lydeffekter settings tab.
+            oneAwayStyle:          'synth',
             volOneAway:            1,
             autoBackupDownload:    true,
             // Bottom block-bar: when true, chips are ordered by how many
@@ -776,6 +777,8 @@ class BingoApp {
             volOvertime:             document.getElementById('vol-overtime'),
             settingFirstRekkeStyle:  document.getElementById('setting-first-rekke-style'),
             volFirstRekke:           document.getElementById('vol-first-rekke'),
+            settingOneAwayStyle:     document.getElementById('setting-one-away-style'),
+            volOneAway:              document.getElementById('vol-one-away'),
             settingTypingDelay:   document.getElementById('setting-typing-delay'),
             settingTypingDelayPlus:  document.getElementById('typing-delay-plus'),
             settingTypingDelayMinus: document.getElementById('typing-delay-minus'),
@@ -905,7 +908,6 @@ class BingoApp {
             bvCallTimerPlus:          document.getElementById('bv-call-timer-plus'),
             bvCallTimerMinus:         document.getElementById('bv-call-timer-minus'),
             bvWinNotifyEnabled:       document.getElementById('bv-win-notify-enabled'),
-            bvOneAwaySoundEnabled:    document.getElementById('bv-oneaway-sound-enabled'),
             bvWinModal:               document.getElementById('bv-win-modal'),
             bvWinAutoOpen:            document.getElementById('bv-win-auto-open'),
             settingOverAverageBlink:    document.getElementById('setting-over-average-blink'),
@@ -1523,6 +1525,7 @@ class BingoApp {
         bindSoundStyle(this.el.settingResetHardStyle, 'resetHardStyle', 'reset-hard');
         bindSoundStyle(this.el.settingOvertimeStyle,   'overtimeStyle',   'overtime');
         bindSoundStyle(this.el.settingFirstRekkeStyle, 'firstRekkeStyle', 'first-rekke');
+        bindSoundStyle(this.el.settingOneAwayStyle,    'oneAwayStyle',    'one-away');
 
         const bindVol = (el, key, type) => {
             if (!el) return;
@@ -1543,6 +1546,7 @@ class BingoApp {
         bindVol(this.el.volResetHard, 'volResetHard', 'reset-hard');
         bindVol(this.el.volOvertime,    'volOvertime',    'overtime');
         bindVol(this.el.volFirstRekke,  'volFirstRekke',  'first-rekke');
+        bindVol(this.el.volOneAway,     'volOneAway',     'one-away');
         if (this.el.settingTypingDelayPlus) {
             this.el.settingTypingDelayPlus.addEventListener('click', () => {
                 this.settings.typingDelay = Math.min(30, (this.settings.typingDelay ?? 8) + 1);
@@ -1735,14 +1739,6 @@ class BingoApp {
                 this.settings.bvWinNotifyEnabled = this.el.bvWinNotifyEnabled.checked;
                 this.saveSettings();
                 if (!this.settings.bvWinNotifyEnabled) this._bvClearWinNotices();
-            });
-        }
-        if (this.el.bvOneAwaySoundEnabled) {
-            this.el.bvOneAwaySoundEnabled.addEventListener('change', () => {
-                this.settings.bvOneAwaySoundEnabled = this.el.bvOneAwaySoundEnabled.checked;
-                this.saveSettings();
-                // Preview the chime when the caller flips it on.
-                if (this.settings.bvOneAwaySoundEnabled) this.playSound('one-away');
             });
         }
         if (this.el.bvWinAutoOpen) {
@@ -1990,6 +1986,8 @@ class BingoApp {
         if (this.el.volOvertime)            this.el.volOvertime.value            = s.volOvertime;
         if (this.el.settingFirstRekkeStyle) this.el.settingFirstRekkeStyle.value = s.firstRekkeStyle;
         if (this.el.volFirstRekke)          this.el.volFirstRekke.value          = s.volFirstRekke;
+        if (this.el.settingOneAwayStyle)    this.el.settingOneAwayStyle.value    = s.oneAwayStyle ?? 'synth';
+        if (this.el.volOneAway)             this.el.volOneAway.value             = s.volOneAway ?? 1;
         // Restore mute button states
         document.querySelectorAll('.sound-mute-btn').forEach(btn => {
             const muted = !!(s.mutedSounds?.[btn.dataset.soundType]);
@@ -2052,8 +2050,6 @@ class BingoApp {
             this.el.bvCallTimerValue.textContent = s.bvCallTimerSeconds ?? 15;
         if (this.el.bvWinNotifyEnabled)
             this.el.bvWinNotifyEnabled.checked = s.bvWinNotifyEnabled ?? true;
-        if (this.el.bvOneAwaySoundEnabled)
-            this.el.bvOneAwaySoundEnabled.checked = s.bvOneAwaySoundEnabled ?? true;
         if (this.el.bvWinAutoOpen)
             this.el.bvWinAutoOpen.checked = s.bvWinAutoOpenWinModal ?? true;
 
@@ -6905,6 +6901,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                 o.connect(g); g.connect(md); o.start(n); o.stop(n+0.4); }
 
             } else if (type === 'one-away') {
+                if (s.oneAwayStyle === 'off') return;
                 // A phone just dropped to a single number left — a bright,
                 // quick two-note "ping". Kept short and pitched well above the
                 // call/win chimes so it reads as its own distinct event.
@@ -8608,15 +8605,20 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         const prev = this._bvOneAwayKeysPrev;
         this._bvOneAwayKeysPrev = currentKeys;
         if (!prev) return; // first run: seed only, never chime on load
-        if (this.settings.bvOneAwaySoundEnabled === false) return;
         let isNew = false;
         currentKeys.forEach(k => { if (!prev.has(k)) isNew = true; });
-        if (isNew) {
-            this.playSound('one-away');
-            // Let the just-fired call know it dropped someone to one away, so
-            // it can skip the normal call blip and let this chime stand alone.
-            this._bvOneAwayJustChimed = true;
-        }
+        if (!isNew) return;
+        // Only chime — and only suppress the call blip — when the sound will
+        // actually be heard: master sound on, this effect not set to 'off',
+        // and not individually muted. Otherwise the call sound plays as normal.
+        const audible = this.settings.soundEnabled
+            && this.settings.oneAwayStyle !== 'off'
+            && !(this.settings.mutedSounds && this.settings.mutedSounds['one-away']);
+        if (!audible) return;
+        this.playSound('one-away');
+        // Let the just-fired call know it dropped someone to one away, so it
+        // can skip the normal call blip and let this chime stand alone.
+        this._bvOneAwayJustChimed = true;
     }
 
     // Accepts either a single win object or an array of wins. When more

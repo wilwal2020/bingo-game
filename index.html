@@ -1161,6 +1161,20 @@
                         </div>
                         <div class="settings-row">
                             <div class="settings-label">
+                                <span>Mangler ett tall</span>
+                                <span class="settings-desc">Når en telefon mangler ett tall (BingoView)</span>
+                            </div>
+                            <div class="sound-row-controls">
+                                <select id="setting-one-away-style" class="session-input" style="width:130px;">
+                                    <option value="synth">Synth (ping)</option>
+                                    <option value="off">Av</option>
+                                </select>
+                                <input type="range" id="vol-one-away" class="vol-slider" min="0" max="1" step="0.05" value="0.9">
+                                <button class="sound-mute-btn" data-sound-type="one-away" title="Mute">🔊</button>
+                            </div>
+                        </div>
+                        <div class="settings-row">
+                            <div class="settings-label">
                                 <span>Last opp lyd</span>
                                 <span class="settings-desc">Legg til egne lydeffekter</span>
                             </div>
@@ -1261,13 +1275,6 @@
                             <span class="settings-stepper-value" id="bv-call-timer-value">15</span>
                             <button type="button" class="rekke-adjust-btn" id="bv-call-timer-plus">+</button>
                         </div>
-                    </div>
-                    <div class="bv-settings-row">
-                        <div class="bv-settings-label">Spill lyd når telefon mangler ett tall</div>
-                        <label class="settings-toggle">
-                            <input type="checkbox" id="bv-oneaway-sound-enabled" checked>
-                            <span class="settings-toggle-track"></span>
-                        </label>
                     </div>
                     <div class="bv-settings-row">
                         <div class="bv-settings-label">Vis varsel når telefon vinner</div>
