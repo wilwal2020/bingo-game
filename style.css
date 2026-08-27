@@ -4280,26 +4280,21 @@ option.user-sound {
    it scales with the ball font and always renders as a true circle centred on
    the digit — the old `inset: -2px; border-radius: 50%` stretched into an
    ellipse on non-square cells and drifted off the number. The concentric,
-   per-phone colour rings live in --bv-rings (set by JS); the faint inner disc
-   gives the marked ball a subtle spotlight so the number still reads. */
+   per-phone colour rings live in --bv-rings (set by JS). No fill: the ring is
+   only ever shown when a phone has a single number left, so it needs no extra
+   emphasis. */
 .balls.bv-watch::before {
     content:        '';
     position:       absolute;
     top:            50%;
     left:           50%;
-    width:          1.28em;
-    height:         1.28em;
+    width:          1.55em;
+    height:         1.55em;
     transform:      translate(-50%, -50%);
     border-radius:  50%;
     pointer-events: none;
-    background:     rgba(255, 255, 255, 0.05);
     box-shadow:     var(--bv-rings, none);
     z-index:        5;
-}
-/* One number away — kept static (no motion), but with a brighter centre so the
-   hottest balls still stand out from the merely-close ones. */
-.balls.bv-watch.bv-pulse::before {
-    background: rgba(255, 255, 255, 0.11);
 }
 /* Name label(s) above a watched ball — shows which phone(s) need this
    number. Designed to match the bingo site's chunky retro aesthetic:
