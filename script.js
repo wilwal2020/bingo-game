@@ -2406,8 +2406,13 @@ class BingoApp {
             // If the "Neste spill om" countdown is running, a new call means
             // the next game hasn't actually started yet — cancel the timer.
             this.stopNextGameCountdown();
+            // bvSend() runs the paper-highlight pass synchronously, which fires
+            // the one-away chime and flags it here. If this call just dropped a
+            // phone to a single number left, play only that chime — skip the
+            // normal call blip so the one-away sound isn't muddied.
+            this._bvOneAwayJustChimed = false;
             this.bvSend(number);
-            this.playSound('call');
+            if (!this._bvOneAwayJustChimed) this.playSound('call');
             if (isFirstOfRekke) setTimeout(() => this.playSound('first-rekke'), 80);
             this.checkOvertimeSound();
             this.startBigNumberProgress();
@@ -8606,7 +8611,12 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         if (this.settings.bvOneAwaySoundEnabled === false) return;
         let isNew = false;
         currentKeys.forEach(k => { if (!prev.has(k)) isNew = true; });
-        if (isNew) this.playSound('one-away');
+        if (isNew) {
+            this.playSound('one-away');
+            // Let the just-fired call know it dropped someone to one away, so
+            // it can skip the normal call blip and let this chime stand alone.
+            this._bvOneAwayJustChimed = true;
+        }
     }
 
     // Accepts either a single win object or an array of wins. When more
