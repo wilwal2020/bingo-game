@@ -15,6 +15,7 @@
         <nav class="flex-container">
             <div class="logo" role="img" aria-label="Geithus Bingo logo"></div>
             <button class="flex-item settings-nav-btn" id="bingoview-btn" aria-label="BingoView telefon" title="Koble til telefon"><span class="bv-btn-icon">📱</span><span class="bv-nav-badge" id="bv-nav-badge" style="display:none">0</span></button>
+            <button class="flex-item settings-nav-btn" id="funfact-btn" aria-label="Fun facts" title="Fun facts">💡</button>
             <button class="flex-item settings-nav-btn" id="settings-btn" aria-label="Innstillinger">⚙</button>
             <div class="dropdown">
                 <button class="dropbtn flex-item" aria-label="Åpne meny" style="font-size:1.3rem;">
@@ -1375,6 +1376,64 @@
     </div>
 
     <!-- FREQUENCY HEATMAP MODAL -->
+    <!-- FUN FACT MODAL — assign facts to any of the 90 numbers -->
+    <div class="modal-overlay" id="funfact-modal" style="display:none">
+        <div class="modal modal-viewer funfact-modal">
+            <h2 class="modal-title">Fun facts</h2>
+            <p class="modal-subtitle" id="funfact-subtitle"></p>
+
+            <div class="funfact-settings">
+                <div class="settings-row">
+                    <div class="settings-label">
+                        <span>Vis fun facts</span>
+                        <span class="settings-desc">Et faktum dukker opp i midtfeltet når tallet kalles</span>
+                    </div>
+                    <label class="settings-toggle">
+                        <input type="checkbox" id="funfact-enabled">
+                        <span class="settings-toggle-track"></span>
+                    </label>
+                </div>
+                <div class="settings-row">
+                    <div class="settings-label">
+                        <span>Sekunder på skjermen</span>
+                        <span class="settings-desc">0 = bli stående til du klikker den vekk</span>
+                    </div>
+                    <div class="settings-stepper">
+                        <button class="rekke-adjust-btn" id="funfact-dur-minus">−</button>
+                        <span class="settings-stepper-value" id="funfact-dur-value">8</span>
+                        <button class="rekke-adjust-btn" id="funfact-dur-plus">+</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="funfact-body">
+                <div class="funfact-grid" id="funfact-grid"></div>
+                <div class="funfact-editor">
+                    <div class="funfact-editor-empty" id="funfact-editor-empty">
+                        Velg et tall for å legge til fakta
+                    </div>
+                    <div class="funfact-editor-inner" id="funfact-editor-inner" style="display:none">
+                        <div class="funfact-editor-head">
+                            <span class="funfact-editor-num" id="funfact-editor-num">1</span>
+                            <span class="funfact-editor-count" id="funfact-editor-count"></span>
+                        </div>
+                        <div class="funfact-list" id="funfact-list"></div>
+                        <textarea id="funfact-input" class="session-input funfact-input" rows="3"
+                                  placeholder="Skriv et fun fact om dette tallet..."></textarea>
+                        <div class="funfact-editor-actions">
+                            <button class="modal-btn modal-btn-yes" id="funfact-add">Legg til</button>
+                            <button class="modal-btn modal-btn-no" id="funfact-preview">Forhåndsvis</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-buttons" style="margin-top:14px">
+                <button class="modal-btn modal-btn-no" id="funfact-close">Lukk</button>
+            </div>
+        </div>
+    </div>
+
     <div class="modal-overlay" id="frequency-modal" style="display:none">
         <div class="modal modal-viewer">
             <h2 class="modal-title">Tall-frekvens</h2>
@@ -1424,6 +1483,19 @@
           <button class="bv-win-modal-close" type="button">Lukk</button>
         </div>
       </div>
+    </div>
+
+    <!-- Fun-fact popup. Sized and placed from JS (see positionFunFact) so it
+         covers column 2 from "Tid igjen" down and nothing above it. -->
+    <div class="funfact-pop" id="funfact-pop" style="display:none" aria-live="polite">
+      <div class="funfact-pop-head">
+        <span class="funfact-pop-num" id="funfact-pop-num">0</span>
+        <span class="funfact-pop-label">Fun fact</span>
+        <span class="funfact-pop-idx" id="funfact-pop-idx"></span>
+      </div>
+      <div class="funfact-pop-text" id="funfact-pop-text"></div>
+      <div class="funfact-pop-bar"><div class="funfact-pop-bar-fill" id="funfact-pop-bar"></div></div>
+      <div class="funfact-pop-hint">Klikk for å lukke</div>
     </div>
 
     <script src="script.js?v=13" defer></script>

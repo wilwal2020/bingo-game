@@ -532,6 +532,11 @@ class BingoApp {
             oneAwaySpeechEnabled:  false,
             oneAwaySpeechDelay:    1,
             autoBackupDownload:    true,
+            // Fun facts: a note tied to a number, shown when that number is
+            // called. Off until switched on in the Fun facts tab; the facts
+            // themselves live in localStorage under 'bingoFunFacts'.
+            funFactsEnabled:       false,
+            funFactSeconds:        8,
             // Bottom block-bar: when true, chips are ordered by how many
             // numbers each block is missing (fewest = leftmost).
             bvBlockBarSort:        false,
@@ -942,6 +947,29 @@ class BingoApp {
             bvNavBadge:                 document.getElementById('bv-nav-badge'),
             // Frequency heatmap
             navFrequency:               document.getElementById('nav-frequency'),
+            // Fun facts
+            funfactBtn:          document.getElementById('funfact-btn'),
+            funfactModal:        document.getElementById('funfact-modal'),
+            funfactSubtitle:     document.getElementById('funfact-subtitle'),
+            funfactEnabled:      document.getElementById('funfact-enabled'),
+            funfactDurValue:     document.getElementById('funfact-dur-value'),
+            funfactDurPlus:      document.getElementById('funfact-dur-plus'),
+            funfactDurMinus:     document.getElementById('funfact-dur-minus'),
+            funfactGrid:         document.getElementById('funfact-grid'),
+            funfactEditorEmpty:  document.getElementById('funfact-editor-empty'),
+            funfactEditorInner:  document.getElementById('funfact-editor-inner'),
+            funfactEditorNum:    document.getElementById('funfact-editor-num'),
+            funfactEditorCount:  document.getElementById('funfact-editor-count'),
+            funfactList:         document.getElementById('funfact-list'),
+            funfactInput:        document.getElementById('funfact-input'),
+            funfactAdd:          document.getElementById('funfact-add'),
+            funfactPreview:      document.getElementById('funfact-preview'),
+            funfactClose:        document.getElementById('funfact-close'),
+            funfactPop:          document.getElementById('funfact-pop'),
+            funfactPopNum:       document.getElementById('funfact-pop-num'),
+            funfactPopText:      document.getElementById('funfact-pop-text'),
+            funfactPopIdx:       document.getElementById('funfact-pop-idx'),
+            funfactPopBar:       document.getElementById('funfact-pop-bar'),
             frequencyModal:             document.getElementById('frequency-modal'),
             frequencyClose:             document.getElementById('frequency-close'),
             frequencyScope:             document.getElementById('frequency-scope'),
@@ -1072,6 +1100,7 @@ class BingoApp {
             ['unsaved-modal',        () => this.closeUnsavedModal()],
             ['upload-sound-modal',   () => this.closeUploadSoundModal()],
             ['settings-modal',       () => this.closeSettingsModal()],
+            ['funfact-modal',        () => this.closeFunFactModal()],
             ['stats-modal',          () => this.closeStatsModal()],
             ['backups-modal',        () => this.closeBackupsModal()],
             ['suggest-save-modal',   () => { this.playSound('cancel'); this.el.suggestSaveModal.style.display = 'none'; }],
@@ -1442,6 +1471,7 @@ class BingoApp {
 
         // Settings
         this.el.settingsBtn.addEventListener('click',   () => this.openSettingsModal());
+        this.bindFunFactUI();
         this.el.settingsClose.addEventListener('click', () => this.closeSettingsModal());
         this.el.settingsIoToggle.addEventListener('click', e => {
             e.stopPropagation();
@@ -2172,7 +2202,8 @@ class BingoApp {
     }
 
     exportSettings() {
-        const jsonKeys  = ['bingoSettings', 'bingoThemeColors', 'bingoColorPresets', 'bingoFlareSettings'];
+        const jsonKeys  = ['bingoSettings', 'bingoThemeColors', 'bingoColorPresets',
+                           'bingoFlareSettings', 'bingoFunFacts'];
         const plainKeys = ['bingoTheme'];
         const data = {};
         jsonKeys.forEach(k => {
@@ -2204,7 +2235,8 @@ class BingoApp {
         reader.onload = async (e) => {
             try {
                 const data = JSON.parse(e.target.result);
-                const jsonKeys  = ['bingoSettings', 'bingoThemeColors', 'bingoColorPresets', 'bingoFlareSettings'];
+                const jsonKeys  = ['bingoSettings', 'bingoThemeColors', 'bingoColorPresets',
+                                   'bingoFlareSettings', 'bingoFunFacts'];
                 const plainKeys = ['bingoTheme'];
                 let imported = 0;
                 jsonKeys.forEach(k => {
@@ -2300,6 +2332,8 @@ class BingoApp {
     // ── Apply current slot state to the DOM ─────────
     applySlotToDOM() {
         const s = this.slot;
+        // The board is being rebuilt under it — any fact on screen is stale.
+        this.hideFunFact();
 
         // Restore theme visually
         document.body.classList.remove('theme-blue','theme-yellow','theme-pink','theme-grey');
@@ -2437,6 +2471,8 @@ class BingoApp {
                 }
             }
             this.bvSendUncall(number);
+            // The fact belongs to the call that is being taken back.
+            if (String(this._funFactShownFor) === String(number)) this.hideFunFact();
         } else {
             // If this is the jackpot number being called, break the circle
             if (number === this.slot.jackpotNumber) {
@@ -2469,6 +2505,7 @@ class BingoApp {
             this._bvOneAwayJustChimed = false;
             this.bvSend(number);
             if (!this._bvOneAwayJustChimed) this.playSound('call');
+            this.showFunFact(number);
             if (isFirstOfRekke) setTimeout(() => this.playSound('first-rekke'), 80);
             this.checkOvertimeSound();
             this.startBigNumberProgress();
@@ -3216,7 +3253,8 @@ class BingoApp {
                         'edit-session-modal','delete-modal','leaderboard-modal',
                         'players-modal','player-history-modal','player-delete-modal','add-win-modal',
                         'edit-win-modal',
-                        'settings-modal','upload-sound-modal','bingoview-modal'];
+                        'settings-modal','upload-sound-modal','bingoview-modal',
+                        'funfact-modal'];
         const anyOpen = modals.some(id => document.getElementById(id).style.display === 'flex');
         if (!anyOpen) document.body.style.overflow = '';
     }
@@ -4484,6 +4522,330 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
     }
 
     // ── Frequency heatmap ─────────────────────────────────
+    // ── Fun facts ────────────────────────────────────
+    // A fact (or several) can be tied to any of the 90 numbers; when that
+    // number is called the fact covers column 2 from "Tid igjen" down, so the
+    // big number, the averages and the whole ball grid stay readable.
+
+    getFunFacts() {
+        if (this._funFacts) return this._funFacts;
+        let data = {};
+        try { data = JSON.parse(localStorage.getItem('bingoFunFacts') || '{}') || {}; }
+        catch (e) { data = {}; }
+        // Normalise: keys are number strings, values arrays of non-empty text.
+        const clean = {};
+        Object.entries(data).forEach(([k, v]) => {
+            const n = parseInt(k, 10);
+            if (!(n >= 1 && n <= 90)) return;
+            const list = (Array.isArray(v) ? v : [v])
+                .map(t => String(t == null ? '' : t).trim())
+                .filter(Boolean);
+            if (list.length) clean[String(n)] = list;
+        });
+        this._funFacts = clean;
+        return this._funFacts;
+    }
+
+    saveFunFacts() {
+        try {
+            localStorage.setItem('bingoFunFacts', JSON.stringify(this._funFacts || {}));
+        } catch (e) {
+            try { window.bingoErrorLog.record('funfact', 'Kunne ikke lagre fun facts', e && e.message); }
+            catch (e2) {}
+        }
+    }
+
+    bindFunFactUI() {
+        const el = this.el;
+        if (el.funfactBtn)   el.funfactBtn.addEventListener('click', () => this.openFunFactModal());
+        if (el.funfactClose) el.funfactClose.addEventListener('click', () => this.closeFunFactModal());
+
+        if (el.funfactEnabled) {
+            el.funfactEnabled.addEventListener('change', () => {
+                this.settings.funFactsEnabled = el.funfactEnabled.checked;
+                this.saveSettings();
+                this.playSound('switch');
+                if (!this.settings.funFactsEnabled) this.hideFunFact();
+            });
+        }
+
+        // Seconds on screen. 0 means "stay until clicked away".
+        const bumpDur = (delta) => {
+            const next = Math.min(60, Math.max(0, (this.settings.funFactSeconds ?? 8) + delta));
+            this.settings.funFactSeconds = next;
+            if (el.funfactDurValue) el.funfactDurValue.textContent = next;
+            this.saveSettings();
+            this.playSound('select');
+        };
+        if (el.funfactDurPlus)  el.funfactDurPlus.addEventListener('click',  () => bumpDur(1));
+        if (el.funfactDurMinus) el.funfactDurMinus.addEventListener('click', () => bumpDur(-1));
+
+        // Grid + fact list are rebuilt constantly, so both go through delegation.
+        if (el.funfactGrid) {
+            el.funfactGrid.addEventListener('click', e => {
+                const cell = e.target.closest('.funfact-cell');
+                if (!cell) return;
+                this.selectFunFactNumber(Number(cell.dataset.num));
+            });
+        }
+        if (el.funfactList) {
+            el.funfactList.addEventListener('click', e => {
+                const btn = e.target.closest('.funfact-item-del');
+                if (!btn) return;
+                this.deleteFunFact(Number(btn.dataset.idx));
+            });
+        }
+        if (el.funfactAdd)     el.funfactAdd.addEventListener('click', () => this.addFunFact());
+        if (el.funfactPreview) el.funfactPreview.addEventListener('click', () => {
+            if (this._funFactEditNum) {
+                this.playSound('select');
+                this.showFunFact(this._funFactEditNum, true);
+            }
+        });
+        if (el.funfactInput) {
+            // Ctrl/Cmd+Enter commits; plain Enter stays a newline, since a fact
+            // can run to several lines.
+            el.funfactInput.addEventListener('keydown', e => {
+                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                    e.preventDefault();
+                    this.addFunFact();
+                }
+            });
+        }
+
+        if (el.funfactPop) el.funfactPop.addEventListener('click', () => this.hideFunFact());
+        // Keep the panel glued to column 2 when the window changes shape.
+        window.addEventListener('resize', () => {
+            if (el.funfactPop && el.funfactPop.style.display !== 'none') this.positionFunFact();
+        });
+    }
+
+    openFunFactModal() {
+        this.playSound('select');
+        if (this.el.funfactEnabled)
+            this.el.funfactEnabled.checked = this.settings.funFactsEnabled ?? false;
+        if (this.el.funfactDurValue)
+            this.el.funfactDurValue.textContent = this.settings.funFactSeconds ?? 8;
+        this.renderFunFactGrid();
+        this.renderFunFactEditor();
+        document.body.style.overflow = 'hidden';
+        this.el.funfactModal.style.display = 'flex';
+    }
+
+    closeFunFactModal() {
+        this.playSound('cancel');
+        this.el.funfactModal.style.display = 'none';
+        this.restoreBodyScroll();
+    }
+
+    renderFunFactGrid() {
+        const grid = this.el.funfactGrid;
+        if (!grid) return;
+        const facts = this.getFunFacts();
+        const frag = document.createDocumentFragment();
+        for (let n = 1; n <= 90; n++) {
+            const list = facts[String(n)];
+            const cell = document.createElement('div');
+            cell.className = 'funfact-cell'
+                           + (list ? ' has-facts' : '')
+                           + (this._funFactEditNum === n ? ' selected' : '');
+            cell.dataset.num = n;
+            cell.textContent = n;
+            if (list) {
+                const badge = document.createElement('span');
+                badge.className = 'funfact-cell-count';
+                badge.textContent = list.length;
+                cell.appendChild(badge);
+            }
+            frag.appendChild(cell);
+        }
+        grid.innerHTML = '';
+        grid.appendChild(frag);
+
+        const nums  = Object.keys(facts).length;
+        const total = Object.values(facts).reduce((a, l) => a + l.length, 0);
+        if (this.el.funfactSubtitle) {
+            this.el.funfactSubtitle.textContent = nums
+                ? `${total} fakta fordelt på ${nums} tall`
+                : 'Ingen fakta ennå — velg et tall for å legge til det første';
+        }
+    }
+
+    selectFunFactNumber(n) {
+        if (!(n >= 1 && n <= 90)) return;
+        this.playSound('select');
+        this._funFactEditNum = n;
+        this.renderFunFactGrid();
+        this.renderFunFactEditor();
+        if (this.el.funfactInput) {
+            this.el.funfactInput.value = '';
+            this.el.funfactInput.focus();
+        }
+    }
+
+    renderFunFactEditor() {
+        const el = this.el;
+        const n  = this._funFactEditNum;
+        if (!el.funfactEditorInner || !el.funfactEditorEmpty) return;
+        if (!n) {
+            el.funfactEditorEmpty.style.display = '';
+            el.funfactEditorInner.style.display = 'none';
+            return;
+        }
+        el.funfactEditorEmpty.style.display = 'none';
+        el.funfactEditorInner.style.display = 'flex';
+        el.funfactEditorNum.textContent = n;
+
+        const list = this.getFunFacts()[String(n)] || [];
+        el.funfactEditorCount.textContent = list.length
+            ? (list.length === 1 ? '1 faktum' : `${list.length} fakta`)
+            : 'ingen fakta';
+        if (el.funfactPreview) el.funfactPreview.disabled = !list.length;
+
+        el.funfactList.innerHTML = '';
+        list.forEach((text, i) => {
+            const row = document.createElement('div');
+            row.className = 'funfact-item';
+            const txt = document.createElement('div');
+            txt.className = 'funfact-item-text';
+            txt.textContent = text;
+            const del = document.createElement('button');
+            del.className = 'funfact-item-del';
+            del.type = 'button';
+            del.title = 'Slett dette faktumet';
+            del.dataset.idx = i;
+            del.textContent = '✕';
+            row.appendChild(txt);
+            row.appendChild(del);
+            el.funfactList.appendChild(row);
+        });
+    }
+
+    addFunFact() {
+        const n = this._funFactEditNum;
+        const input = this.el.funfactInput;
+        if (!n || !input) return;
+        const text = input.value.trim();
+        if (!text) { input.focus(); return; }
+        const facts = this.getFunFacts();
+        const key = String(n);
+        if (!facts[key]) facts[key] = [];
+        facts[key].push(text);
+        this.saveFunFacts();
+        this.playSound('confirm');
+        input.value = '';
+        this.renderFunFactGrid();
+        this.renderFunFactEditor();
+        input.focus();
+    }
+
+    deleteFunFact(idx) {
+        const n = this._funFactEditNum;
+        if (!n || !Number.isInteger(idx)) return;
+        const facts = this.getFunFacts();
+        const key = String(n);
+        if (!facts[key] || !facts[key][idx]) return;
+        facts[key].splice(idx, 1);
+        if (!facts[key].length) delete facts[key];
+        this.saveFunFacts();
+        this.playSound('close');
+        this.renderFunFactGrid();
+        this.renderFunFactEditor();
+    }
+
+    // Show the fact for a called number. With several facts on one number they
+    // are rotated rather than picked at random, so repeat calls across games
+    // work through all of them instead of hammering the same one.
+    // `force` bypasses the enable toggle — used by the modal's preview button.
+    showFunFact(number, force = false) {
+        const el = this.el;
+        if (!el.funfactPop) return;
+        if (!force && !this.settings.funFactsEnabled) return;
+        const key  = String(parseInt(number, 10));
+        const list = this.getFunFacts()[key];
+        if (!list || !list.length) return;
+
+        if (!this._funFactSeq) this._funFactSeq = {};
+        const i = (this._funFactSeq[key] ?? 0) % list.length;
+        this._funFactSeq[key] = (i + 1) % list.length;
+
+        el.funfactPopNum.textContent  = key;
+        el.funfactPopText.textContent = list[i];
+        el.funfactPopIdx.textContent  = list.length > 1 ? `${i + 1}/${list.length}` : '';
+        this._funFactShownFor = key;
+
+        clearTimeout(this._funFactTimer);
+        el.funfactPop.classList.remove('funfact-pop-out');
+        el.funfactPop.style.display = 'flex';
+        this.positionFunFact();
+        // Restart the entrance animation even if the panel was already up.
+        el.funfactPop.style.animation = 'none';
+        void el.funfactPop.offsetWidth;
+        el.funfactPop.style.animation = '';
+
+        // Countdown bar + auto-hide. 0 seconds = stay until clicked away.
+        const secs = this.settings.funFactSeconds ?? 8;
+        const bar  = el.funfactPopBar;
+        if (bar) {
+            bar.style.transition = 'none';
+            bar.style.transform  = 'scaleX(1)';
+            void bar.offsetWidth;
+            if (secs > 0) {
+                bar.style.transition = `transform ${secs}s linear`;
+                bar.style.transform  = 'scaleX(0)';
+            }
+        }
+        if (secs > 0) {
+            this._funFactTimer = setTimeout(() => this.hideFunFact(), secs * 1000);
+        }
+    }
+
+    hideFunFact() {
+        const pop = this.el && this.el.funfactPop;
+        if (!pop || pop.style.display === 'none') return;
+        clearTimeout(this._funFactTimer);
+        this._funFactShownFor = null;
+        pop.classList.add('funfact-pop-out');
+        clearTimeout(this._funFactOutTimer);
+        this._funFactOutTimer = setTimeout(() => {
+            pop.style.display = 'none';
+            pop.classList.remove('funfact-pop-out');
+        }, 220);
+    }
+
+    // Lay the panel over column 2, starting at the "Tid igjen" heading and
+    // running to the bottom of the column. Measured live rather than hard-coded
+    // so it keeps up with the layout (vertical grid mode, fullscreen, resizes).
+    // Falls back to a centred card when the columns are too narrow to target.
+    positionFunFact() {
+        const pop = this.el.funfactPop;
+        if (!pop) return;
+        const col   = document.querySelector('.page-layout .container');
+        const igjen = document.querySelector('.page-layout .container .igjen');
+        const c = col   && col.getBoundingClientRect();
+        const t = igjen && igjen.getBoundingClientRect();
+        if (!c || !c.width || !t || c.width < 200) {
+            // No usable column — centre it instead of pinning it to nothing.
+            pop.classList.add('funfact-pop-floating');
+            const w = Math.min(520, window.innerWidth - 32);
+            pop.style.left   = Math.round((window.innerWidth - w) / 2) + 'px';
+            pop.style.width  = w + 'px';
+            pop.style.top    = Math.round(window.innerHeight * 0.32) + 'px';
+            pop.style.height = 'auto';
+            pop.style.maxHeight = '46vh';
+            return;
+        }
+        pop.classList.remove('funfact-pop-floating');
+        // Start a touch above the heading so the panel's border doesn't cut
+        // through it, and stop at the column's bottom edge.
+        const top = Math.max(c.top, t.top - 6);
+        pop.style.left      = Math.round(c.left) + 'px';
+        pop.style.width     = Math.round(c.width) + 'px';
+        pop.style.top       = Math.round(top) + 'px';
+        pop.style.height    = Math.round(Math.max(120, c.bottom - top)) + 'px';
+        pop.style.maxHeight = '';
+    }
+
     openFrequencyModal() {
         this.playSound('select');
         this.el.frequencyModal.style.display = 'flex';
@@ -4887,6 +5249,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         add(this.el.suggestSaveModal,   { confirm: () => { this.el.suggestSaveModal.style.display = 'none'; this.openSessionModal(); },
                                           close:   () => { this.playSound('cancel'); this.el.suggestSaveModal.style.display = 'none'; } });
         add(this.el.uploadSoundModal,   { close: () => this.closeUploadSoundModal() });
+        add(this.el.funfactModal,       { close: () => this.closeFunFactModal() });
         add(this.el.playerHistoryModal, { close: () => this.closePlayerHistory() });
         add(this.el.playersModal,       { close: () => this.closePlayersModal() });
         add(this.el.leaderboardModal,   { close: () => this.closeLeaderboard() });
