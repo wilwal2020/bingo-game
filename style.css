@@ -4688,19 +4688,30 @@ option.user-sound {
 /* ── Logging a winner while the notice is up ──────────
    The whole point of the notice is that the winning numbers stay readable
    while they are called out, so the log dialog must not cover or blur them.
-   They sit SIDE BY SIDE: the notice keeps the left of the screen, the logging
-   dialog takes a column on the right, both vertically centred.
+   They sit SIDE BY SIDE, as one centred pair: notice on the left, dialog
+   immediately to its right.
 
-   The notice's width is tied to the viewport (`100vw - 500px`) rather than to
-   a percentage, so it always yields exactly the room the fixed-width dialog
-   needs and the two can never overlap on the way down. */
-.bv-win-modal.bv-win-modal-logging {
+   The two are separate fixed overlays, so neither can centre the pair on its
+   own. Instead both lay out against the SAME box — the pair's own bounds,
+   derived below — and then the notice pins to its left edge and the dialog to
+   its right. Because the side margin is identical on both, the pair lands
+   centred with the gap between the panels rather than beside them. */
+.bv-win-modal.bv-win-modal-logging,
+.modal-overlay.modal-over-bv-win {
+    /* The dialog is a fixed 420px (#winner-modal .modal); the notice takes
+       what is left, capped, keeping a 24px margin outside the pair. */
+    --bv-log-dialog-w: 420px;
+    --bv-log-gap:      24px;
+    --bv-log-notice-w: min(780px, calc(100vw - var(--bv-log-dialog-w)
+                                              - var(--bv-log-gap) - 48px));
+    --bv-log-side:     calc((100vw - var(--bv-log-notice-w) - var(--bv-log-gap)
+                                   - var(--bv-log-dialog-w)) / 2);
     align-items: center;
-    justify-content: flex-start;
-    padding: 20px 10px 20px 22px;
+    padding: 20px var(--bv-log-side);
 }
+.bv-win-modal.bv-win-modal-logging { justify-content: flex-start; }
 .bv-win-modal.bv-win-modal-logging .bv-win-modal-scroller {
-    width: min(780px, calc(100vw - 500px));
+    width: var(--bv-log-notice-w);
     max-height: 92vh;
 }
 /* Narrower column than the full-screen notice, so ease the type down a step. */
@@ -4718,9 +4729,7 @@ option.user-sound {
     background-color: transparent;
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
-    align-items: center;
     justify-content: flex-end;
-    padding: 20px 22px 20px 10px;
     /* Only the dialog itself should swallow clicks — a click on the bare
        area falls through to the notice behind (which closes on backdrop
        click just as it did before). */
@@ -4741,6 +4750,7 @@ option.user-sound {
         justify-content: center;
         padding: 14px 20px 20px;
     }
+    .modal-overlay.modal-over-bv-win { align-items: center; }
     .bv-win-modal.bv-win-modal-logging .bv-win-modal-scroller {
         width: min(100%, 900px);
         max-height: 48vh;
