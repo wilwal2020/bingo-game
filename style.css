@@ -4441,9 +4441,13 @@ option.user-sound {
    phone that needs it (set by JS as --bv-two-color); the digit keeps its own
    colour at rest so the grid still reads normally at a glance. */
 .balls.bv-two-away .ball-inner {
-    animation: bvTwoAwayPulse 1.6s ease-in-out infinite;
+    animation: bvTwoAwayPulse 2.4s ease-in-out infinite;
     will-change: transform, color;
 }
+/* The peak is deliberately understated: a small swell, and the digit only
+   leans PART of the way toward the block's colour (color-mix) instead of
+   jumping to it outright. Each colour is declared twice — the plain value
+   first as a fallback, the mixed one second for engines that support it. */
 @keyframes bvTwoAwayPulse {
     0%, 100% {
         transform: scale(1);
@@ -4451,21 +4455,30 @@ option.user-sound {
         text-shadow: none;
     }
     50% {
-        transform: scale(1.22);
+        transform: scale(1.07);
         color: var(--bv-two-color, var(--accent-color));
-        text-shadow: 0 0 14px var(--bv-two-color, var(--accent-color)),
-                     0 0 26px var(--bv-two-color, var(--accent-color));
+        color: color-mix(in srgb, var(--bv-two-color, var(--accent-color)) 55%,
+                                  var(--balls-color));
+        text-shadow: 0 0 8px var(--bv-two-color, var(--accent-color));
+        text-shadow: 0 0 8px color-mix(in srgb, var(--bv-two-color, var(--accent-color)) 40%,
+                                                transparent);
     }
 }
-/* Motion-sensitive users still get the colour/glow beat, just no movement. */
+/* Motion-sensitive users still get the colour beat, just no movement. */
 @media (prefers-reduced-motion: reduce) {
     .balls.bv-two-away .ball-inner {
         animation-name: bvTwoAwayPulseStill;
     }
     @keyframes bvTwoAwayPulseStill {
         0%, 100% { color: var(--balls-color); text-shadow: none; }
-        50%      { color: var(--bv-two-color, var(--accent-color));
-                   text-shadow: 0 0 14px var(--bv-two-color, var(--accent-color)); }
+        50%      {
+            color: var(--bv-two-color, var(--accent-color));
+            color: color-mix(in srgb, var(--bv-two-color, var(--accent-color)) 55%,
+                                      var(--balls-color));
+            text-shadow: 0 0 8px var(--bv-two-color, var(--accent-color));
+            text-shadow: 0 0 8px color-mix(in srgb, var(--bv-two-color, var(--accent-color)) 40%,
+                                                    transparent);
+        }
     }
 }
 
@@ -4675,30 +4688,39 @@ option.user-sound {
 /* ── Logging a winner while the notice is up ──────────
    The whole point of the notice is that the winning numbers stay readable
    while they are called out, so the log dialog must not cover or blur them.
-   The notice pins its stack to the TOP of the screen and shrinks, and the
-   winner modal docks to the BOTTOM with no backdrop of its own. */
+   They sit SIDE BY SIDE: the notice keeps the left of the screen, the logging
+   dialog takes a column on the right, both vertically centred.
+
+   The notice's width is tied to the viewport (`100vw - 500px`) rather than to
+   a percentage, so it always yields exactly the room the fixed-width dialog
+   needs and the two can never overlap on the way down. */
 .bv-win-modal.bv-win-modal-logging {
-    align-items: flex-start;
-    padding-top: 14px;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 20px 10px 20px 22px;
 }
 .bv-win-modal.bv-win-modal-logging .bv-win-modal-scroller {
-    max-height: 48vh;
+    width: min(780px, calc(100vw - 500px));
+    max-height: 92vh;
 }
-.bv-win-modal.bv-win-modal-logging .bv-win-name   { font-size: 1.7rem; padding-top: 12px; }
-.bv-win-modal.bv-win-modal-logging .bv-win-rekke  { padding-bottom: 12px; }
-.bv-win-modal.bv-win-modal-logging .bv-win-header { padding: 10px 18px; }
-.bv-win-modal.bv-win-modal-logging .bv-win-trophy { font-size: 2.2rem; }
+/* Narrower column than the full-screen notice, so ease the type down a step. */
+.bv-win-modal.bv-win-modal-logging .bv-win-name   { font-size: 1.9rem; padding-top: 14px; }
+.bv-win-modal.bv-win-modal-logging .bv-win-rekke  { padding-bottom: 14px; }
+.bv-win-modal.bv-win-modal-logging .bv-win-header { padding: 12px 18px; }
+.bv-win-modal.bv-win-modal-logging .bv-win-trophy { font-size: 2.4rem; }
 .bv-win-modal.bv-win-modal-logging .bv-win-id,
-.bv-win-modal.bv-win-modal-logging .bv-win-control { font-size: 3rem; padding: 2px 14px; }
+.bv-win-modal.bv-win-modal-logging .bv-win-control { font-size: 3.2rem; padding: 2px 16px; }
+.bv-win-modal.bv-win-modal-logging .bv-win-cell   { font-size: 2.1rem; }
 /* The winner-logging overlay, raised above the notice (z-index 1500) and
-   stripped of its darkening + blur so the cards behind stay crisp. */
+   stripped of its darkening + blur so the cards beside it stay crisp. */
 .modal-overlay.modal-over-bv-win {
     z-index: 1600;
     background-color: transparent;
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
-    align-items: flex-end;
-    padding-bottom: 14px;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 20px 22px 20px 10px;
     /* Only the dialog itself should swallow clicks — a click on the bare
        area falls through to the notice behind (which closes on backdrop
        click just as it did before). */
@@ -4706,11 +4728,35 @@ option.user-sound {
 }
 .modal-overlay.modal-over-bv-win .modal {
     pointer-events: auto;
-    max-height: 46vh;
+    max-height: 92vh;
     overflow-y: auto;
-    box-shadow: 0 -10px 50px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.08);
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
-.modal-overlay.modal-over-bv-win .modal-subtitle { margin-bottom: 12px; }
+.modal-overlay.modal-over-bv-win .modal-subtitle { margin-bottom: 14px; }
+/* Too narrow for two columns — fall back to the notice on top and the dialog
+   docked below it, which is still readable side of nothing. */
+@media (max-width: 900px) {
+    .bv-win-modal.bv-win-modal-logging {
+        align-items: flex-start;
+        justify-content: center;
+        padding: 14px 20px 20px;
+    }
+    .bv-win-modal.bv-win-modal-logging .bv-win-modal-scroller {
+        width: min(100%, 900px);
+        max-height: 48vh;
+    }
+    .bv-win-modal.bv-win-modal-logging .bv-win-name    { font-size: 1.7rem; padding-top: 12px; }
+    .bv-win-modal.bv-win-modal-logging .bv-win-header  { padding: 10px 18px; }
+    .bv-win-modal.bv-win-modal-logging .bv-win-trophy  { font-size: 2.2rem; }
+    .bv-win-modal.bv-win-modal-logging .bv-win-id,
+    .bv-win-modal.bv-win-modal-logging .bv-win-control { font-size: 3rem; padding: 2px 14px; }
+    .modal-overlay.modal-over-bv-win {
+        align-items: flex-end;
+        justify-content: center;
+        padding: 20px 20px 14px;
+    }
+    .modal-overlay.modal-over-bv-win .modal { max-height: 46vh; }
+}
 @keyframes bv-win-modal-fadein {
     0%   { opacity: 0; }
     100% { opacity: 1; }
