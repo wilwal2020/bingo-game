@@ -537,6 +537,10 @@ class BingoApp {
             // themselves live in localStorage under 'bingoFunFacts'.
             funFactsEnabled:       false,
             funFactSeconds:        8,
+            // Which of a number's facts to show. Random by default: in a real
+            // game a number comes up once, so stepping through them in order
+            // meant fact 1 was the only one anyone ever saw.
+            funFactRandom:         true,
             // Bottom block-bar: when true, chips are ordered by how many
             // numbers each block is missing (fewest = leftmost).
             bvBlockBarSort:        false,
@@ -952,6 +956,7 @@ class BingoApp {
             funfactModal:        document.getElementById('funfact-modal'),
             funfactSubtitle:     document.getElementById('funfact-subtitle'),
             funfactEnabled:      document.getElementById('funfact-enabled'),
+            funfactRandom:       document.getElementById('funfact-random'),
             funfactDurValue:     document.getElementById('funfact-dur-value'),
             funfactDurPlus:      document.getElementById('funfact-dur-plus'),
             funfactDurMinus:     document.getElementById('funfact-dur-minus'),
@@ -4569,6 +4574,14 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             });
         }
 
+        if (el.funfactRandom) {
+            el.funfactRandom.addEventListener('change', () => {
+                this.settings.funFactRandom = el.funfactRandom.checked;
+                this.saveSettings();
+                this.playSound('switch');
+            });
+        }
+
         // Seconds on screen. 0 means "stay until clicked away".
         const bumpDur = (delta) => {
             const next = Math.min(60, Math.max(0, (this.settings.funFactSeconds ?? 8) + delta));
@@ -4624,6 +4637,8 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         this.playSound('select');
         if (this.el.funfactEnabled)
             this.el.funfactEnabled.checked = this.settings.funFactsEnabled ?? false;
+        if (this.el.funfactRandom)
+            this.el.funfactRandom.checked = this.settings.funFactRandom ?? true;
         if (this.el.funfactDurValue)
             this.el.funfactDurValue.textContent = this.settings.funFactSeconds ?? 8;
         this.renderFunFactGrid();
@@ -4753,9 +4768,40 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         this.renderFunFactEditor();
     }
 
-    // Show the fact for a called number. With several facts on one number they
-    // are rotated rather than picked at random, so repeat calls across games
-    // work through all of them instead of hammering the same one.
+    // Which of a number's facts to show next, as an index into its list.
+    // Two modes, both remembering the last index they landed on so the choice
+    // survives a reload — a number is normally called once per game, so an
+    // in-memory counter always restarted at the first fact and nobody ever saw
+    // the rest of them.
+    //   random (default): any fact except the one shown last for this number
+    //   sequential:       the next one along, wrapping at the end
+    _pickFunFactIndex(key, count) {
+        if (count <= 1) return 0;
+        if (!this._funFactLast) {
+            let saved = {};
+            try { saved = JSON.parse(localStorage.getItem('bingoFunFactLast') || '{}') || {}; }
+            catch (e) { saved = {}; }
+            this._funFactLast = saved;
+        }
+        const last = Number.isInteger(this._funFactLast[key]) ? this._funFactLast[key] : null;
+        let i;
+        if (this.settings.funFactRandom ?? true) {
+            // Draw from the other facts only, so the same one never lands twice
+            // in a row — with three facts, a plain random draw would repeat
+            // about a third of the time and still look stuck.
+            const choices = [];
+            for (let k = 0; k < count; k++) if (k !== last) choices.push(k);
+            i = choices[Math.floor(Math.random() * choices.length)];
+        } else {
+            i = last === null ? 0 : (last + 1) % count;
+        }
+        this._funFactLast[key] = i;
+        this.scheduleWrite('bingoFunFactLast', () => JSON.stringify(this._funFactLast));
+        return i;
+    }
+
+    // Show the fact for a called number. Which one is picked depends on the
+    // "Tilfeldig faktum" setting — see _pickFunFactIndex.
     // `force` bypasses the enable toggle — used by the modal's preview button.
     showFunFact(number, force = false) {
         const el = this.el;
@@ -4765,9 +4811,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         const list = this.getFunFacts()[key];
         if (!list || !list.length) return;
 
-        if (!this._funFactSeq) this._funFactSeq = {};
-        const i = (this._funFactSeq[key] ?? 0) % list.length;
-        this._funFactSeq[key] = (i + 1) % list.length;
+        const i = this._pickFunFactIndex(key, list.length);
 
         el.funfactPopNum.textContent  = key;
         el.funfactPopText.textContent = list[i];
