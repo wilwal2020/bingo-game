@@ -34,7 +34,24 @@
       "Bash(python -c \"import sys; print\\(sys.version\\)\")",
       "Bash(python -)",
       "Bash(node --check _check.js)",
-      "Bash(rm -f _check.js)"
+      "Bash(rm -f _check.js)",
+      "Bash(git rm *)",
+      "Bash(git reset *)",
+      "Bash(git commit -q index.html script.js style.css -m '@ *)",
+      "Bash(git commit *)",
+      "Bash(cd \"C:/BILDER 2/bilder bra/index.html\" && echo \"=== MAIN head ===\" && grep -n -i \"<title>\\\\|favicon\\\\|<head>\\\\|icon\" \"bingo modernise - with sounds - bug fix 2/index.html\" | head -20 && echo \"\" && echo \"=== BINGOVIEW head ===\" && grep -n -i \"<title>\\\\|favicon\\\\|<head>\\\\|icon\" \"BingoView/index.html\" | head -20)",
+      "Skill(claude-api)",
+      "Skill(claude-api:*)",
+      "Bash(python3 -)",
+      "Bash(node -)",
+      "Bash(node -e ' *)",
+      "Bash(node --check \"C:\\\\BILDER 2\\\\bilder bra\\\\index.html\\\\bingo modernise - with sounds - bug fix 2\\\\script.js\")",
+      "Bash(where python *)",
+      "Bash(where npx *)",
+      "Bash(where node *)",
+      "Read(//c/BILDER 2/bilder bra/index.html/BingoView/**)",
+      "Skill(artifact-design)",
+      "Skill(artifact-design:*)"
     ]
   }
 }

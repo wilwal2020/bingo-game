@@ -4435,6 +4435,40 @@ option.user-sound {
     100% { transform: scale(1);    opacity: 1; }
 }
 
+/* ── Two numbers away: the DIGIT pulses, nothing is drawn around it ──
+   Deliberately quieter than the one-away ring — a block two numbers out is
+   worth noticing, not worth interrupting for. The glow is the colour of the
+   phone that needs it (set by JS as --bv-two-color); the digit keeps its own
+   colour at rest so the grid still reads normally at a glance. */
+.balls.bv-two-away .ball-inner {
+    animation: bvTwoAwayPulse 1.6s ease-in-out infinite;
+    will-change: transform, color;
+}
+@keyframes bvTwoAwayPulse {
+    0%, 100% {
+        transform: scale(1);
+        color: var(--balls-color);
+        text-shadow: none;
+    }
+    50% {
+        transform: scale(1.22);
+        color: var(--bv-two-color, var(--accent-color));
+        text-shadow: 0 0 14px var(--bv-two-color, var(--accent-color)),
+                     0 0 26px var(--bv-two-color, var(--accent-color));
+    }
+}
+/* Motion-sensitive users still get the colour/glow beat, just no movement. */
+@media (prefers-reduced-motion: reduce) {
+    .balls.bv-two-away .ball-inner {
+        animation-name: bvTwoAwayPulseStill;
+    }
+    @keyframes bvTwoAwayPulseStill {
+        0%, 100% { color: var(--balls-color); text-shadow: none; }
+        50%      { color: var(--bv-two-color, var(--accent-color));
+                   text-shadow: 0 0 14px var(--bv-two-color, var(--accent-color)); }
+    }
+}
+
 /* Phone-win notification stack — slides in from the top-right when a
    connected phone's paper completes a winning row (controlled by the
    "Vis varsel når telefon vinner" setting). */
@@ -4596,7 +4630,15 @@ option.user-sound {
     color: #0c2310;
     box-shadow: 0 0 14px rgba(255, 225, 74, 0.55);
 }
-.bv-win-modal-close {
+/* Button row under the win cards — Logg vinner + Lukk side by side. */
+.bv-win-modal-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 12px;
+    flex-shrink: 0;
+}
+.bv-win-modal-close,
+.bv-win-modal-log {
     background: rgba(255, 255, 255, 0.08);
     border: 1.5px solid rgba(255, 255, 255, 0.2);
     color: #fff;
@@ -4606,17 +4648,69 @@ option.user-sound {
     letter-spacing: 0.18em;
     text-transform: uppercase;
     padding: 12px 22px;
-    margin-top: 12px;
     border-radius: 8px;
     cursor: pointer;
     transition: background 0.15s, border-color 0.15s;
-    flex-shrink: 0;
-    align-self: stretch;
+    flex: 1;
 }
-.bv-win-modal-close:hover {
+.bv-win-modal-close:hover,
+.bv-win-modal-log:hover {
     background: rgba(255, 255, 255, 0.15);
     border-color: rgba(255, 255, 255, 0.4);
 }
+/* Logg vinner is the action you actually want — give it the win-green weight. */
+.bv-win-modal-log {
+    background: linear-gradient(135deg, #1a7a40 0%, #29a25a 100%);
+    border-color: #35c06d;
+}
+.bv-win-modal-log:hover {
+    background: linear-gradient(135deg, #229150 0%, #32bd6c 100%);
+    border-color: #5fe098;
+}
+.bv-win-modal-offline .bv-win-modal-log {
+    background: linear-gradient(135deg, #b87a14 0%, #d99425 100%);
+    border-color: #f0b44c;
+}
+
+/* ── Logging a winner while the notice is up ──────────
+   The whole point of the notice is that the winning numbers stay readable
+   while they are called out, so the log dialog must not cover or blur them.
+   The notice pins its stack to the TOP of the screen and shrinks, and the
+   winner modal docks to the BOTTOM with no backdrop of its own. */
+.bv-win-modal.bv-win-modal-logging {
+    align-items: flex-start;
+    padding-top: 14px;
+}
+.bv-win-modal.bv-win-modal-logging .bv-win-modal-scroller {
+    max-height: 48vh;
+}
+.bv-win-modal.bv-win-modal-logging .bv-win-name   { font-size: 1.7rem; padding-top: 12px; }
+.bv-win-modal.bv-win-modal-logging .bv-win-rekke  { padding-bottom: 12px; }
+.bv-win-modal.bv-win-modal-logging .bv-win-header { padding: 10px 18px; }
+.bv-win-modal.bv-win-modal-logging .bv-win-trophy { font-size: 2.2rem; }
+.bv-win-modal.bv-win-modal-logging .bv-win-id,
+.bv-win-modal.bv-win-modal-logging .bv-win-control { font-size: 3rem; padding: 2px 14px; }
+/* The winner-logging overlay, raised above the notice (z-index 1500) and
+   stripped of its darkening + blur so the cards behind stay crisp. */
+.modal-overlay.modal-over-bv-win {
+    z-index: 1600;
+    background-color: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    align-items: flex-end;
+    padding-bottom: 14px;
+    /* Only the dialog itself should swallow clicks — a click on the bare
+       area falls through to the notice behind (which closes on backdrop
+       click just as it did before). */
+    pointer-events: none;
+}
+.modal-overlay.modal-over-bv-win .modal {
+    pointer-events: auto;
+    max-height: 46vh;
+    overflow-y: auto;
+    box-shadow: 0 -10px 50px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+.modal-overlay.modal-over-bv-win .modal-subtitle { margin-bottom: 12px; }
 @keyframes bv-win-modal-fadein {
     0%   { opacity: 0; }
     100% { opacity: 1; }

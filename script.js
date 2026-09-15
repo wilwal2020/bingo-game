@@ -518,6 +518,10 @@ class BingoApp {
             bvCallTimerSeconds:    15,
             bvWinNotifyEnabled:    true,
             bvWinAutoOpenWinModal: true,
+            // Pulse the DIGIT (no ring) of every number a block is two away
+            // from needing. The one-away ring stays the loud signal; this is
+            // the quiet heads-up one step behind it.
+            bvTwoAwayPulse:        true,
             // Chime the moment a phone drops to a single number left. 'off'
             // disables it; a user-uploaded sound key plays that instead.
             // Configured in the Lydeffekter settings tab.
@@ -919,6 +923,7 @@ class BingoApp {
             bvWinNotifyEnabled:       document.getElementById('bv-win-notify-enabled'),
             bvWinModal:               document.getElementById('bv-win-modal'),
             bvWinAutoOpen:            document.getElementById('bv-win-auto-open'),
+            bvTwoAwayPulse:           document.getElementById('bv-two-away-pulse'),
             settingOverAverageBlink:    document.getElementById('setting-over-average-blink'),
             settingBlur:                document.getElementById('setting-blur'),
             settingNextGameCountdown:   document.getElementById('setting-next-game-countdown'),
@@ -1785,6 +1790,13 @@ class BingoApp {
                 this.saveSettings();
             });
         }
+        if (this.el.bvTwoAwayPulse) {
+            this.el.bvTwoAwayPulse.addEventListener('change', () => {
+                this.settings.bvTwoAwayPulse = this.el.bvTwoAwayPulse.checked;
+                this.saveSettings();
+                try { this._bvUpdatePaperHighlights(); } catch(e) {}
+            });
+        }
 
         // Per-theme color preset save buttons
         document.querySelectorAll('.color-preset-save-btn').forEach(btn => {
@@ -2092,6 +2104,8 @@ class BingoApp {
             this.el.bvWinNotifyEnabled.checked = s.bvWinNotifyEnabled ?? true;
         if (this.el.bvWinAutoOpen)
             this.el.bvWinAutoOpen.checked = s.bvWinAutoOpenWinModal ?? true;
+        if (this.el.bvTwoAwayPulse)
+            this.el.bvTwoAwayPulse.checked = s.bvTwoAwayPulse ?? true;
 
         // Next-game countdown
         if (this.el.settingNextGameCountdown) {
@@ -3258,12 +3272,26 @@ class BingoApp {
         this.updateWinnerModalState();
         document.body.style.overflow = 'hidden';
         this.el.winnerModal.style.display = 'flex';
+        this._syncWinnerModalLayering();
         setTimeout(() => this.el.winnerNameInput.focus(), 100);
+    }
+
+    // The phone-win notice has to stay readable while the winning numbers are
+    // called out, so when it is up the logging dialog is stacked ABOVE it —
+    // notice pinned to the top, dialog docked to the bottom, no backdrop of its
+    // own. Without this the notice (z-index 1500) simply buried the dialog.
+    _syncWinnerModalLayering() {
+        const notice = this.el.bvWinModal || document.getElementById('bv-win-modal');
+        const logging = !!notice && notice.style.display === 'flex'
+                     && this.el.winnerModal.style.display === 'flex';
+        this.el.winnerModal.classList.toggle('modal-over-bv-win', logging);
+        if (notice) notice.classList.toggle('bv-win-modal-logging', logging);
     }
 
     closeWinnerModal() {
         this.playSound('cancel');
         this.el.winnerModal.style.display = 'none';
+        this._syncWinnerModalLayering();
         this.restoreBodyScroll();
     }
 
@@ -6950,18 +6978,98 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
 
             } else if (type === 'one-away') {
                 if (s.oneAwayStyle === 'off') return;
-                // A phone just dropped to a single number left — a bright,
-                // quick two-note "ping". Kept short and pitched well above the
-                // call/win chimes so it reads as its own distinct event.
                 const md = MD(s.volOneAway ?? 1);
-                [[988, 0], [1319, 0.11]].forEach(([freq, delay]) => {
-                    const o = osc('triangle', freq); const g = gn();
-                    const o2 = osc('sine', freq * 2); const g2 = gn();
-                    g.gain.setValueAtTime(0, n+delay); g.gain.linearRampToValueAtTime(0.22, n+delay+0.008); g.gain.exponentialRampToValueAtTime(0.001, n+delay+0.5);
-                    g2.gain.setValueAtTime(0, n+delay); g2.gain.linearRampToValueAtTime(0.05, n+delay+0.008); g2.gain.exponentialRampToValueAtTime(0.001, n+delay+0.3);
-                    o.connect(g); g.connect(md); o2.connect(g2); g2.connect(md);
-                    o.start(n+delay); o.stop(n+delay+0.5); o2.start(n+delay); o2.stop(n+delay+0.3);
-                });
+
+                if (s.oneAwayStyle === 'synth-ping') {
+                    // The original: a bright, quick two-note "ping". Kept as an
+                    // option for anyone who preferred it short.
+                    [[988, 0], [1319, 0.11]].forEach(([freq, delay]) => {
+                        const o = osc('triangle', freq); const g = gn();
+                        const o2 = osc('sine', freq * 2); const g2 = gn();
+                        g.gain.setValueAtTime(0, n+delay); g.gain.linearRampToValueAtTime(0.22, n+delay+0.008); g.gain.exponentialRampToValueAtTime(0.001, n+delay+0.5);
+                        g2.gain.setValueAtTime(0, n+delay); g2.gain.linearRampToValueAtTime(0.05, n+delay+0.008); g2.gain.exponentialRampToValueAtTime(0.001, n+delay+0.3);
+                        o.connect(g); g.connect(md); o2.connect(g2); g2.connect(md);
+                        o.start(n+delay); o.stop(n+delay+0.5); o2.start(n+delay); o2.stop(n+delay+0.3);
+                    });
+                    return;
+                }
+
+                // Default: a bright little FANFARE for "someone needs one more
+                // number". Three ideas, all in D major so the whole thing reads
+                // as one happy phrase rather than a row of beeps:
+                //
+                //   1. a rising D-F#-A-D arpeggio (bell-like, each note ringing
+                //      on over the next so they pile into a chord)
+                //   2. a two-note lift onto the top D that lands as the arpeggio
+                //      peaks — the "ta-daa"
+                //   3. a sparkle tail of soft high grace notes that thins out
+                //
+                // Roughly 1.6s end to end, so it is clearly longer than every
+                // other cue on the board and can't be mistaken for a call blip.
+                const bell = (freq, at, dur, peak) => {
+                    // Triangle body + a quiet octave above = a struck-bell
+                    // colour that stays warm instead of piercing.
+                    const o  = osc('triangle', freq);   const g  = gn();
+                    const o2 = osc('sine',  freq * 2);  const g2 = gn();
+                    const o3 = osc('sine',  freq * 3);  const g3 = gn();
+                    g.gain.setValueAtTime(0, n+at);
+                    g.gain.linearRampToValueAtTime(peak, n+at+0.012);
+                    g.gain.exponentialRampToValueAtTime(0.001, n+at+dur);
+                    g2.gain.setValueAtTime(0, n+at);
+                    g2.gain.linearRampToValueAtTime(peak * 0.3, n+at+0.012);
+                    g2.gain.exponentialRampToValueAtTime(0.001, n+at+dur*0.7);
+                    g3.gain.setValueAtTime(0, n+at);
+                    g3.gain.linearRampToValueAtTime(peak * 0.1, n+at+0.012);
+                    g3.gain.exponentialRampToValueAtTime(0.001, n+at+dur*0.45);
+                    o.connect(g);   g.connect(md);
+                    o2.connect(g2); g2.connect(md);
+                    o3.connect(g3); g3.connect(md);
+                    o.start(n+at);  o.stop(n+at+dur);
+                    o2.start(n+at); o2.stop(n+at+dur*0.7);
+                    o3.start(n+at); o3.stop(n+at+dur*0.45);
+                };
+
+                // 1 — rising arpeggio. Long tails so the notes stack up.
+                [[587.33, 0.00, 1.00],   // D5
+                 [739.99, 0.10, 0.95],   // F#5
+                 [880.00, 0.20, 0.90],   // A5
+                 [1174.66, 0.30, 1.10]]  // D6
+                    .forEach(([f, at, dur]) => bell(f, at, dur, 0.2));
+
+                // 2 — the lift onto the top D: a short A5 grace note sliding up,
+                // arriving right as the arpeggio reaches its peak.
+                { const o = osc('sine', 880); const g = gn();
+                  o.frequency.setValueAtTime(880, n+0.30);
+                  o.frequency.exponentialRampToValueAtTime(1174.66, n+0.42);
+                  g.gain.setValueAtTime(0, n+0.30);
+                  g.gain.linearRampToValueAtTime(0.13, n+0.34);
+                  g.gain.exponentialRampToValueAtTime(0.001, n+0.55);
+                  o.connect(g); g.connect(md); o.start(n+0.30); o.stop(n+0.55); }
+
+                // 3 — sparkle tail: high grace notes fading out, so the cue
+                // ends by drifting away rather than stopping dead.
+                [[1760.00, 0.52, 0.16],  // A6
+                 [2349.32, 0.64, 0.12],  // D7
+                 [1975.53, 0.78, 0.09],  // B6
+                 [2637.02, 0.92, 0.07]]  // E7
+                    .forEach(([f, at, peak]) => {
+                        const o = osc('sine', f); const g = gn();
+                        g.gain.setValueAtTime(0, n+at);
+                        g.gain.linearRampToValueAtTime(peak, n+at+0.01);
+                        g.gain.exponentialRampToValueAtTime(0.001, n+at+0.5);
+                        o.connect(g); g.connect(md); o.start(n+at); o.stop(n+at+0.5);
+                    });
+
+                // Closing chord — the same D major the arpeggio spelled out,
+                // swelling in gently under the sparkles and ringing off.
+                [[587.33, 0.075], [880.00, 0.055], [1174.66, 0.065]]
+                    .forEach(([f, peak]) => {
+                        const o = osc('triangle', f); const g = gn();
+                        g.gain.setValueAtTime(0, n+0.60);
+                        g.gain.linearRampToValueAtTime(peak, n+0.78);
+                        g.gain.exponentialRampToValueAtTime(0.001, n+1.6);
+                        o.connect(g); g.connect(md); o.start(n+0.60); o.stop(n+1.6);
+                    });
             }
         } catch(e) {}
     }
@@ -7906,6 +8014,44 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         return [{ total: bestTotal, numbers: [...winning], level }];
     }
 
+    // Every number that sits on a win-path this strip is EXACTLY two away
+    // from completing. Deliberately separate from _bvStripCloseInfos rather
+    // than a raised threshold: that function aggregates all paths within the
+    // threshold into one entry and reports only the best distance, so a strip
+    // already one away would swallow its two-away numbers. Here each distance
+    // is answered on its own terms.
+    //
+    // Rekke 1: any row missing exactly two. Rekke 2/3: any N-row combination
+    // whose misses total exactly two, unioned.
+    _bvStripTwoAwayNumbers(strip, calledSet, rekke) {
+        const out = new Set();
+        if (!strip || !Array.isArray(strip.rows)) return out;
+        const rowsMissing = strip.rows.map(nums =>
+            (nums || []).filter(n => Number.isFinite(n) && !calledSet.has(n))
+        );
+
+        if (rekke === 'Rekke1') {
+            rowsMissing.forEach(missing => {
+                if (missing.length === 2) missing.forEach(n => out.add(n));
+            });
+            return out;
+        }
+
+        const N = rekke === 'Rekke3' ? 3 : 2;
+        const visit = (start, picked, total) => {
+            if (total > 2) return;                       // prune
+            if (picked.length === N) {
+                if (total === 2) picked.forEach(m => m.forEach(n => out.add(n)));
+                return;
+            }
+            for (let i = start; i < rowsMissing.length; i++) {
+                visit(i + 1, [...picked, rowsMissing[i]], total + rowsMissing[i].length);
+            }
+        };
+        visit(0, [], 0);
+        return out;
+    }
+
     // Fewest numbers a block is still missing to complete the current rekke
     // for one game — used by the bottom block-bar. Unlike _bvStripCloseInfos
     // this is unbounded (no threshold): it always returns a distance, so a
@@ -8263,8 +8409,10 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         // Clear previous styling on every ball
         const ballMap = this._bvBallMap();
         Object.values(ballMap).forEach(el => {
-            el.classList.remove('bv-watch', 'bv-pulse', 'bv-watch-flip', 'bv-watch-new');
+            el.classList.remove('bv-watch', 'bv-pulse', 'bv-watch-flip', 'bv-watch-new',
+                                'bv-two-away');
             el.style.removeProperty('--bv-rings');
+            el.style.removeProperty('--bv-two-color');
             // Remove old name labels (leave any .bv-burst to self-remove)
             const oldLabel = el.querySelector('.bv-watch-names');
             if (oldLabel) oldLabel.remove();
@@ -8287,6 +8435,11 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
 
         // Aggregate: { number: [{phoneIdx, level, color, name}, ...] }
         const byBall = {};
+        // Numbers a block is exactly two away from needing → the colour of the
+        // first block that wants it. Rings are not drawn for these; the digit
+        // pulses instead (setting: bvTwoAwayPulse).
+        const twoAwayOn = highlightOn && (this.settings.bvTwoAwayPulse ?? true);
+        const twoAway   = new Map();
         // For modal rendering, also collect close strips per phone
         const phoneRows = [];
         // For the fixed bottom bar: name + numbers-missing per block.
@@ -8317,6 +8470,10 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                             byBall[num].push({ phoneIdx: idx, color, level: info.level, name: displayName });
                         });
                     });
+                    if (twoAwayOn) {
+                        this._bvStripTwoAwayNumbers(strip, calledSet, rekke)
+                            .forEach(num => { if (!twoAway.has(num)) twoAway.set(num, color); });
+                    }
                 });
             }
 
@@ -8417,6 +8574,16 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             ball.appendChild(label);
         });
         this._bvWatchedNumsPrev = nowWatched;
+
+        // Two-away pulse. Applied after the ring pass so a number that some
+        // OTHER block is already one away from keeps the ring as its only
+        // signal — two competing treatments on one digit just reads as noise.
+        twoAway.forEach((color, num) => {
+            const ball = ballMap[num];
+            if (!ball || nowWatched.has(num)) return;
+            ball.style.setProperty('--bv-two-color', color);
+            ball.classList.add('bv-two-away');
+        });
 
         // After labels render, flip below the ball any that would overflow
         // off the top edge of the viewport.
@@ -8711,6 +8878,17 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
     // the line, not every render. The first run only seeds the set (no sound),
     // so opening BingoView on an already-close board stays quiet.
     _bvProcessOneAwaySound(phones, calledSet, rekke, threshold, game, highlightOn) {
+        // Fingerprint of what has actually been CALLED. A strip can only newly
+        // drop to one number left because a number was called (or the game /
+        // rekke changed). Anything that "appears" while this stays identical is
+        // a re-render artefact, not an event: a phone leaving and rejoining, a
+        // shared block re-merging under a different member's id, the highlight
+        // toggle being flipped. Those used to replay the chime out of nowhere.
+        const callSig = game + '|' + rekke + '|' +
+                        [...calledSet].sort((a, b) => a - b).join(',');
+        const prevSig = this._bvOneAwayCallSig;
+        this._bvOneAwayCallSig = callSig;
+
         const currentKeys = new Set();
         // Map each one-away strip key to the player's display name, so a newly
         // one-away key can be announced by name (Tale mode).
@@ -8725,7 +8903,12 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                 strips.forEach(strip => {
                     const infos = this._bvStripCloseInfos(strip, calledSet, rekke, threshold);
                     if (infos.some(info => info.level === 'strong')) {
-                        const key = `${phone.id}|${game}|${rekke}|${strip.id}`;
+                        // Key on the block's stable identity, not the phone id:
+                        // a merged/shared block swaps which member represents it
+                        // whenever one of them connects or drops, and keying on
+                        // the raw id made that look like a brand-new strip.
+                        const blockId = phone._orderKey || phone.id;
+                        const key = `${blockId}|${game}|${rekke}|${strip.id}`;
                         currentKeys.add(key);
                         keyName.set(key, displayName);
                     }
@@ -8733,8 +8916,11 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             });
         }
         const prev = this._bvOneAwayKeysPrev;
+        // The set is refreshed even when no sound can follow, so the next real
+        // call still compares against the truth.
         this._bvOneAwayKeysPrev = currentKeys;
-        if (!prev) return; // first run: seed only, never chime on load
+        if (!prev) return;             // first run: seed only, never chime on load
+        if (prevSig === callSig) return; // nothing was called — nothing crossed the line
         // Names of players who just crossed to one away (deduped, in order).
         const newNames = [];
         const seenNames = new Set();
@@ -8891,31 +9077,57 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         });
 
         const closeBtn = modal.querySelector('.bv-win-modal-close');
+        const logBtn   = modal.querySelector('.bv-win-modal-log');
+        // Nothing to log against outside a game — hide the button rather than
+        // offer one that silently does nothing.
+        if (logBtn) logBtn.style.display = this.currentTheme === 'default' ? 'none' : '';
         // Detach any handlers from a previous (possibly still-open) notice so
         // repeated wins don't stack document-level keydown listeners.
         if (modal._bvWinCleanup) modal._bvWinCleanup();
+        const winnerOpen = () => this.el.winnerModal.style.display === 'flex';
         const close = () => {
             modal.style.display = 'none';
+            modal.classList.remove('bv-win-modal-logging');
+            this.el.winnerModal.classList.remove('modal-over-bv-win');
             if (modal._bvWinCleanup) modal._bvWinCleanup();
         };
-        const backdropClose = (e) => { if (e.target === modal) close(); };
-        const keyHandler    = (e) => { if (e.key === 'Escape') close(); };
+        // Log the winner WITHOUT dismissing the notice — the whole point is
+        // that the numbers stay on screen while they are read out.
+        const openLog = (e) => { e.stopPropagation(); this.openWinnerModal(); };
+        // A click straight through to the notice closes it, but not while the
+        // logging dialog is docked on top (its overlay is click-through by
+        // design, so a stray click beside the dialog must not wipe the numbers).
+        const backdropClose = (e) => { if (e.target === modal && !winnerOpen()) close(); };
+        // Same for Escape: the topmost dialog owns that key while it is open.
+        // Registered on the CAPTURE phase so it sees the logging dialog still
+        // open — the app's own keydown handler closes that dialog first, and on
+        // the bubble phase this would then find nothing above it and take the
+        // notice down with it in a single keypress.
+        const keyHandler    = (e) => { if (e.key === 'Escape' && !winnerOpen()) close(); };
         modal._bvWinCleanup = () => {
             modal.removeEventListener('click', backdropClose);
             closeBtn.removeEventListener('click', close);
-            document.removeEventListener('keydown', keyHandler);
+            if (logBtn) logBtn.removeEventListener('click', openLog);
+            document.removeEventListener('keydown', keyHandler, true);
             modal._bvWinCleanup = null;
         };
         modal.addEventListener('click', backdropClose);
         closeBtn.addEventListener('click', close);
-        document.addEventListener('keydown', keyHandler);
+        if (logBtn) logBtn.addEventListener('click', openLog);
+        document.addEventListener('keydown', keyHandler, true);
 
         modal.style.display = 'flex';
+        // A second win can land while the dialog is already open — re-apply the
+        // split layout so the refreshed stack doesn't sit under the dialog.
+        this._syncWinnerModalLayering();
     }
 
     _bvClearWinNotices() {
         const modal = document.getElementById('bv-win-modal');
-        if (modal) modal.style.display = 'none';
+        if (!modal) return;
+        modal.style.display = 'none';
+        modal.classList.remove('bv-win-modal-logging');
+        this.el.winnerModal.classList.remove('modal-over-bv-win');
     }
 }
 
