@@ -111,9 +111,11 @@ body {
     align-items:      center;
     justify-content:  space-between;
     height:           50px;
+    /* No backdrop-filter: the only thing behind the nav is the plain page
+       background and the particle canvas, so the blur changed nothing you
+       could see — but the canvas moves every frame, which made the iPad
+       re-blur the whole nav strip on every frame too. */
     background-color: rgba(0,0,0,.35);
-    backdrop-filter:  blur(12px);
-    -webkit-backdrop-filter: blur(12px);
     border-bottom:    1px solid rgba(255,255,255,.06);
     box-shadow:       0 3px 0 var(--accent-color);
     position:         relative;
@@ -310,7 +312,9 @@ body.layout-vertical #jackpot-btn-cell {
     text-align:      center;
     cursor:          pointer;
     position:        relative;
-    transition:      all .3s ease;
+    /* Only what actually changes on a ball. `all` also watched every other
+       property on all 90 balls and animated anything that happened to move. */
+    transition:      color .3s ease, text-shadow .3s ease, opacity .3s ease;
     display:         flex;
     align-items:     center;
     justify-content: center;
@@ -473,7 +477,23 @@ body.layout-vertical #jackpot-btn-cell {
     position:        relative;
     text-shadow:     0 2px 24px rgba(0,0,0,.8);
     transition:      color .3s ease, background-color .3s ease, transform .3s ease, box-shadow .3s ease;
-    filter:          drop-shadow(0 0 1px rgba(255,255,255,.05));
+    /* Keeps the negative-z rings below inside this circle. This used to come
+       from a filter (a 5%-white drop-shadow nobody could see), which cost a
+       full filter pass whenever anything in the circle repainted. */
+    isolation:       isolate;
+}
+
+/* Red "over average" fill. On its own layer so the blink is an opacity fade
+   the GPU runs by itself — animating the circle's background colour instead
+   repainted the rings, masks and text on every frame. */
+.circle-pulse {
+    position:         absolute;
+    inset:            0;
+    border-radius:    50%;
+    background-color: rgba(var(--danger-rgb), .8);
+    opacity:          0;
+    z-index:          -3;
+    pointer-events:   none;
 }
 
 .circle::before {
@@ -496,12 +516,13 @@ body.layout-vertical #jackpot-btn-cell {
     position:      absolute;
     inset:         -15px;
     border-radius: 50%;
+    /* --balls-bright is --balls-color at brightness(2), worked out in JS
+       (applyThemeColors) so the ring needs no filter. */
     background:    conic-gradient(
-        var(--balls-color) 0deg,
-        var(--balls-color) var(--outer-progress-angle, 0deg),
-        transparent        var(--outer-progress-angle, 0deg)
+        var(--balls-bright, #98b0d6) 0deg,
+        var(--balls-bright, #98b0d6) var(--outer-progress-angle, 0deg),
+        transparent                  var(--outer-progress-angle, 0deg)
     );
-    filter:  brightness(2);
     z-index: -2;
     -webkit-mask: radial-gradient(circle, transparent 83px, black 84px);
             mask: radial-gradient(circle, transparent 83px, black 84px);
@@ -515,9 +536,9 @@ body.layout-vertical #jackpot-btn-cell {
     );
 }
 
-.circle.over-average { animation: redPulse 1.5s infinite; }
-.circle.over-average.game-done { animation: none; }
-body.no-over-average-blink .circle.over-average { animation: none; }
+.circle.over-average .circle-pulse { animation: redPulse 1.5s infinite; }
+.circle.over-average.game-done .circle-pulse { animation: none; }
+body.no-over-average-blink .circle.over-average .circle-pulse { animation: none; }
 .circle.count-update  { animation: countUpdate .5s ease-out; }
 
 /* Averages */
@@ -536,8 +557,9 @@ body.no-over-average-blink .circle.over-average { animation: none; }
     border:           1px solid rgba(255,255,255,.12);
     border-radius:    14px;
     white-space:      nowrap;
+    /* No backdrop-filter — see .flex-container. Three of these, each re-blurred
+       every frame behind the moving particles, for no visible difference. */
     background-color: rgba(255,255,255,.04);
-    backdrop-filter:  blur(4px);
     box-shadow:       0 2px 8px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.06);
     transition:       background-color .4s ease, color .4s ease, border-color .4s ease, box-shadow .4s ease;
 }
@@ -597,12 +619,15 @@ body.no-over-average-blink .circle.over-average { animation: none; }
     overflow: hidden;
     margin: 6px auto 0;
 }
+/* Shrinks by scaleX (set from JS) rather than width: a width transition
+   re-ran layout on every frame for the minutes the countdown is up. */
 .next-game-cd-bar-fill {
     height: 100%;
     width: 100%;
     background: var(--accent-color);
     border-radius: 4px;
-    transition: width 1s linear;
+    transform-origin: left center;
+    transition: transform 1s linear;
 }
 
 /* Game indicator */
@@ -1687,8 +1712,8 @@ select.session-input option {
     width:            44px;
     height:           44px;
     border-radius:    12px;
+    /* No backdrop-filter — see .flex-container. */
     background-color: rgba(255,255,255,.08);
-    backdrop-filter:  blur(12px);
     color:            rgba(255,255,255,.6);
     border:           1px solid rgba(255,255,255,.12);
     font-size:        1.3rem;
@@ -1955,10 +1980,12 @@ body.fullscreen .page-layout {
     100% { transform: scale(1); }
 }
 
+/* Runs on .circle-pulse, which carries the red at .8 — so fading its opacity
+   0 → 1 → 0 looks exactly like the old transparent → red → transparent. */
 @keyframes redPulse {
-    0%   { background-color: transparent; }
-    50%  { background-color: rgba(var(--danger-rgb),.8); }
-    100% { background-color: transparent; }
+    0%   { opacity: 0; }
+    50%  { opacity: 1; }
+    100% { opacity: 0; }
 }
 
 @keyframes jackpotBreak {
@@ -2945,10 +2972,11 @@ body.layout-vertical #random-button {
     100% { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 
-/* Jackpot mode: highlight unclicked balls */
+/* Jackpot mode: highlight unclicked balls. --accent-bright is the accent at
+   brightness(1.4), worked out in JS: the same colour the old per-ball filter
+   produced, without up to 90 filtered layers blinking at once. */
 .balls.jackpot-highlight {
-    color:      var(--accent-color);
-    filter:     brightness(1.4);
+    color:      var(--accent-bright, var(--accent-color));
     animation:  jackpotHighlight 1.5s ease-in-out infinite;
 }
 
@@ -4440,46 +4468,50 @@ option.user-sound {
    worth noticing, not worth interrupting for. The glow is the colour of the
    phone that needs it (set by JS as --bv-two-color); the digit keeps its own
    colour at rest so the grid still reads normally at a glance. */
+/* Built from transform + opacity only, so the GPU runs every pulse on its own.
+   Animating the digit's colour and glow directly (as before) meant repainting
+   each pulsing number, blur and all, on every frame — the main reason a board
+   full of two-away numbers dragged on the iPad.
+
+   Two parts, sharing one clock: the digit swells (transform), and a copy of
+   it — already in the peak colour, glow included — fades in over it and back
+   out (opacity). Fading between two copies of the same glyph reads the same
+   as the colour change it replaces. */
 .balls.bv-two-away .ball-inner {
-    animation: bvTwoAwayPulse 2.4s ease-in-out infinite;
-    will-change: transform, color;
+    position:  relative;   /* anchors the copy */
+    animation: bvTwoAwaySwell 2.4s ease-in-out infinite;
 }
-/* The peak is deliberately understated: a small swell, and the digit only
-   leans PART of the way toward the block's colour (color-mix) instead of
-   jumping to it outright. Each colour is declared twice — the plain value
-   first as a fallback, the mixed one second for engines that support it. */
-@keyframes bvTwoAwayPulse {
-    0%, 100% {
-        transform: scale(1);
-        color: var(--balls-color);
-        text-shadow: none;
-    }
-    50% {
-        transform: scale(1.07);
-        color: var(--bv-two-color, var(--accent-color));
-        color: color-mix(in srgb, var(--bv-two-color, var(--accent-color)) 55%,
-                                  var(--balls-color));
-        text-shadow: 0 0 8px var(--bv-two-color, var(--accent-color));
-        text-shadow: 0 0 8px color-mix(in srgb, var(--bv-two-color, var(--accent-color)) 40%,
-                                                transparent);
-    }
+/* The peak is deliberately understated: the copy only leans PART of the way
+   toward the block's colour (color-mix) instead of jumping to it outright.
+   Each colour is declared twice — the plain value first as a fallback, the
+   mixed one second for engines that support it. data-num on .ball-inner
+   supplies the digits (set in cacheElements). */
+.balls.bv-two-away .ball-inner::after {
+    content:        attr(data-num);
+    position:       absolute;
+    inset:          0;
+    white-space:    nowrap;
+    pointer-events: none;
+    color:       var(--bv-two-color, var(--accent-color));
+    color:       color-mix(in srgb, var(--bv-two-color, var(--accent-color)) 55%,
+                                    var(--balls-color));
+    text-shadow: 0 0 8px var(--bv-two-color, var(--accent-color));
+    text-shadow: 0 0 8px color-mix(in srgb, var(--bv-two-color, var(--accent-color)) 40%,
+                                           transparent);
+    opacity:     0;
+    animation:   bvTwoAwayGlow 2.4s ease-in-out infinite;
+}
+@keyframes bvTwoAwaySwell {
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.07); }
+}
+@keyframes bvTwoAwayGlow {
+    0%, 100% { opacity: 0; }
+    50%      { opacity: 1; }
 }
 /* Motion-sensitive users still get the colour beat, just no movement. */
 @media (prefers-reduced-motion: reduce) {
-    .balls.bv-two-away .ball-inner {
-        animation-name: bvTwoAwayPulseStill;
-    }
-    @keyframes bvTwoAwayPulseStill {
-        0%, 100% { color: var(--balls-color); text-shadow: none; }
-        50%      {
-            color: var(--bv-two-color, var(--accent-color));
-            color: color-mix(in srgb, var(--bv-two-color, var(--accent-color)) 55%,
-                                      var(--balls-color));
-            text-shadow: 0 0 8px var(--bv-two-color, var(--accent-color));
-            text-shadow: 0 0 8px color-mix(in srgb, var(--bv-two-color, var(--accent-color)) 40%,
-                                                    transparent);
-        }
-    }
+    .balls.bv-two-away .ball-inner { animation: none; }
 }
 
 /* Phone-win notification stack — slides in from the top-right when a

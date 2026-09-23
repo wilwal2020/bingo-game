@@ -106,6 +106,14 @@ function hexToRgb(hex) {
     const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex.trim());
     return m ? `${parseInt(m[1],16)}, ${parseInt(m[2],16)}, ${parseInt(m[3],16)}` : null;
 }
+// The colour filter: brightness(k) would turn this #rrggbb into, as rgb().
+// Lets CSS use the brightened colour directly instead of paying for a filter.
+function brightenHex(hex, k) {
+    const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(String(hex).trim());
+    if (!m) return null;
+    const ch = i => Math.min(255, Math.round(parseInt(m[i], 16) * k));
+    return `rgb(${ch(1)}, ${ch(2)}, ${ch(3)})`;
+}
 
 // Prize amounts per game (index 0=blue/spill1, 1=yellow/spill2, 2=pink/spill3, 3=grey/spill4)
 const PRIZES = {
@@ -264,12 +272,28 @@ const BlockEstimate = (() => {
     }
 
 
+    // estimate() is pure but asked about the same sessions over and over: the
+    // live tracker re-runs it for every saved session on each rekke change and
+    // game switch, and the viewer, graph and win odds all repeat it. ~0.2 ms a
+    // session on a desktop (more on the iPad), so cache by the observations.
+    const estimateCache = new Map();
+
     /**
      * Estimate how many blocks are in play.
      * @param {Array<{rekke:0|1|2, draws:number}>} obs  logged rekke counts
      * @returns {{blocks:number, boards:number, low:number, high:number, samples:number}|null}
+     *   Cached and shared between callers — treat it as read-only.
      */
     function estimate(obs) {
+        const key = (obs || []).map(o => o ? o.rekke + ':' + o.draws : '-').join(',');
+        if (estimateCache.has(key)) return estimateCache.get(key);
+        if (estimateCache.size >= 2000) estimateCache.clear();
+        const result = estimateUncached(obs);
+        estimateCache.set(key, result);
+        return result;
+    }
+
+    function estimateUncached(obs) {
         const clean = (obs || []).filter(usable);
         if (!clean.length) return null;
         const ll = B => logLike(clean, B);
@@ -685,6 +709,7 @@ class BingoApp {
             randomButton:    document.getElementById('random-button'),
             randomBtnCell:   document.getElementById('random-btn-cell'),
             circle:          document.querySelector('.circle'),
+            circleCount:     document.querySelector('.circle .circle-count'),
             difference:      document.getElementById('difference'),
             rekkeBtns:       document.querySelectorAll('.rekke-btn'),
             rekkeButtonsDiv: document.getElementById('rekke-buttons'),
@@ -1009,7 +1034,8 @@ class BingoApp {
         // Wrap each ball's text in an inner span so hover/clicked scale
         // transforms target the inner element. The parent's hit-area then
         // stays fixed at its layout size and can't flicker hover state when
-        // the cursor sits right on the edge.
+        // the cursor sits right on the edge. data-num on the span feeds the
+        // two-away pulse's glowing copy of the digit (CSS attr()).
         this.el.balls.forEach(ball => {
             if (ball.classList.contains('grid-btn-cell')) return;
             if (ball.querySelector(':scope > .ball-inner')) return;
@@ -1018,6 +1044,7 @@ class BingoApp {
                     const span = document.createElement('span');
                     span.className = 'ball-inner';
                     span.textContent = node.textContent;
+                    span.dataset.num = node.textContent.trim();
                     ball.replaceChild(span, node);
                     break;
                 }
@@ -1965,6 +1992,10 @@ class BingoApp {
         body.style.setProperty('--balls-color',   c.balls);
         const rgb = hexToRgb(c.accent);
         if (rgb) body.style.setProperty('--accent-rgb', rgb);
+        // Pre-brightened copies for what used to be filter: brightness() — the
+        // jackpot highlight (1.4) and the counter's outer ring (2).
+        body.style.setProperty('--accent-bright', brightenHex(c.accent, 1.4) || c.accent);
+        body.style.setProperty('--balls-bright',  brightenHex(c.balls, 2) || c.balls);
 
         // The background particle field caches the accent as an RGB triple and
         // only refreshes on flare-setting edits — tell it the accent moved so
@@ -2739,7 +2770,7 @@ class BingoApp {
         const outerProgress = Math.min(count / rekke3Threshold, 1);
         this.el.circle.style.setProperty('--outer-progress-angle', `${outerProgress * 360}deg`);
 
-        this.el.circle.textContent = count;
+        this.el.circleCount.textContent = count;
         const gameDone = this.slot.loggedRekkes.Rekke3 !== null;
         this.el.circle.classList.toggle('over-average', count > threshold);
         this.el.circle.classList.toggle('game-done', gameDone);
@@ -6752,8 +6783,8 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             const s = remaining % 60;
             this.el.nextGameCdDisplay.textContent =
                 `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-            this.el.nextGameCdBar.style.width =
-                `${(remaining / this._nextGameCdTotal) * 100}%`;
+            this.el.nextGameCdBar.style.transform =
+                `scaleX(${remaining / this._nextGameCdTotal})`;
             if (remaining > 0) {
                 this._nextGameCdTimer = setTimeout(tick, 1000);
             } else {
@@ -7840,7 +7871,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                 // when the game/rekke changes or a phone appears, so a stale
                 // node written by an earlier build could sit there all evening
                 // and phones would keep showing whatever it was missing.
-                try { this.bvSendState(); } catch (e) {}
+                try { this.bvSendState(true); } catch (e) {}
             };
             infoRef.on('value', infoHandler);
             this._bvInfoConnectedOff = () => infoRef.off('value', infoHandler);
@@ -7953,8 +7984,10 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                 const onlineCount = onlineDevices.size;
                 this._bvOnlineCount = onlineCount;
                 this._bvUpdatePresenceUI(onlineCount);
+                // bvSendState ends with the highlight pass itself — calling
+                // both ran the whole pass twice on every snapshot.
                 if (onlineCount > 0) this.bvSendState();
-                this._bvUpdatePaperHighlights();
+                else this._bvUpdatePaperHighlights();
             };
 
             // Attach child-path listeners via named refs/handlers and stash
@@ -8021,6 +8054,10 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
     }
 
     _bvUpdatePresenceUI(count) {
+        // Runs on every snapshot; rewriting the same badge text still swaps
+        // its text node and relays it out.
+        if (count === this._bvPresenceCount) return;
+        this._bvPresenceCount = count;
         const btn = document.getElementById('bingoview-btn');
         if (btn) {
             btn.style.opacity = count > 0 ? '1' : '0.6';
@@ -8300,9 +8337,11 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         } catch (e) { return null; }
     }
 
-    bvSendState() {
+    // `force` rewrites the node even when nothing in it changed — used on
+    // (re)connect so a stale node from an earlier build can't linger.
+    bvSendState(force = false) {
         if (!this._bvChannelRef) return;
-        this._bvChannelRef.child('state').set({
+        const state = {
             game:  this.currentTheme,
             rekke: this.slot.currentRekke,
             // How long the phones' countdown ring should run. Whether to show
@@ -8313,8 +8352,17 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             // the same figures the avg boxes show — read off the slot
             // thresholds, which updateAverages keeps in step with the history.
             avgs: this._bvRekkeAverages(),
-            ts:    Date.now()
-        });
+        };
+        // This runs on every phones/papers snapshot, and a single phone
+        // reconnecting sends a burst of them. Rewriting an identical state
+        // each time made every connected phone re-apply it for nothing, so
+        // only write when something the phones read has actually changed.
+        const sig = JSON.stringify(state);
+        if (force || sig !== this._bvSentStateSig || this._bvSentStateRef !== this._bvChannelRef) {
+            this._bvSentStateSig = sig;
+            this._bvSentStateRef = this._bvChannelRef;
+            this._bvChannelRef.child('state').set({ ...state, ts: Date.now() });
+        }
         this._bvUpdatePaperHighlights();
     }
 
@@ -8585,9 +8633,10 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             bar.style.display = 'none';
             if (this._bvTipEl) this._bvTipEl.style.display = 'none';
             this._bvTipPinned = null;
+            this._bvBlockBarSig = null;
             return;
         }
-        bar.style.display = 'flex';
+        if (bar.style.display !== 'flex') bar.style.display = 'flex';
 
         const sortOn = !!this.settings.bvBlockBarSort;
         if (sortBtn) {
@@ -8610,6 +8659,16 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             shown = shown.slice().sort((a, b) =>
                 a.missing - b.missing || (ord.get(a.id) ?? 0) - (ord.get(b.id) ?? 0));
         }
+
+        // Nothing the bar shows has changed (the usual case for a snapshot —
+        // most are a phone reconnecting): keep the chips as they are. The
+        // rebuild below measures every chip twice for the slide animation.
+        const sig = (sortOn ? 'S' : 'U') + shown.map(it => [
+            it.id, it.name, it.color, it.missing, it.rekkeNum,
+            (it.missNow || []).join(','), it.rekkeNextNum || '', (it.missNext || []).join(','),
+        ].join('\u0001')).join('\u0002');
+        if (sig === this._bvBlockBarSig && list.children.length === shown.length) return;
+        this._bvBlockBarSig = sig;
 
         // FLIP: record each existing chip's position (by stable key) before the
         // rebuild so we can animate any that land somewhere new.
@@ -8674,8 +8733,11 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         // keyframes explicitly avoids the CSS-transition trap where the browser
         // coalesces the invert+release into a no-op and the chips just snap.
         // Transforms don't reflow siblings, so chips slide through each other.
-        const reduceMotion = window.matchMedia &&
-            window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (this._bvReduceMotionMq === undefined) {
+            this._bvReduceMotionMq = window.matchMedia
+                ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+        }
+        const reduceMotion = !!(this._bvReduceMotionMq && this._bvReduceMotionMq.matches);
         if (!reduceMotion) {
             [...list.children].forEach(chip => {
                 const prev = firstRects.get(chip.getAttribute('data-key'));
@@ -8812,18 +8874,14 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
 
     // Recompute ball highlights and modal phones list. Called from phones-listener,
     // bvSend, bvSendUncall, bvSendState, bvSendReset.
+    //
+    // The balls are updated as a DIFF against what each one already shows, so
+    // a ball whose highlight hasn't changed isn't touched. This runs on every
+    // Firebase snapshot (a phone reconnecting sends a burst of them); the old
+    // clear-all-then-rebuild pass restyled all 90 balls and rebuilt every name
+    // plate each time — and any layout read mid-rebuild restarted the pulses.
     _bvUpdatePaperHighlights() {
-        // Clear previous styling on every ball
         const ballMap = this._bvBallMap();
-        Object.values(ballMap).forEach(el => {
-            el.classList.remove('bv-watch', 'bv-pulse', 'bv-watch-flip', 'bv-watch-new',
-                                'bv-two-away');
-            el.style.removeProperty('--bv-rings');
-            el.style.removeProperty('--bv-two-color');
-            // Remove old name labels (leave any .bv-burst to self-remove)
-            const oldLabel = el.querySelector('.bv-watch-names');
-            if (oldLabel) oldLabel.remove();
-        });
 
         // Order phones by a STABLE first-seen sequence, not by connection ts.
         // _bvPhones is sorted online-first / by ts, so a phone that exits and
@@ -8928,29 +8986,67 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         const seeding     = !prevWatched;
         const nowWatched  = new Set();
 
-        // Apply ball highlights
-        Object.entries(byBall).forEach(([numStr, entries]) => {
-            const num = Number(numStr);
-            const ball = ballMap[num];
-            if (!ball) return;
+        // Apply ball highlights — every ball, touching only what changed.
+        Object.entries(ballMap).forEach(([numStr, ball]) => {
+            const num     = Number(numStr);
+            const entries = byBall[num];
+
+            if (!entries) {
+                // No ring on this ball (any more).
+                if (ball.classList.contains('bv-watch')) {
+                    ball.classList.remove('bv-watch', 'bv-pulse', 'bv-watch-flip', 'bv-watch-new');
+                    clearTimeout(ball._bvNewTimer);
+                    ball.style.removeProperty('--bv-rings');
+                    // (a .bv-burst still playing removes itself)
+                    const oldLabel = ball.querySelector(':scope > .bv-watch-names');
+                    if (oldLabel) oldLabel.remove();
+                }
+                // Two-away pulse — only on ring-less numbers, so a number some
+                // OTHER block is already one away from keeps the ring as its
+                // only signal; two competing treatments on one digit just
+                // reads as noise. A ball that is already pulsing keeps its
+                // class untouched, so its pulse carries on instead of restarting.
+                const twoColor = twoAway.get(num);
+                if (twoColor) {
+                    if (ball.style.getPropertyValue('--bv-two-color') !== twoColor) {
+                        ball.style.setProperty('--bv-two-color', twoColor);
+                    }
+                    // (classList.add rewrites the attribute even when the class
+                    // is already there, hence the contains checks throughout)
+                    if (!ball.classList.contains('bv-two-away')) ball.classList.add('bv-two-away');
+                } else if (ball.classList.contains('bv-two-away')) {
+                    ball.classList.remove('bv-two-away');
+                    ball.style.removeProperty('--bv-two-color');
+                }
+                return;
+            }
+
             nowWatched.add(num);
+            if (ball.classList.contains('bv-two-away')) {
+                ball.classList.remove('bv-two-away');
+                ball.style.removeProperty('--bv-two-color');
+            }
             // Stack rings outward as solid 3px bands — one per phone that
             // needs this ball. Crisper/chunkier than the old 2px to match the
             // site's flat retro weight; see .balls.bv-watch::before.
             const rings = entries.map((e, i) =>
                 `0 0 0 ${3 + i * 3}px ${e.color}`
             ).join(', ');
-            ball.style.setProperty('--bv-rings', rings);
-            ball.classList.add('bv-watch');
-            if (entries.some(e => e.level === 'strong')) {
-                ball.classList.add('bv-pulse');
+            if (ball.style.getPropertyValue('--bv-rings') !== rings) {
+                ball.style.setProperty('--bv-rings', rings);
             }
+            if (!ball.classList.contains('bv-watch')) ball.classList.add('bv-watch');
+            ball.classList.toggle('bv-pulse', entries.some(e => e.level === 'strong'));
 
             // Did this circle just appear? Fire the one-shot flashy entrance:
             // the circle pops in and a radiating "ping" burst fans out.
             const isNewWatch = !seeding && !prevWatched.has(num);
             if (isNewWatch) {
                 ball.classList.add('bv-watch-new');
+                // Off again once the entrance has played (0.38 s delay + 0.5 s)
+                // so it can play again the next time this ball lights up.
+                clearTimeout(ball._bvNewTimer);
+                ball._bvNewTimer = setTimeout(() => ball.classList.remove('bv-watch-new'), 1000);
                 // The square that collapses in from the whole number field...
                 this._bvPlaySlamIn(ball, entries[0].color);
                 // ...and the shockwave it kicks up on impact (CSS-delayed to
@@ -8962,46 +9058,43 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                 setTimeout(() => burst.remove(), 1300);
             }
 
-            // Add name label(s) beside the ball — dedupe per phone (a phone can
+            // Name label(s) beside the ball — dedupe per phone (a phone can
             // appear multiple times if multiple strips need this same number).
+            // Rebuilt only when a new circle arrives or the names/colours change.
             const seen = new Set();
             const uniqueEntries = entries.filter(e => {
                 if (seen.has(e.phoneIdx)) return false;
                 seen.add(e.phoneIdx); return true;
             });
-            const label = document.createElement('div');
-            label.className = 'bv-watch-names' + (isNewWatch ? ' bv-names-new' : '');
-            uniqueEntries.forEach(e => {
-                const tag = document.createElement('span');
-                tag.className = 'bv-watch-name';
-                tag.textContent = e.name;
-                tag.style.setProperty('--bv-name-color', e.color);
-                label.appendChild(tag);
-            });
-            ball.appendChild(label);
+            const labelSig = uniqueEntries.map(e => e.color + '\u0001' + e.name).join('\u0002');
+            const oldLabel = ball.querySelector(':scope > .bv-watch-names');
+            if (isNewWatch || !oldLabel || oldLabel.dataset.sig !== labelSig) {
+                if (oldLabel) oldLabel.remove();
+                const label = document.createElement('div');
+                label.className = 'bv-watch-names' + (isNewWatch ? ' bv-names-new' : '');
+                label.dataset.sig = labelSig;
+                uniqueEntries.forEach(e => {
+                    const tag = document.createElement('span');
+                    tag.className = 'bv-watch-name';
+                    tag.textContent = e.name;
+                    tag.style.setProperty('--bv-name-color', e.color);
+                    label.appendChild(tag);
+                });
+                ball.appendChild(label);
+            }
         });
         this._bvWatchedNumsPrev = nowWatched;
 
-        // Two-away pulse. Applied after the ring pass so a number that some
-        // OTHER block is already one away from keeps the ring as its only
-        // signal — two competing treatments on one digit just reads as noise.
-        twoAway.forEach((color, num) => {
-            const ball = ballMap[num];
-            if (!ball || nowWatched.has(num)) return;
-            ball.style.setProperty('--bv-two-color', color);
-            ball.classList.add('bv-two-away');
-        });
-
-        // After labels render, flip below the ball any that would overflow
-        // off the top edge of the viewport.
-        requestAnimationFrame(() => {
-            document.querySelectorAll('.balls.bv-watch').forEach(ball => {
-                const lbl = ball.querySelector('.bv-watch-names');
-                if (!lbl) return;
-                const r = lbl.getBoundingClientRect();
-                if (r.top < 4) ball.classList.add('bv-watch-flip');
+        // Before the next paint, flip below the ball any label that would
+        // overflow off the top edge of the viewport. One check per frame, however
+        // many passes ran in it.
+        if (nowWatched.size && !this._bvFlipCheckQueued) {
+            this._bvFlipCheckQueued = true;
+            requestAnimationFrame(() => {
+                this._bvFlipCheckQueued = false;
+                this._bvCheckLabelFlips();
             });
-        });
+        }
 
         // Win detection — fires a one-time notification per (phone, game, rekke,
         // strip) combo as it transitions to a winning state. Only online phones
@@ -9018,6 +9111,22 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         this._bvRenderBlockBar(blockBarItems);
 
         this._bvRenderPhonesSection(phoneRows);
+    }
+
+    // Flip each watched ball's name plate below the ball when, sitting above
+    // it, the plate would run off the top of the screen. Every plate is judged
+    // in its default (above) position: flips come off, all rects are read in
+    // one go — a single layout — and the needed flips go back on, all before
+    // the frame paints, so nothing visibly jumps.
+    _bvCheckLabelFlips() {
+        const balls = [...document.querySelectorAll('.balls.bv-watch')];
+        const wasFlipped = balls.filter(b => b.classList.contains('bv-watch-flip'));
+        wasFlipped.forEach(b => b.classList.remove('bv-watch-flip'));
+        const flip = balls.filter(b => {
+            const lbl = b.querySelector(':scope > .bv-watch-names');
+            return lbl && lbl.getBoundingClientRect().top < 4;
+        });
+        flip.forEach(b => b.classList.add('bv-watch-flip'));
     }
 
     _bvRenderPhonesSection(rows) {
@@ -9632,7 +9741,12 @@ document.addEventListener('DOMContentLoaded', () => { window.bingoApp = new Bing
     const ctx = cvs.getContext('2d');
     let W, H;
 
-    function resize() { W = cvs.width = window.innerWidth; H = cvs.height = window.innerHeight; }
+    // Squares last drawn into, one per particle — the next frame clears just
+    // these instead of the whole screen-sized canvas.
+    let drawnBoxes = [];
+
+    // Resizing a canvas wipes it, so the boxes go with it.
+    function resize() { W = cvs.width = window.innerWidth; H = cvs.height = window.innerHeight; drawnBoxes = []; }
     window.addEventListener('resize', resize);
     resize();
 
@@ -9648,13 +9762,20 @@ document.addEventListener('DOMContentLoaded', () => { window.bingoApp = new Bing
 
     let rafHandle = 0;
     let canvasCleared = false;
+    let lastDraw = 0;
+
+    // The dots drift a fraction of a pixel per frame, so 30 fps looks the same
+    // as 60 — and this loop never stops, so halving it (and more on a 120 Hz
+    // screen) is felt everywhere else on the page.
+    const FRAME_MS = 1000 / 30;
+    const BASE_MS  = 1000 / 60;   // the per-frame speeds below are tuned for 60 fps
 
     function loopActive() {
         // Only the canvas-based particle field needs the rAF loop.
         return S.particles;
     }
 
-    function mainLoop() {
+    function mainLoop(now) {
         rafHandle = 0;
 
         if (document.hidden) {
@@ -9667,29 +9788,48 @@ document.addEventListener('DOMContentLoaded', () => { window.bingoApp = new Bing
             if (!canvasCleared) {
                 ctx.clearRect(0, 0, W, H);
                 canvasCleared = true;
+                drawnBoxes = [];
             }
             return;
         }
 
-        ctx.clearRect(0, 0, W, H);
+        rafHandle = requestAnimationFrame(mainLoop);
+        // Skip frames to hold ~30 fps (small slack for rAF timing jitter).
+        if (lastDraw && now - lastDraw < FRAME_MS - 2) return;
+        // Move by elapsed time rather than by frame, so the drift speed is the
+        // same at any frame rate. Capped so a stall (or coming back to the
+        // tab) doesn't send the dots jumping.
+        const steps = lastDraw ? Math.min(4, (now - lastDraw) / BASE_MS) : 1;
+        lastDraw = now;
+
+        // Clear only where dots were drawn last time. Cleared before any dot
+        // is redrawn, so overlapping neighbours can't erase each other.
+        for (let i = 0; i < drawnBoxes.length; i++) {
+            const bx = drawnBoxes[i];
+            ctx.clearRect(bx[0], bx[1], bx[2], bx[2]);
+        }
+        drawnBoxes = [];
         canvasCleared = false;
         const [r, g, b] = cachedRGB;
+        ctx.fillStyle = `rgb(${r},${g},${b})`;
 
         const pCount = S.particles
             ? Math.round(S.particlesDensity * MAX_PARTS / 100) : 0;
         for (let i = 0; i < pCount; i++) {
             const p = particles[i];
-            p.wobble += p.wobbleSpeed;
-            p.x += Math.sin(p.wobble) * 0.45;
-            p.y += p.vy;
+            p.wobble += p.wobbleSpeed * steps;
+            p.x += Math.sin(p.wobble) * 0.45 * steps;
+            p.y += p.vy * steps;
             if (p.y < -6) { p.y = H + 6; p.x = Math.random() * W; }
+            ctx.globalAlpha = p.alpha;
             ctx.beginPath();
             ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(${r},${g},${b},${p.alpha})`;
             ctx.fill();
+            // Whole-pixel square around the dot plus its anti-aliased edge.
+            drawnBoxes.push([Math.floor(p.x - p.r) - 2, Math.floor(p.y - p.r) - 2,
+                             Math.ceil(p.r * 2) + 5]);
         }
-
-        rafHandle = requestAnimationFrame(mainLoop);
+        ctx.globalAlpha = 1;
     }
 
     function ensureLoopRunning() {
