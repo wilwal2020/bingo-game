@@ -717,9 +717,8 @@ class BingoApp {
             themeButtons:    document.querySelectorAll('.theme-button'),
             countdown:       document.getElementById('countdown'),
             rekkeTooltip:    document.getElementById('rekke-tooltip'),
-            chance1:         document.getElementById('chance1'),
-            chance2:         document.getElementById('chance2'),
-            chance3:         document.getElementById('chance3'),
+            oddsGlow:        document.getElementById('odds-glow'),
+            oddsRing:        document.getElementById('odds-ring'),
             avgBox1:         document.getElementById('avg-box-1'),
             avgBox2:         document.getElementById('avg-box-2'),
             avgBox3:         document.getElementById('avg-box-3'),
@@ -839,7 +838,7 @@ class BingoApp {
             settingCallSafetyMinus:      document.getElementById('call-safety-minus'),
             settingBallAnim:             document.getElementById('setting-ball-anim'),
             settingGridLayout:           document.getElementById('setting-grid-layout'),
-            statsRow:           document.querySelector('.stats-row'),
+            oddsCells:          document.querySelectorAll('.odds-cell'),
             undoBtnCell:        document.getElementById('undo-btn-cell'),
             undoButton:         document.getElementById('undo-button'),
             avgFilterAllBtn:    document.getElementById('avg-filter-all'),
@@ -1580,7 +1579,7 @@ class BingoApp {
         });
         this.el.settingChances.addEventListener('change', () => {
             this.settings.chancesVisible = this.el.settingChances.checked;
-            this.el.statsRow.classList.toggle('hidden', !this.settings.chancesVisible);
+            this.el.oddsCells.forEach(c => c.classList.toggle('hidden', !this.settings.chancesVisible));
             this.saveSettings();
         });
         this.el.settingSound.addEventListener('change', () => {
@@ -2088,7 +2087,7 @@ class BingoApp {
         this.el.undoBtnCell.style.display     = 'flex';
         this.el.settingTooltip.checked        = s.tooltipEnabled;
         this.el.settingChances.checked        = s.chancesVisible;
-        this.el.statsRow.classList.toggle('hidden', !s.chancesVisible);
+        this.el.oddsCells.forEach(c => c.classList.toggle('hidden', !s.chancesVisible));
         this.el.settingSound.checked          = s.soundEnabled;
         this.el.settingHoverStyle.value       = s.hoverStyle;
         this.el.settingCallStyle.value        = s.callStyle;
@@ -2783,15 +2782,20 @@ class BingoApp {
         this.el.difference.classList.toggle('negative', diff < 0);
     }
 
+    // The two percentages flanking the grid buttons: left of Reset, the chance
+    // the next ball is one of the glowing (two-away) numbers; right of "?",
+    // the chance it is one of the ringed (one-away) numbers — i.e. that
+    // somebody wins on it. Counts come from the last highlight pass, which
+    // re-runs right after every call, so a momentarily stale count is
+    // corrected within the same tick.
     updateChances() {
-        const remaining = 90 - this.slot.selectedNumbers.length;
-        if (remaining <= 0) {
-            ['chance1','chance2','chance3'].forEach(id => this.el[id].textContent = '0%');
-            return;
-        }
-        [1,2,3].forEach((n, i) => {
-            this.el[`chance${i+1}`].textContent = ((n / remaining) * 100).toFixed(2) + '%';
-        });
+        const remaining = 90 - (this.slot ? this.slot.selectedNumbers.length : 0);
+        const { glow = 0, ring = 0 } = this._bvOddsCounts || {};
+        const pct = n => remaining > 0 ? Math.round((n / remaining) * 100) + '%' : '0%';
+        const glowTxt = pct(glow), ringTxt = pct(ring);
+        // Called on every snapshot — skip the write when nothing changed.
+        if (this.el.oddsGlow.textContent !== glowTxt) this.el.oddsGlow.textContent = glowTxt;
+        if (this.el.oddsRing.textContent !== ringTxt) this.el.oddsRing.textContent = ringTxt;
     }
 
     // ── Rekke Change (with confirmation) ────────────
@@ -8985,6 +8989,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         const prevWatched = this._bvWatchedNumsPrev;
         const seeding     = !prevWatched;
         const nowWatched  = new Set();
+        let glowCount = 0;          // balls showing the two-away pulse
 
         // Apply ball highlights — every ball, touching only what changed.
         Object.entries(ballMap).forEach(([numStr, ball]) => {
@@ -9008,6 +9013,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                 // class untouched, so its pulse carries on instead of restarting.
                 const twoColor = twoAway.get(num);
                 if (twoColor) {
+                    glowCount++;
                     if (ball.style.getPropertyValue('--bv-two-color') !== twoColor) {
                         ball.style.setProperty('--bv-two-color', twoColor);
                     }
@@ -9084,6 +9090,10 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             }
         });
         this._bvWatchedNumsPrev = nowWatched;
+
+        // Feed the glow / win percentages beside the grid buttons.
+        this._bvOddsCounts = { glow: glowCount, ring: nowWatched.size };
+        this.updateChances();
 
         // Before the next paint, flip below the ball any label that would
         // overflow off the top edge of the viewport. One check per frame, however

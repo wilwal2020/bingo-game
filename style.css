@@ -280,7 +280,6 @@ body.layout-vertical .row1 {
 }
 
 /* Stats and theme-buttons each span all 10 columns at the bottom */
-body.layout-vertical .stats-row,
 body.layout-vertical .theme-buttons {
     grid-column: 1 / -1;
 }
@@ -393,23 +392,6 @@ body.layout-vertical #jackpot-btn-cell {
     text-shadow:    0 0 4px rgba(0,0,0,.7);
     pointer-events: none;
     z-index:        2;
-}
-
-/* Statistics row */
-.stats-row {
-    display: flex;
-    width:   100%;
-}
-
-.statistics {
-    font-size:       20px;
-    color:           white;
-    display:         flex;
-    justify-content: space-evenly;
-    align-items:     center;
-    width:           100%;
-    gap:             8px;
-    padding:         4px 0;
 }
 
 /* Theme Buttons */
@@ -2379,17 +2361,41 @@ body.fullscreen .page-layout {
    column up with the others. In horizontal mode we pin "90" to one ball
    width, collapse the padding spacers, and let auto margins split the
    leftover space evenly on both sides of the button group. Because the gaps
-   sit as margins on the buttons themselves, the group stays centred whether
-   or not the Random button is showing. */
+   sit as margins on the outer percentage cells, the group stays centred
+   whether or not the Random button is showing. */
 body:not(.layout-vertical) .row1.last-row > .balls        { flex: 0 0 10%; }
 body:not(.layout-vertical) .row1.last-row > .balls.spacer { flex: 0 0 0; }
-body:not(.layout-vertical) .row1.last-row > #reset-btn-cell    { margin-left: auto; }
+body:not(.layout-vertical) .row1.last-row > .balls.odds-cell { flex: 0 0 10%; }
+body:not(.layout-vertical) .row1.last-row > #odds-glow-cell    { margin-left: auto; }
 body:not(.layout-vertical) .row1.last-row > #jackpot-btn-cell,
 body:not(.layout-vertical) .row1.last-row > #random-btn-cell   { margin-left: 10%; }
-body:not(.layout-vertical) .row1.last-row > #random-btn-cell   { margin-right: auto; }
-/* When Random is hidden, Jackpot becomes the last button and takes the
-   right-hand auto margin so the pair stays centred. */
-body:not(.layout-vertical) .row1.last-row.random-off > #jackpot-btn-cell { margin-right: auto; }
+body:not(.layout-vertical) .row1.last-row > #odds-ring-cell    { margin-right: auto; }
+
+/* Glow / win percentages beside Reset and "?" — static text, no animation.
+   Hidden with visibility (not display) so the buttons never shift when the
+   setting is toggled. */
+.balls.odds-cell {
+    font-size:   1.35rem;
+    font-weight: bold;
+    white-space: nowrap;
+    overflow:    visible;
+}
+.balls.odds-cell.hidden { visibility: hidden; }
+/* Left: echoes the two-away numbers' soft glow. */
+.odds-value.odds-glow {
+    color:       var(--accent-color);
+    color:       color-mix(in srgb, var(--accent-color) 55%, var(--balls-color));
+    text-shadow: 0 0 8px rgba(var(--accent-rgb), .55);
+}
+/* Right: echoes the one-away numbers' ring. */
+.odds-value.odds-ring {
+    color:         var(--balls-color);
+    padding:       2px 8px;
+    border-radius: 999px;
+    box-shadow:    0 0 0 3px var(--accent-color);
+}
+body.layout-vertical .balls.odds-cell { font-size: 0.9rem; }
+body.layout-vertical .odds-value.odds-ring { padding: 1px 4px; box-shadow: 0 0 0 2px var(--accent-color); }
 
 /* Stop ball hover applying to the button cells */
 .grid-btn-cell:hover {
@@ -3519,9 +3525,6 @@ body.no-blur *::after {
 #undo-btn-cell.undo-disabled button {
     /* undo is always active */
 }
-
-/* Hide chances row */
-.stats-row.hidden { display: none; }
 
 /* =====================================================
    VOLUME SLIDERS IN SETTINGS
