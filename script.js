@@ -7444,10 +7444,10 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                 //      on over the next so they pile into a chord)
                 //   2. a two-note lift onto the top D that lands as the arpeggio
                 //      peaks — the "ta-daa"
-                //   3. the full chord struck on the landing and left to ring,
-                //      with two soft chord-tone twinkles stepping down on top
+                //   3. a closing "ding-DING" of two single bell notes, the
+                //      second one step higher and left to ring out
                 //
-                // Roughly 1.7s end to end, so it is clearly longer than every
+                // Roughly 1.8s end to end, so it is clearly longer than every
                 // other cue on the board and can't be mistaken for a call blip.
                 const bell = (freq, at, dur, peak) => {
                     // Triangle body + a quiet octave above = a struck-bell
@@ -7489,28 +7489,12 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                   g.gain.exponentialRampToValueAtTime(0.001, n+0.55);
                   o.connect(g); g.connect(md); o.start(n+0.30); o.stop(n+0.55); }
 
-                // 3 — the landing: the whole D major chord STRUCK once, right as
-                // the lift arrives, then left to ring out on its own. The old
-                // ending wandered through non-chord sparkles (B, E) and faded a
-                // chord IN underneath them, which read as unresolved; a single
-                // struck chord that only decays lands the phrase cleanly.
-                [[587.33,  0.10],   // D5
-                 [739.99,  0.08],   // F#5
-                 [880.00,  0.08],   // A5
-                 [1174.66, 0.09]]   // D6
-                    .forEach(([f, peak]) => bell(f, 0.44, 1.3, peak));
-
-                // 4 — two soft twinkles on top, both chord tones, stepping DOWN
-                // so the cue settles instead of climbing away unfinished.
-                [[2349.32, 0.52, 0.05],  // D7
-                 [1760.00, 0.64, 0.035]] // A6
-                    .forEach(([f, at, peak]) => {
-                        const o = osc('sine', f); const g = gn();
-                        g.gain.setValueAtTime(0, n+at);
-                        g.gain.linearRampToValueAtTime(peak, n+at+0.008);
-                        g.gain.exponentialRampToValueAtTime(0.001, n+at+0.6);
-                        o.connect(g); g.connect(md); o.start(n+at); o.stop(n+at+0.6);
-                    });
+                // 3 — "ding-DING": two single bell notes after a short breath,
+                // the top D again and then one step up to F#6, left to ring.
+                // Picked by ear over a re-struck chord, sparkles and a lower
+                // note under the last ding — all of those muddied the finish.
+                bell(1174.66, 0.62, 0.45, 0.15);   // D6
+                bell(1479.98, 0.80, 1.00, 0.18);   // F#6
             }
         } catch(e) {}
     }
