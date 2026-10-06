@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#101c2d">
     <title>Geithus Bingo</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
-    <link rel="stylesheet" href="style.css?v=15">
+    <link rel="stylesheet" href="style.css?v=16">
 </head>
 <body>
 
@@ -661,9 +661,9 @@
                     <div class="settings-nav-title">Innstillinger</div>
                     <button class="settings-nav-item active" data-panel="sg-progress" data-label="Bingoball">Bingoball</button>
                     <button class="settings-nav-item" data-panel="sg-countdown" data-label="Nedtelling">Nedtelling</button>
-                    <button class="settings-nav-item" data-panel="sg-themecolors" data-label="Spillfarger">Spillfarger</button>
                     <button class="settings-nav-item" data-panel="sg-gameplay" data-label="Spillinnstillinger">Spillinnstillinger</button>
                     <button class="settings-nav-item" data-panel="sg-sound" data-label="Lydeffekter">Lydeffekter</button>
+                    <button class="settings-nav-item" data-panel="sg-themecolors" data-label="Spillfarger">🎨 Spillfarger</button>
                     <div class="settings-nav-spacer"></div>
                     <div class="settings-io-menu">
                         <button class="settings-io-toggle" id="settings-io-toggle">⬆⬇ Eksporter / Importer</button>
@@ -791,10 +791,24 @@
                                 <span class="settings-toggle-track"></span>
                             </label>
                         </div>
+                        <div class="settings-row" id="next-game-cd-auto-row" style="display:none">
+                            <div class="settings-label">
+                                <span>Automatisk varighet</span>
+                                <span class="settings-desc">Median av tiden fra Rekke 3 lagres til første tall i neste spill</span>
+                                <span class="settings-desc" id="next-game-cd-learned"></span>
+                            </div>
+                            <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+                                <button class="modal-btn session-action-btn session-edit-btn" id="next-game-cd-learned-reset" style="font-size:.78rem;padding:5px 12px" title="Glem målte pauser">Nullstill</button>
+                                <label class="settings-toggle">
+                                    <input type="checkbox" id="setting-next-game-cd-auto" checked>
+                                    <span class="settings-toggle-track"></span>
+                                </label>
+                            </div>
+                        </div>
                         <div class="settings-row" id="next-game-countdown-dur-row" style="display:none">
                             <div class="settings-label">
-                                <span>Varighet</span>
-                                <span class="settings-desc">Tid for neste spill nedtelling</span>
+                                <span>Fast varighet</span>
+                                <span class="settings-desc">Brukes når automatisk er av, eller før det finnes målinger</span>
                             </div>
                             <div style="display:flex;align-items:center;gap:6px;">
                                 <div class="settings-stepper">
@@ -1507,6 +1521,6 @@
       <div class="funfact-pop-hint">Klikk for å lukke</div>
     </div>
 
-    <script src="script.js?v=17" defer></script>
+    <script src="script.js?v=18" defer></script>
 </body>
 </html>

@@ -4176,32 +4176,7 @@ option.user-sound {
     100% { background: rgba(255,255,255,.03);   border-left-color: var(--bv-phone-color, #888); }
 }
 
-/* "📱N" badge that briefly appears on the ball clicked by the host so the
-   host has direct visual confirmation that disconnected phones' papers
-   were also evaluated for that call. */
-.bv-ball-ping {
-    position: absolute;
-    top: 4px;
-    right: 4px;
-    background: rgba(46, 204, 113, .9);
-    color: #0a0a0a;
-    font-size: 0.55rem;
-    font-weight: 700;
-    line-height: 1;
-    padding: 3px 6px;
-    border-radius: 9px;
-    box-shadow: 0 0 10px rgba(46, 204, 113, .6);
-    pointer-events: none;
-    z-index: 5;
-    white-space: nowrap;
-    animation: bv-ball-ping 1.4s ease-out forwards;
-}
-.bv-ball-ping.bv-ball-ping-offline {
-    background: rgba(255, 200, 60, .95);
-    box-shadow: 0 0 10px rgba(255, 200, 60, .6);
-}
-/* "This one came from a phone." Bottom-left so it can sit alongside the
-   offline-papers ping in the opposite corner without either hiding the other. */
+/* "This one came from a phone." Bottom-left, out of the way of the number. */
 .bv-ball-remote {
     position: absolute;
     bottom: 4px;

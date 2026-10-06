@@ -528,6 +528,9 @@ class BingoApp {
             nextGameCountdownEnabled: true,
             nextGameCountdownMinutes: 4,
             nextGameCountdownSeconds: 0,
+            // Time the "Neste spill om" bar from how long the breaks between
+            // games actually last; the minutes/seconds above are the fallback.
+            nextGameCountdownAuto: true,
             blurEnabled: true,
             randomBtnEnabled: true,
             bvHighlightEnabled:    true,
@@ -968,6 +971,10 @@ class BingoApp {
             nextGameCdMinMinus:         document.getElementById('next-game-cd-min-minus'),
             nextGameCdSecPlus:          document.getElementById('next-game-cd-sec-plus'),
             nextGameCdSecMinus:         document.getElementById('next-game-cd-sec-minus'),
+            settingNextGameCdAuto:      document.getElementById('setting-next-game-cd-auto'),
+            nextGameCdAutoRow:          document.getElementById('next-game-cd-auto-row'),
+            nextGameCdLearned:          document.getElementById('next-game-cd-learned'),
+            nextGameCdLearnedReset:     document.getElementById('next-game-cd-learned-reset'),
             nextGameCdWrap:             document.getElementById('next-game-cd-wrap'),
             nextGameCdDisplay:          document.getElementById('next-game-cd-display'),
             nextGameCdBar:              document.getElementById('next-game-cd-bar'),
@@ -1754,8 +1761,19 @@ class BingoApp {
             this.el.settingNextGameCountdown.addEventListener('change', () => {
                 this.settings.nextGameCountdownEnabled = this.el.settingNextGameCountdown.checked;
                 this.el.nextGameCdDurRow.style.display = this.settings.nextGameCountdownEnabled ? '' : 'none';
+                this.el.nextGameCdAutoRow.style.display = this.settings.nextGameCountdownEnabled ? '' : 'none';
                 if (!this.settings.nextGameCountdownEnabled) this.stopNextGameCountdown();
                 this.saveSettings();
+            });
+            this.el.settingNextGameCdAuto.addEventListener('change', () => {
+                this.settings.nextGameCountdownAuto = this.el.settingNextGameCdAuto.checked;
+                this.saveSettings();
+                this.renderNextGameCdLearned();
+            });
+            this.el.nextGameCdLearnedReset.addEventListener('click', () => {
+                this.playSound('reset');
+                try { localStorage.removeItem('bingoGameGaps'); } catch (e) {}
+                this.renderNextGameCdLearned();
             });
             this.el.nextGameCdMinPlus.addEventListener('click', () => {
                 this.settings.nextGameCountdownMinutes = Math.min(59, (this.settings.nextGameCountdownMinutes ?? 3) + 1);
@@ -2176,6 +2194,9 @@ class BingoApp {
         if (this.el.settingNextGameCountdown) {
             this.el.settingNextGameCountdown.checked = s.nextGameCountdownEnabled ?? false;
             this.el.nextGameCdDurRow.style.display = (s.nextGameCountdownEnabled ?? false) ? '' : 'none';
+            this.el.nextGameCdAutoRow.style.display = (s.nextGameCountdownEnabled ?? false) ? '' : 'none';
+            this.el.settingNextGameCdAuto.checked = s.nextGameCountdownAuto ?? true;
+            this.renderNextGameCdLearned();
             this.el.nextGameCdMin.textContent = s.nextGameCountdownMinutes ?? 3;
             this.el.nextGameCdSec.textContent = String(s.nextGameCountdownSeconds ?? 0).padStart(2, '0');
         }
@@ -2520,6 +2541,9 @@ class BingoApp {
                 }, 400);
             }
             const isFirstOfRekke = nums.length === (this.slot.countAtLastRekkeChange || 0);
+            // First call of a game closes the break that started when the
+            // previous game's Rekke 3 was saved — that gap times the next bar.
+            if (nums.length === 0) this.recordNextGameGap();
             this.slot.selectedNumbers.push(number);
             // Remove last-clicked from previous ball
             if (this._lastClickedBall && this._lastClickedBall !== ball) {
@@ -2853,6 +2877,7 @@ class BingoApp {
             this.slot.loggedRekkes['Rekke3'] = this.pendingCount;
             this.checkSaveSessionButton();
             this.saveSlotToStorage();
+            this.markGameEnded();
             this.startNextGameCountdown();
         } else {
             // Log current rekke and switch to next
@@ -6770,13 +6795,85 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
     hideRekkeTooltip() { this.el.rekkeTooltip.classList.remove('visible'); }
 
     // ── Next-game countdown ──────────────────────────
+    // Breaks are measured from "Rekke 3 saved" to the first call of the next
+    // game and kept per hop (Spill 1→2, 2→3, …), since the breaks aren't all
+    // the same length. The median is used so a break that ran long because
+    // something was announced doesn't drag the estimate.
+    _loadGameGaps() {
+        try { return JSON.parse(localStorage.getItem('bingoGameGaps') || '{}') || {}; }
+        catch (e) { return {}; }
+    }
+
+    markGameEnded() {
+        if (!GAME_THEMES.includes(this.currentTheme)) return;
+        try {
+            localStorage.setItem('bingoGameEndPending',
+                JSON.stringify({ theme: this.currentTheme, ts: Date.now() }));
+        } catch (e) {}
+    }
+
+    recordNextGameGap() {
+        let pending = null;
+        try { pending = JSON.parse(localStorage.getItem('bingoGameEndPending') || 'null'); } catch (e) {}
+        if (!pending) return;
+        const to = this.currentTheme;
+        // Calls in the finished game itself or in "Orig" don't end the break.
+        if (!GAME_THEMES.includes(to) || to === pending.theme) return;
+        try { localStorage.removeItem('bingoGameEndPending'); } catch (e) {}
+        // Only a straight hop to the following game is a real between-games
+        // break; skipping around, or a gap long enough to be a pause, is not.
+        if (GAME_THEMES.indexOf(to) !== GAME_THEMES.indexOf(pending.theme) + 1) return;
+        const gapSec = Math.round((Date.now() - pending.ts) / 1000);
+        if (gapSec < 15 || gapSec > 20 * 60) return;
+        const gaps = this._loadGameGaps();
+        const key  = `${pending.theme}>${to}`;
+        gaps[key] = [...(gaps[key] || []), gapSec].slice(-12);
+        try { localStorage.setItem('bingoGameGaps', JSON.stringify(gaps)); } catch (e) {}
+        this.renderNextGameCdLearned();
+    }
+
+    _median(values) {
+        const v = [...values].sort((a, b) => a - b);
+        const mid = v.length >> 1;
+        return v.length % 2 ? v[mid] : Math.round((v[mid - 1] + v[mid]) / 2);
+    }
+
+    // Learned break (seconds) after `fromTheme`, or null if there isn't enough
+    // to go on yet. Uses that hop's own history once it has a few samples,
+    // otherwise all hops pooled together.
+    learnedNextGameSeconds(fromTheme) {
+        const gaps = this._loadGameGaps();
+        const next = GAME_THEMES[GAME_THEMES.indexOf(fromTheme) + 1];
+        const own  = gaps[`${fromTheme}>${next}`] || [];
+        if (own.length >= 3) return this._median(own);
+        const all = Object.values(gaps).flat();
+        return all.length >= 2 ? this._median(all) : null;
+    }
+
+    renderNextGameCdLearned() {
+        const el = this.el.nextGameCdLearned;
+        if (!el) return;
+        const gaps = this._loadGameGaps();
+        const fmt  = sec => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+        const parts = [];
+        for (let i = 0; i < GAME_THEMES.length - 1; i++) {
+            const list = gaps[`${GAME_THEMES[i]}>${GAME_THEMES[i + 1]}`] || [];
+            if (list.length) parts.push(`Spill ${i + 1}→${i + 2}: ${fmt(this._median(list))} (${list.length}×)`);
+        }
+        el.textContent = parts.length
+            ? parts.join(' · ')
+            : 'Ingen målinger ennå — bruker fast varighet til da';
+    }
+
     startNextGameCountdown() {
         if (!this.settings.nextGameCountdownEnabled) return;
         // Don't show timer after the LAST game (game 4 / grey)
         if (this.currentTheme === GAME_THEMES[GAME_THEMES.length - 1]) return;
         this.stopNextGameCountdown();
-        const totalSeconds = (this.settings.nextGameCountdownMinutes ?? 3) * 60
-                           + (this.settings.nextGameCountdownSeconds ?? 0);
+        const learned = (this.settings.nextGameCountdownAuto ?? true)
+            ? this.learnedNextGameSeconds(this.currentTheme) : null;
+        const totalSeconds = learned ?? ((this.settings.nextGameCountdownMinutes ?? 3) * 60
+                                       + (this.settings.nextGameCountdownSeconds ?? 0));
         if (totalSeconds <= 0) return;
         this._nextGameCdEnd   = Date.now() + totalSeconds * 1000;
         this._nextGameCdTotal = totalSeconds;
@@ -8199,37 +8296,6 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         // that even disconnected papers were processed.
         this._bvLastCallTs = Date.now();
         this._bvUpdatePaperHighlights();
-        this._bvShowBallPing(number);
-    }
-
-    // Briefly flash a "papers updated" badge on the clicked ball so the
-    // host can see, at a glance, that disconnected phones' papers were
-    // also processed for this call.
-    _bvShowBallPing(number) {
-        const phones = this._bvPhones || [];
-        const game = this.currentTheme;
-        // Only ping if at least one paper for this game is OFFLINE — the
-        // online phones already get visible feedback on their own screens,
-        // so a badge on the ball would just be noise.
-        // Count unique offline DEVICES with papers (not individual block entries)
-        const offlineDevices = new Set();
-        phones.forEach(p => {
-            if (!p.online && Array.isArray((p.papers || {})[game])) {
-                offlineDevices.add(p.id.replace(/_b\d+$/, ''));
-            }
-        });
-        if (offlineDevices.size === 0) return;
-        const offlinePapers = offlineDevices.size;
-        const ball = this._bvBallMap()[number];
-        if (!ball) return;
-        // Remove any prior badge so the animation can restart
-        const old = ball.querySelector('.bv-ball-ping');
-        if (old) old.remove();
-        const badge = document.createElement('div');
-        badge.className = 'bv-ball-ping bv-ball-ping-offline';
-        badge.textContent = '📱' + offlinePapers;
-        ball.appendChild(badge);
-        setTimeout(() => { if (badge.parentNode) badge.remove(); }, 1400);
     }
 
     // A number called from a phone in BingoView's administrator mode. Routed
