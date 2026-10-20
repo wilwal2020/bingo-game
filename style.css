@@ -1715,16 +1715,69 @@ select.session-input option {
     background-color: rgba(255,255,255,.12);
 }
 
+/* Block-claim QR button: same chrome, one slot to the left */
+.claim-qr-btn { right: 72px; }
+
+/* Block-claim QR popup — as big as the screen allows, so it scans from
+   across the room */
+.claim-qr-card {
+    display:          flex;
+    flex-direction:   column;
+    align-items:      center;
+    gap:              14px;
+    padding:          28px 32px 24px;
+    border-radius:    20px;
+    background-color: #16171d;
+    border:           1px solid rgba(255,255,255,.12);
+    box-shadow:       0 20px 60px rgba(0,0,0,.6);
+    max-width:        calc(100vw - 32px);
+    cursor:           pointer;
+}
+.claim-qr-title {
+    font-size:   2rem;
+    font-weight: 800;
+    color:       #fff;
+}
+.claim-qr-sub {
+    font-size:  1.05rem;
+    color:      rgba(255,255,255,.65);
+    text-align: center;
+    max-width:  32em;
+}
+.claim-qr-box {
+    background:    #fff;
+    border-radius: 14px;
+    padding:       16px;
+    line-height:   0;
+}
+.claim-qr-box img,
+.claim-qr-box canvas {
+    display: block;
+    width:   min(62vh, calc(100vw - 120px)) !important;
+    height:  min(62vh, calc(100vw - 120px)) !important;
+}
+.claim-qr-code-label {
+    font-size:      1rem;
+    color:          rgba(255,255,255,.55);
+    letter-spacing: .04em;
+}
+.claim-qr-code-label span {
+    color:          var(--accent-color);
+    font-weight:    800;
+    letter-spacing: .14em;
+}
+
 /* ===================================================
    CONNECTED-BLOCKS BAR (bottom, next to fullscreen)
    =================================================== */
 .bv-block-bar {
     position:         fixed;
     bottom:           18px;
-    /* Centered along the bottom; leave clearance for the fullscreen button */
+    /* Centered along the bottom; leave clearance for the QR + fullscreen
+       buttons (they reach 116px in from the right, so 130px each side) */
     left:             50%;
     transform:        translateX(-50%);
-    max-width:        calc(100vw - 160px);
+    max-width:        calc(100vw - 260px);
     height:           46px;
     display:          flex;
     align-items:      center;

@@ -3319,7 +3319,7 @@ class BingoApp {
                         'players-modal','player-history-modal','player-delete-modal','add-win-modal',
                         'edit-win-modal',
                         'settings-modal','upload-sound-modal','bingoview-modal',
-                        'funfact-modal'];
+                        'funfact-modal','claim-qr-modal'];
         const anyOpen = modals.some(id => document.getElementById(id).style.display === 'flex');
         if (!anyOpen) document.body.style.overflow = '';
     }
@@ -5363,6 +5363,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         add(this.el.backupsModal,       { close: () => this.closeBackupsModal() });
         add(this.el.errorLogModal,      { close: () => this.closeErrorLogModal() });
         add(document.getElementById('bingoview-modal'), { close: () => this.closeBingoViewModal() });
+        add(document.getElementById('claim-qr-modal'),  { close: () => this.closeClaimQRModal() });
         add(this.el.settingsModal,      { close: () => this.closeSettingsModal() });
         add(this.el.viewerModal,        { close: () => this.closeViewerModal(), adjust: d => this.stepAvgFilter(d) });
         this._modalKeyTable = t;
@@ -7679,6 +7680,14 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             if (e.target === modal) this.closeBingoViewModal();
         });
 
+        // Block-claim QR — any tap on the popup closes it, card included:
+        // there's nothing on it to interact with.
+        document.getElementById('claim-qr-btn').addEventListener('click', () => {
+            this.playSound('select');
+            this.openClaimQRModal();
+        });
+        document.getElementById('claim-qr-modal').addEventListener('click', () => this.closeClaimQRModal());
+
         // "Nytt spill" — fresh random code + fresh channel. Two-tap confirm
         // because it disconnects every phone joined on the current code.
         const newGameBtn = document.getElementById('bv-new-game');
@@ -7885,6 +7894,47 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
 
     closeBingoViewModal() {
         document.getElementById('bingoview-modal').style.display = 'none';
+        this.restoreBodyScroll();
+    }
+
+    // Big QR that sends a phone to BingoView's "hent blokk" page for this
+    // session. There the player types a Spill 1 control number and gets the
+    // block holding it, out of the blocks already scanned into the session.
+    openClaimQRModal() {
+        const modal = document.getElementById('claim-qr-modal');
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+
+        const code = this.bvGenerateCode();
+        document.getElementById('claim-qr-code-text').textContent = code;
+
+        // Rendered at a fixed 512px and scaled by CSS. Redrawn only when the
+        // code has changed since last time (Nytt spill, custom code).
+        const qrEl = document.getElementById('claim-qr-code');
+        const url = 'https://wilwal2020.github.io/BingoView/?code=' + code + '&hent=1';
+        if (qrEl._qrFor !== url) {
+            qrEl._qrFor = url;
+            this._loadQRCodeLib().then(() => {
+                if (qrEl._qrFor !== url) return;
+                qrEl.innerHTML = '';
+                new QRCode(qrEl, {
+                    text:         url,
+                    width:        512,
+                    height:       512,
+                    colorDark:    '#000000',
+                    colorLight:   '#ffffff',
+                    correctLevel: QRCode.CorrectLevel.M
+                });
+            }).catch(() => { qrEl._qrFor = null; });
+        }
+
+        // The phone reads the scanned blocks out of this session's channel,
+        // so the host has to be on it.
+        if (!this._bvChannelRef) this.bvConnect();
+    }
+
+    closeClaimQRModal() {
+        document.getElementById('claim-qr-modal').style.display = 'none';
         this.restoreBodyScroll();
     }
 
