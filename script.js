@@ -8462,21 +8462,37 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         const facts = this.getFunFacts();
         const key = String(n);
         const list = facts[key] || (facts[key] = []);
-        if (list.includes(text)) return;           // sent twice
-        list.push(text);
+        const isEdit = data.action === 'edit';
+        if (isEdit) {
+            // Matched on the old text, not an index: the list may have moved
+            // since the phone read it. If the old text is gone (deleted here
+            // meanwhile), the edit is still worth keeping — it goes in as new.
+            const old = String(data.old == null ? '' : data.old).replace(/\s+/g, ' ').trim();
+            const at = list.findIndex(t => t.replace(/\s+/g, ' ').trim() === old);
+            if (list.includes(text)) {
+                if (at >= 0 && list[at] !== text) list.splice(at, 1);   // edited into a duplicate
+            } else if (at >= 0) {
+                list[at] = text;
+            } else {
+                list.push(text);
+            }
+        } else {
+            if (list.includes(text)) return;       // sent twice
+            list.push(text);
+        }
         this.saveFunFacts();
         if (this.el.funfactModal && this.el.funfactModal.style.display === 'flex') {
             this.renderFunFactGrid();
             this.renderFunFactEditor();
         }
         const from = String(data.from || '').trim().slice(0, 24);
-        console.log('[BV] fun fact for ' + n + ' from ' + (from || data.phone || 'ukjent'));
-        this._bvShowFactNotice(n, from);
+        console.log('[BV] fun fact ' + (isEdit ? 'edited' : 'added') + ' for ' + n + ' from ' + (from || data.phone || 'ukjent'));
+        this._bvShowFactNotice(n, from, isEdit);
     }
 
     // A small note in the corner so the host knows a fact came in — and,
     // with fun facts switched off, that it won't show until they're on.
-    _bvShowFactNotice(n, from) {
+    _bvShowFactNotice(n, from, edited = false) {
         let note = document.getElementById('bv-fact-notice');
         if (!note) {
             note = document.createElement('div');
@@ -8484,7 +8500,8 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             note.className = 'bv-fact-notice';
             document.body.appendChild(note);
         }
-        note.textContent = 'Nytt fun fact for ' + n + (from ? ' fra ' + from : '')
+        note.textContent = (edited ? 'Fun fact for ' + n + ' endret' : 'Nytt fun fact for ' + n)
+            + (from ? (edited ? ' av ' : ' fra ') + from : '')
             + (this.settings.funFactsEnabled ? '' : ' — slå på fun facts for å vise det');
         note.classList.remove('show');
         void note.offsetWidth;
