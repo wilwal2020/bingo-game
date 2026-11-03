@@ -4950,6 +4950,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             pop.style.top    = Math.round(window.innerHeight * 0.32) + 'px';
             pop.style.height = 'auto';
             pop.style.maxHeight = '46vh';
+            this.fitFunFactText();
             return;
         }
         pop.classList.remove('funfact-pop-floating');
@@ -4961,6 +4962,36 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         pop.style.top       = Math.round(top) + 'px';
         pop.style.height    = Math.round(Math.max(120, c.bottom - top)) + 'px';
         pop.style.maxHeight = '';
+        this.fitFunFactText();
+    }
+
+    // Size the fact to the panel: the largest font at which it still fits, so
+    // a one-word fact fills the space and a long one shrinks to stay whole.
+    // Measured with word-breaking off, so a long word shrinks the text rather
+    // than being split across lines; if even the smallest size can't hold it,
+    // the stylesheet's breaking and scrolling take over again.
+    fitFunFactText() {
+        const pop  = this.el.funfactPop;
+        const text = this.el.funfactPopText;
+        if (!pop || !text || pop.style.display === 'none') return;
+        const MIN = 16;
+        const MAX = Math.max(MIN, Math.min(110, pop.clientWidth / 5));
+        text.classList.add('funfact-fitting');
+        const fits = (px) => {
+            text.style.fontSize = px + 'px';
+            return text.scrollHeight <= text.clientHeight + 1
+                && text.scrollWidth  <= text.clientWidth  + 1;
+        };
+        let lo = MIN, hi = MAX;
+        if (fits(hi)) lo = hi;
+        else {
+            while (hi - lo > 1) {
+                const mid = Math.floor((lo + hi) / 2);
+                if (fits(mid)) lo = mid; else hi = mid;
+            }
+        }
+        text.style.fontSize = lo + 'px';
+        text.classList.remove('funfact-fitting');
     }
 
     openFrequencyModal() {
