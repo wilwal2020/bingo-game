@@ -5138,6 +5138,28 @@ option.user-sound {
                 inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
+/* "Nytt fun fact for 23 fra Kari" — a fact sent from a phone just came in. */
+.bv-fact-notice {
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    z-index: 95;          /* over the fact panel, under every modal (100+) */
+    max-width: min(420px, calc(100vw - 36px));
+    padding: 10px 16px;
+    background: rgba(12, 17, 27, 0.96);
+    border: 1.5px solid rgba(var(--accent-rgb), 0.5);
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    color: #fff;
+    font-size: 0.95rem;
+    line-height: 1.35;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.25s, transform 0.25s;
+}
+.bv-fact-notice.show { opacity: 1; transform: translateY(0); }
+
 @media (max-width: 900px) {
     .funfact-modal { width: 92vw; }
     .funfact-body { flex-direction: column; }

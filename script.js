@@ -4618,6 +4618,18 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
             try { window.bingoErrorLog.record('funfact', 'Kunne ikke lagre fun facts', e && e.message); }
             catch (e2) {}
         }
+        this._bvPublishFunFacts();
+    }
+
+    // Mirror the facts (and whether they're switched on) into the BingoView
+    // channel. Phones read it when a number is held, to list what's already
+    // there; the list itself still lives here, in localStorage.
+    _bvPublishFunFacts() {
+        if (!this._bvChannelRef) return;
+        this._bvChannelRef.child('funFactInfo').set({
+            enabled: !!this.settings.funFactsEnabled,
+            facts: this.getFunFacts(),
+        }).catch(() => {});
     }
 
     bindFunFactUI() {
@@ -4631,6 +4643,7 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                 this.saveSettings();
                 this.playSound('switch');
                 if (!this.settings.funFactsEnabled) this.hideFunFact();
+                this._bvPublishFunFacts();
             });
         }
 
@@ -8175,6 +8188,18 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
                 this._bvChannelDetachFns.push(() => remoteRef.off('child_added', remoteHandler));
             });
 
+            // Fun facts sent from a phone (hold a number in BingoView). Same
+            // queue shape as remoteCalls, but a fact that waited while this
+            // screen was closed is still a fact, not a stale command — so the
+            // backlog is taken in too rather than dropped.
+            const factsRef = this._bvChannelRef.child('funFacts');
+            const factsHandler = (s) => this._bvHandlePhoneFunFact(s);
+            factsRef.on('child_added', factsHandler);
+            this._bvChannelDetachFns.push(() => factsRef.off('child_added', factsHandler));
+            // ...and the facts this screen already has, so a phone holding a
+            // number can see what's there before adding to it.
+            this._bvPublishFunFacts();
+
         };
 
         if (window.firebase && window.firebase.database) {
@@ -8390,6 +8415,51 @@ OBS: ${name} har ${winCount} registrerte seier${winCount !== 1 ? 'er' : ''} i lo
         console.log('[BV] remote call ' + number + ' from ' + (data.from || 'ukjent'));
         this.handleNormalClick(ball, number);
         this._bvShowRemoteBadge(ball);
+    }
+
+    // A fun fact a player sent from their phone. Goes into the same list as the
+    // ones typed in here (Fun facts → that number), so it shows when the
+    // number is called and can be deleted from the modal like any other.
+    _bvHandlePhoneFunFact(snap) {
+        const data = snap.val() || {};
+        snap.ref.remove().catch(() => {});
+        const n = parseInt(data.number, 10);
+        if (!(n >= 1 && n <= 90)) return;
+        const text = String(data.text == null ? '' : data.text)
+            .replace(/\s+/g, ' ').trim().slice(0, 200);
+        if (!text) return;
+        const facts = this.getFunFacts();
+        const key = String(n);
+        const list = facts[key] || (facts[key] = []);
+        if (list.includes(text)) return;           // sent twice
+        list.push(text);
+        this.saveFunFacts();
+        if (this.el.funfactModal && this.el.funfactModal.style.display === 'flex') {
+            this.renderFunFactGrid();
+            this.renderFunFactEditor();
+        }
+        const from = String(data.from || '').trim().slice(0, 24);
+        console.log('[BV] fun fact for ' + n + ' from ' + (from || data.phone || 'ukjent'));
+        this._bvShowFactNotice(n, from);
+    }
+
+    // A small note in the corner so the host knows a fact came in — and,
+    // with fun facts switched off, that it won't show until they're on.
+    _bvShowFactNotice(n, from) {
+        let note = document.getElementById('bv-fact-notice');
+        if (!note) {
+            note = document.createElement('div');
+            note.id = 'bv-fact-notice';
+            note.className = 'bv-fact-notice';
+            document.body.appendChild(note);
+        }
+        note.textContent = 'Nytt fun fact for ' + n + (from ? ' fra ' + from : '')
+            + (this.settings.funFactsEnabled ? '' : ' — slå på fun facts for å vise det');
+        note.classList.remove('show');
+        void note.offsetWidth;
+        note.classList.add('show');
+        clearTimeout(this._bvFactNoticeTimer);
+        this._bvFactNoticeTimer = setTimeout(() => note.classList.remove('show'), 5000);
     }
 
     // Mark the ball so the host can see at a glance that this call came from a
